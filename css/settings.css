@@ -1,0 +1,1055 @@
+/* ================================================
+   INVESTHOOD IT - Candidate Settings Styles
+   ================================================
+   Premium account-management centre. Builds on the
+   brand tokens from styles.css and reuses the
+   reusable component classes (btn, form, toggle,
+   modal, tag, info-grid, profile-edit-section) from
+   styles.css / profile.css.
+   ================================================ */
+
+/* ================================================
+   0. LAYOUT WRAPPER
+   ================================================ */
+.settings-page .dash-content {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.settings-layout {
+  width: 100%;
+}
+
+/* Smooth entrance */
+.settings-hero,
+.settings-workspace {
+  animation: settingsFadeUp 0.5s ease-out both;
+}
+
+@keyframes settingsFadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ================================================
+   1. SETTINGS HERO  (premium)
+   ================================================ */
+.settings-hero {
+  position: relative;
+  background: linear-gradient(135deg, var(--dark) 0%, #1e3a5f 55%, var(--primary-dark) 100%);
+  border-radius: var(--radius-xl);
+  padding: 1.75rem 2rem;
+  overflow: hidden;
+  color: white;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 1.5rem;
+}
+
+.settings-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.08;
+  background-image:
+    radial-gradient(circle at 12% 25%, rgba(6,182,212,0.55) 0%, transparent 50%),
+    radial-gradient(circle at 88% 75%, rgba(245,158,11,0.45) 0%, transparent 50%),
+    radial-gradient(circle at 50% 0%, rgba(59,130,246,0.4) 0%, transparent 55%);
+  pointer-events: none;
+}
+
+.settings-hero__inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.settings-hero__title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: white;
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+  margin-bottom: 0.25rem;
+}
+
+.settings-hero__subtitle {
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.75);
+  line-height: 1.5;
+}
+
+.settings-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  background: rgba(16,185,129,0.16);
+  border: 1px solid rgba(16,185,129,0.32);
+  color: #6ee7b7;
+  white-space: nowrap;
+}
+
+.settings-hero__badge i {
+  font-size: 0.55rem;
+}
+
+/* ================================================
+   2. SETTINGS WORKSPACE  (two-column)
+   ================================================ */
+.settings-workspace {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* ----- Left navigation ----- */
+.settings-nav {
+  position: sticky;
+  top: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.settings-nav__inner {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.settings-nav__item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-light);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+
+.settings-nav__item .settings-nav__icon {
+  width: 18px;
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text-lighter);
+  transition: color var(--transition);
+  flex-shrink: 0;
+}
+
+.settings-nav__item:hover {
+  color: var(--primary);
+  background: var(--primary-bg);
+}
+
+.settings-nav__item:hover .settings-nav__icon {
+  color: var(--primary);
+}
+
+.settings-nav__item.active {
+  color: var(--primary);
+  background: var(--primary-bg);
+  font-weight: 600;
+}
+
+.settings-nav__item.active .settings-nav__icon {
+  color: var(--primary);
+}
+
+/* Account status card */
+.settings-status-card {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.settings-status-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.125rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--dark);
+  background: linear-gradient(180deg, var(--bg-white), var(--bg));
+  border-bottom: 1px solid var(--border-light);
+}
+
+.settings-status-card__header i {
+  color: var(--primary);
+}
+
+.settings-status-card__list {
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 1.125rem 0.75rem;
+}
+
+.settings-status-card__list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  font-size: 0.78rem;
+  color: var(--text-light);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.settings-status-card__list li:last-child {
+  border-bottom: none;
+}
+
+.settings-status-card__val {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.settings-status-card__val i {
+  font-size: 0.6rem;
+}
+
+.settings-status-card__val--active {
+  color: var(--success);
+}
+
+.settings-status-card__val--warn {
+  color: var(--accent);
+}
+
+.settings-status-card__val--muted {
+  color: var(--text-lighter);
+}
+
+/* ----- Right panels ----- */
+.settings-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.settings-panel {
+  display: none;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: settingsFadeUp 0.4s ease-out;
+}
+
+.settings-panel.is-active {
+  display: flex;
+}
+
+/* The Danger Zone has no navigation item - keep it always visible at the
+   bottom of the settings workspace, separated from the active panel. */
+.settings-panel[data-panel="danger"] {
+  display: flex;
+}
+
+/* Mobile selector (hidden on desktop) */
+.settings-select {
+  display: none;
+  margin-bottom: 1rem;
+}
+
+.settings-select__label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-light);
+  margin-bottom: 0.375rem;
+}
+
+/* ================================================
+   3. SETTINGS CARDS  (premium)
+   ================================================ */
+.settings-card {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: box-shadow var(--transition), border-color var(--transition);
+}
+
+.settings-card:hover {
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-light);
+  background: linear-gradient(180deg, var(--bg-white), var(--bg));
+}
+
+.settings-card__header-icon {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-bg), rgba(6,182,212,0.12));
+  color: var(--primary);
+  border-radius: var(--radius);
+  font-size: 1.125rem;
+}
+
+.settings-card__header-icon--cyan {
+  background: rgba(6,182,212,0.1);
+  color: var(--secondary);
+}
+
+.settings-card__header h2 {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--dark);
+  line-height: 1.2;
+}
+
+.settings-card__header p {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  line-height: 1.4;
+  margin-top: 0.125rem;
+}
+
+.settings-card__body {
+  padding: 1.5rem;
+}
+
+/* Subsection */
+.settings-subsection {
+  margin-bottom: 1.5rem;
+}
+
+.settings-subsection:last-child {
+  margin-bottom: 0;
+}
+
+.settings-subsection__title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-subsection__title i {
+  color: var(--primary);
+  width: 16px;
+}
+
+/* ================================================
+   3b. PASSWORD STRENGTH (page-specific layout)
+   The settings markup places segments + text as direct
+   children of .password-strength, so arrange them in a
+   horizontal meter with the label beside it.
+   ================================================ */
+.settings-page .password-strength {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 0.375rem;
+}
+
+.settings-page .password-strength__segment {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  transition: all var(--transition);
+}
+
+.settings-page .password-strength__text {
+  flex: none;
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-lighter);
+  min-width: 52px;
+}
+
+/* Reuse the colour coding from styles.css */
+.settings-page .password-strength__segment.active.weak { background: #ef4444; }
+.settings-page .password-strength__segment.active.medium { background: var(--accent); }
+.settings-page .password-strength__segment.active.strong { background: var(--success); }
+.settings-page .password-strength__text.weak { color: #ef4444; }
+.settings-page .password-strength__text.medium { color: var(--accent); }
+.settings-page .password-strength__text.strong { color: var(--success); }
+
+/* ================================================
+   4. NOTES & FEATURE ROWS
+   ================================================ */
+.settings-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 0.875rem;
+  background: var(--primary-bg);
+  border: 1px solid rgba(26,86,219,0.16);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  color: var(--text-light);
+  line-height: 1.5;
+  margin-bottom: 0.875rem;
+}
+
+.settings-note i {
+  color: var(--primary);
+  margin-top: 2px;
+  font-size: 0.875rem;
+}
+
+.settings-feature-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.125rem;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+}
+
+.settings-feature-row__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-feature-row__info strong {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 0.125rem;
+}
+
+.settings-feature-row__info p {
+  font-size: 0.78rem;
+  color: var(--text-light);
+  line-height: 1.5;
+}
+
+.settings-muted {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  line-height: 1.5;
+}
+
+/* ================================================
+   5. VERIFY STATUS
+   ================================================ */
+.settings-verify {
+  margin-top: 0.875rem;
+  padding: 1rem 1.125rem;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+}
+
+.settings-verify__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.settings-verify__status--good {
+  color: var(--success);
+}
+
+.settings-verify__status--warn {
+  color: var(--accent);
+}
+
+.settings-verify__text {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  line-height: 1.5;
+  margin: 0.5rem 0 0.75rem;
+}
+
+/* ================================================
+   6. PROFILE SETTINGS QUICK LINKS
+   ================================================ */
+.settings-profile-completion {
+  display: flex;
+  align-items: center;
+  gap: 1.125rem;
+  padding: 1rem 1.125rem;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.settings-profile-completion .completeness-ring {
+  width: 64px;
+  height: 64px;
+}
+
+.settings-profile-completion .completeness-ring__bg {
+  stroke: var(--border);
+}
+
+.settings-profile-completion .completeness-ring__fill {
+  stroke: var(--primary);
+}
+
+.settings-profile-completion .completeness-ring__text {
+  color: var(--dark);
+}
+
+.settings-profile-completion__info {
+  flex: 1;
+  min-width: 200px;
+}
+
+.settings-profile-completion__info strong {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 0.125rem;
+}
+
+.settings-profile-completion__info p {
+  font-size: 0.78rem;
+  color: var(--text-light);
+  line-height: 1.5;
+  margin-bottom: 0.625rem;
+}
+
+.settings-quicklinks {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.settings-quicklink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-bg);
+  border: 1px solid rgba(26,86,219,0.14);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+
+.settings-quicklink i {
+  font-size: 0.8rem;
+}
+
+.settings-quicklink:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ================================================
+   7. NOTIFICATION PREFERENCES
+   ================================================ */
+.settings-notif-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.settings-notif-item {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+
+.settings-notif-item:hover {
+  border-color: var(--primary-light);
+  background: var(--bg-white);
+}
+
+.settings-notif-item__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-notif-item__info strong {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 0.125rem;
+}
+
+.settings-notif-item__info > span {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--text-light);
+  line-height: 1.4;
+}
+
+/* ================================================
+   8. PRIVACY & CONSENT
+   ================================================ */
+.settings-privacy-intro {
+  font-size: 0.85rem;
+  color: var(--text-light);
+  line-height: 1.6;
+  margin-bottom: 1rem;
+  padding: 0.875rem 1rem;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--primary);
+}
+
+.consent-item_why {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+/* ================================================
+   9. PREFERENCES  (radio cards)
+   ================================================ */
+.settings-radio-group {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.settings-radio {
+  cursor: pointer;
+}
+
+.settings-radio input {
+  width: 0;
+  height: 0;
+  opacity: 0;
+  position: absolute;
+}
+
+.settings-radio span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+
+.settings-radio span i {
+  color: var(--text-lighter);
+}
+
+.settings-radio span em {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 0.7rem;
+  color: var(--text-lighter);
+}
+
+.settings-radio input:checked + span {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+  color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(26,86,219,0.1);
+}
+
+.settings-radio input:checked + span i {
+  color: var(--primary);
+}
+
+.settings-radio--disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.settings-radio--disabled input:checked + span {
+  border-color: var(--border);
+  background: var(--bg);
+  color: var(--text-lighter);
+  box-shadow: none;
+}
+
+/* ================================================
+   10. DOCUMENT SUMMARY
+   ================================================ */
+.settings-doc-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.settings-doc-summary__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.settings-doc-summary__num {
+  font-size: 1.375rem;
+  font-weight: 800;
+  color: var(--dark);
+}
+
+.settings-doc-summary__num--good {
+  color: var(--success);
+}
+
+.settings-doc-summary__num--warn {
+  color: var(--accent);
+}
+
+.settings-doc-summary__label {
+  font-size: 0.7rem;
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+.settings-recent-docs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.settings-recent-docs li {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+}
+
+.settings-recent-docs li > i {
+  color: var(--primary);
+  font-size: 0.875rem;
+}
+
+.settings-recent-docs__name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-recent-docs__meta {
+  font-size: 0.72rem;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+
+/* ================================================
+   11. SESSIONS & DEVICES
+   ================================================ */
+.settings-session-list,
+.settings-device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin-bottom: 0.875rem;
+}
+
+.settings-session-item {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+
+.settings-session-item:hover {
+  border-color: var(--primary-light);
+  background: var(--bg-white);
+}
+
+.settings-session-item--active {
+  border-left: 3px solid var(--success);
+}
+
+.settings-session-item--active:hover {
+  border-left-color: var(--success);
+}
+
+.settings-session-item__icon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  background: var(--primary-bg);
+  color: var(--primary);
+  font-size: 0.95rem;
+}
+
+.settings-session-item__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-session-item__info strong {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 0.125rem;
+}
+
+.settings-session-item__info > span {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.74rem;
+  color: var(--text-light);
+  line-height: 1.4;
+}
+
+.settings-session-item__info i {
+  width: 13px;
+  font-size: 0.7rem;
+  color: var(--text-lighter);
+}
+
+.settings-session-item__status {
+  flex-shrink: 0;
+}
+
+.settings-session-actions {
+  display: flex;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+}
+
+/* ================================================
+   12. DANGER ZONE
+   ================================================ */
+.settings-danger {
+  background: var(--bg-white);
+  border: 1px solid rgba(239,68,68,0.28);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.settings-danger__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #ef4444;
+  background: rgba(239,68,68,0.06);
+  border-bottom: 1px solid rgba(239,68,68,0.18);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.settings-danger__item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.125rem 1.5rem;
+  border-bottom: 1px solid var(--border-light);
+  flex-wrap: wrap;
+}
+
+.settings-danger__item:last-child {
+  border-bottom: none;
+}
+
+.settings-danger__info {
+  flex: 1;
+  min-width: 220px;
+}
+
+.settings-danger__info strong {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 0.125rem;
+}
+
+.settings-danger__info p {
+  font-size: 0.78rem;
+  color: var(--text-light);
+  line-height: 1.5;
+}
+
+.settings-btn--danger {
+  color: #ef4444 !important;
+  border-color: rgba(239,68,68,0.4) !important;
+}
+
+.settings-btn--danger:hover {
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: white !important;
+}
+
+/* ================================================
+   13. MODALS  (settings refinements)
+   ================================================ */
+.modal__icon--warn {
+  background: rgba(245,158,11,0.1);
+  color: var(--accent);
+}
+
+.modal__icon--danger {
+  background: rgba(239,68,68,0.1);
+  color: #ef4444;
+}
+
+/* ================================================
+   14. RESPONSIVE
+   ================================================ */
+@media (max-width: 1100px) {
+  .settings-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-nav {
+    position: static;
+  }
+
+  .settings-nav__inner {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .settings-nav__item {
+    flex: 1;
+    min-width: 130px;
+    justify-content: center;
+  }
+
+  .settings-status-card {
+    display: none;
+  }
+
+  .settings-select {
+    display: block;
+  }
+}
+
+@media (max-width: 767px) {
+  .settings-hero {
+    padding: 1.25rem;
+    border-radius: var(--radius-lg);
+  }
+
+  .settings-hero__title {
+    font-size: 1.375rem;
+  }
+
+  .settings-card__header {
+    padding: 1rem 1.125rem;
+  }
+
+  .settings-card__body {
+    padding: 1.125rem;
+  }
+
+  .settings-doc-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-quicklinks {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-session-actions {
+    flex-direction: column;
+  }
+
+  .settings-session-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .settings-danger__item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .settings-danger__item .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .settings-nav__inner {
+    display: none;
+  }
+
+  .settings-select {
+    display: block;
+  }
+}

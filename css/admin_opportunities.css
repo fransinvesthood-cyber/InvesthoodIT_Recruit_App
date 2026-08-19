@@ -1,0 +1,114 @@
+/* ============================================================
+   INVESTHOOD IT - Opportunity Management Module
+   ============================================================
+   Dedicated styling for the Administrator Opportunity
+   management workspace. Reuses the platform design tokens
+   (CSS variables from styles.css) and the Programme & Cohort
+   module classes (admin_programmes.css) for a consistent,
+   professional identity.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   Stat card tones (opp list)
+   ------------------------------------------------------------ */
+.pm-stat--closing .pm-stat__icon { background: #f59e0b; }
+.pm-stat--closed .pm-stat__icon { background: #6d28d9; }
+
+/* ------------------------------------------------------------
+   Aggregate capacity / application stats block
+   ------------------------------------------------------------ */
+.opp-agg-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.opp-agg-stat {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  text-align: center;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.opp-agg-stat:hover { box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06); transform: translateY(-2px); }
+.opp-agg-stat__value {
+  display: block;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: var(--primary, #1a56db);
+  line-height: 1.1;
+}
+.opp-agg-stat__label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted, #6b7280);
+  margin-top: 0.3rem;
+}
+
+/* ------------------------------------------------------------
+   Filters (slightly wider layout for the many filter controls)
+   ------------------------------------------------------------ */
+.opp-filters { align-items: center; }
+.opp-filters .pm-filters__select { max-width: 100%; }
+
+/* ------------------------------------------------------------
+   Opportunity card tweaks
+   ------------------------------------------------------------ */
+.opp-card .pm-card__actions form { margin: 0; }
+.opp-card .pm-card__actions .btn { white-space: nowrap; }
+
+/* ------------------------------------------------------------
+   Opportunity detail - skill chips
+   ------------------------------------------------------------ */
+.pm-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.75rem;
+  background: rgba(26, 86, 219, 0.07);
+  border: 1px solid rgba(26, 86, 219, 0.16);
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--primary, #1a56db);
+}
+.pm-tag-chip i { font-size: 0.78rem; }
+
+/* ------------------------------------------------------------
+   Info alert (cohort date hint on forms)
+   ------------------------------------------------------------ */
+.pm-alert--info {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+/* ------------------------------------------------------------
+   Form error text (used under capacity on edit)
+   ------------------------------------------------------------ */
+.pm-form-field .form-error {
+  font-size: 0.8rem;
+  color: #dc2626;
+  margin-top: 0.35rem;
+}
+
+/* ------------------------------------------------------------
+   Document rows (application information)
+   ------------------------------------------------------------ */
+.opp-doc-row { align-items: center; }
+.opp-doc-row .pm-doc-item__info { gap: 0.5rem; }
+
+/* ------------------------------------------------------------
+   Responsive
+   ------------------------------------------------------------ */
+@media (max-width: 992px) {
+  .opp-agg-stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .opp-agg-stats { grid-template-columns: repeat(2, 1fr); }
+  .opp-agg-stat { padding: 0.9rem 0.75rem; }
+  .opp-agg-stat__value { font-size: 1.3rem; }
+  .pm-tag-chip { font-size: 0.8rem; }
+}

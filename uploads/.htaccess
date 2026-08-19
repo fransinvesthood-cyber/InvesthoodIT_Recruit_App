@@ -1,0 +1,13 @@
+# Block direct access to uploaded files via PHP execution
+<FilesMatch "\.(?i:php|php\d+|phtml|phar)$">
+    Require all denied
+</FilesMatch>
+
+# Disable directory listing
+Options -Indexes
+
+# Block access to hidden files
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+

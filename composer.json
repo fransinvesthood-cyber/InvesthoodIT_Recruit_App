@@ -1,0 +1,14 @@
+{
+    "name": "investhood/recruitment-project",
+    "description": "Investhood IT Programme & Scarce Skills Platform - Backend Authentication System",
+    "type": "project",
+    "require": {
+        "php": ">=8.0",
+        "phpmailer/phpmailer": "^6.9"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}
+
