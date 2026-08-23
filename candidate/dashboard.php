@@ -29,6 +29,11 @@ $savedOpportunities = SavedOpportunity::forCandidate($userId);
 $savedCount = SavedOpportunity::countForCandidate($userId);
 $recentOpportunities = CandidateOpportunitiesController::searchOpportunities([], 1, 3)['opportunities'];
 
+// Applications integration (Stage 2)
+$appStats = Application::countByStatus($userId);
+$draftApplications = (int) ($appStats['draft'] ?? 0);
+$activeApplications = (int) ($appStats['total'] ?? 0) - (int) ($appStats['rejected'] ?? 0);
+
 $flashes = render_flashes();
 ?>
 <?php $avatar = url('candidate/avatar.php'); ?><?php $availLabel = $profile['availability_label'] ?? 'Availability not set'; ?>
@@ -195,10 +200,10 @@ $flashes = render_flashes();
             <div class="overview-card">
               <div class="overview-card__icon overview-card__icon--primary"><i class="fas fa-file-alt"></i></div>
               <div class="overview-card__info">
-                <span class="overview-card__number" data-count="4">0</span>
+                <span class="overview-card__number" data-count="<?= (int)$activeApplications ?>"><?= (int)$activeApplications ?></span>
                 <span class="overview-card__label">Active Applications</span>
               </div>
-              <a href="#" class="overview-card__link">View <i class="fas fa-arrow-right"></i></a>
+              <a href="<?= url('candidate/applications.php') ?>" class="overview-card__link">View <i class="fas fa-arrow-right"></i></a>
             </div>
             <div class="overview-card">
               <div class="overview-card__icon overview-card__icon--cyan"><i class="fas fa-graduation-cap"></i></div>
@@ -738,7 +743,7 @@ $flashes = render_flashes();
               <div class="quick-action-card__icon quick-action-card__icon--purple"><i class="fas fa-clock"></i></div>
               <span>Update Availability</span>
             </a>
-            <a href="#" class="quick-action-card">
+            <a href="<?= url('candidate/applications.php') ?>" class="quick-action-card">
               <div class="quick-action-card__icon quick-action-card__icon--red"><i class="fas fa-file-alt"></i></div>
               <span>View Applications</span>
             </a>
@@ -798,7 +803,7 @@ $flashes = render_flashes();
           <!-- Stats Summary -->
           <div class="analytics-stats">
             <div class="analytics-stat">
-              <span class="analytics-stat__number">4</span>
+              <span class="analytics-stat__number"><?= (int)($appStats['submitted'] ?? 0) ?></span>
               <span class="analytics-stat__label">Applications Submitted</span>
             </div>
             <div class="analytics-stat">

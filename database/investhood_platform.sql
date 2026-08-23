@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Aug 19, 2026 at 12:23 PM
+-- Generation Time: Aug 21, 2026 at 10:56 PM
 -- Server version: 10.4.24-MariaDB
 -- PHP Version: 8.1.6
 
@@ -36,6 +36,48 @@ CREATE TABLE `applications` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `submitted_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `applications`
+--
+
+INSERT INTO `applications` (`id`, `application_reference`, `candidate_id`, `opportunity_id`, `status`, `created_at`, `updated_at`, `submitted_at`) VALUES
+(1, 'APP-2026-513C8C', 9, 3, 'draft', '2026-08-19 10:35:03', '2026-08-21 00:56:30', NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `application_documents`
+--
+
+CREATE TABLE `application_documents` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `application_id` int(10) UNSIGNED NOT NULL,
+  `document_type` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `original_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `stored_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `mime_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_size` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `file_checksum` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `application_responses`
+--
+
+CREATE TABLE `application_responses` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `application_id` int(10) UNSIGNED NOT NULL,
+  `question_id` int(10) UNSIGNED NOT NULL,
+  `response` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -260,7 +302,9 @@ INSERT INTO `audit_logs` (`id`, `user_id`, `action`, `record_type`, `record_id`,
 (198, 9, 'profile_picture_uploaded', 'candidate_profile', NULL, 'Profile picture uploaded', '::1', '2026-08-19 09:49:41'),
 (199, 9, 'profile_updated', 'candidate_profile', NULL, 'Personal information updated', '::1', '2026-08-19 09:50:59'),
 (200, 9, 'profile_updated', 'candidate_profile', NULL, 'Professional information updated', '::1', '2026-08-19 09:52:30'),
-(201, 9, 'qualification_removed', 'qualification', 2, 'Qualification removed', '::1', '2026-08-19 09:54:00');
+(201, 9, 'qualification_removed', 'qualification', 2, 'Qualification removed', '::1', '2026-08-19 09:54:00'),
+(202, 9, 'profile_picture_removed', 'candidate_profile', NULL, 'Profile picture removed', '::1', '2026-08-19 23:04:24'),
+(203, 9, 'profile_updated', 'candidate_profile', NULL, 'Professional information updated', '::1', '2026-08-19 23:05:44');
 
 -- --------------------------------------------------------
 
@@ -319,7 +363,7 @@ CREATE TABLE `candidate_profiles` (
 --
 
 INSERT INTO `candidate_profiles` (`id`, `user_id`, `professional_title`, `professional_summary`, `career_interests`, `employment_status`, `availability_status_id`, `availability_date`, `address`, `city`, `profile_picture`, `completion_percent`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 9, 'Software Developer', 'I am a motivated Software Developer holding a Degree in Computer Science, with two years of hands-on experience developing web-based applications, databases, and software solutions. I have a strong understanding of Object-Oriented Programming principles and experience working with HTML, CSS, JavaScript, PHP, and MySQL in Agile development environments. I am passionate about learning new technologies, including Java and cloud platforms, and enjoy building reliable, scalable, and user-friendly software solutions while contributing effectively within collaborative development teams.', 'Back-end development', 'employed', 1, NULL, '1056 Madiba DR', 'Bronkhorstspruit', 'b1835299bd2e7dd05a23b958efd25371.png', 100, 1, '2026-08-05 00:22:14', '2026-08-19 09:54:00'),
+(1, 9, 'Software Developer', 'I am a motivated Software Developer holding a Degree in Computer Science, with two years of hands-on experience developing web-based applications, databases, and software solutions. I have a strong understanding of Object-Oriented Programming principles and experience working with HTML, CSS, JavaScript, PHP, and MySQL in Agile development environments. I am passionate about learning new technologies, including Java and cloud platforms, and enjoy building reliable, scalable, and user-friendly software solutions while contributing effectively within collaborative development teams.', 'Back-end development', 'unemployed', 1, NULL, '1056 Madiba DR', 'Bronkhorstspruit', NULL, 89, 1, '2026-08-05 00:22:14', '2026-08-19 23:05:44'),
 (2, 10, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 1, '2026-08-06 14:31:12', '2026-08-06 14:31:12');
 
 -- --------------------------------------------------------
@@ -868,6 +912,26 @@ INSERT INTO `opportunity_eligibility` (`id`, `opportunity_id`, `qualification_re
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `opportunity_questions`
+--
+
+CREATE TABLE `opportunity_questions` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `opportunity_id` int(10) UNSIGNED NOT NULL,
+  `section` enum('eligibility','application') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'application',
+  `question_text` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `question_type` enum('text','textarea','yes_no','radio','dropdown','checkbox','number','date') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'text',
+  `options` text COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'JSON array of options for radio/dropdown/checkbox',
+  `is_required` tinyint(1) NOT NULL DEFAULT 0,
+  `is_knockout` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Eligibility questions that may knock out',
+  `sort_order` int(11) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `opportunity_responsibilities`
 --
 
@@ -1334,7 +1398,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `role_id`, `first_name`, `last_name`, `username`, `email`, `phone`, `date_of_birth`, `gender`, `province`, `employment_status`, `qualification_level`, `professional_title`, `password_hash`, `profile_picture`, `status`, `email_verified_at`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 1, 'Platform', 'Administrator', 'admin', 'admin@investhoodit.co.za', '+27 11 234 5678', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'masters', 'Platform Administrator', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-08-19 12:05:47', '2026-08-02 23:00:17', '2026-08-19 10:05:47'),
+(1, 1, 'Platform', 'Administrator', 'admin', 'admin@investhoodit.co.za', '+27 11 234 5678', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'masters', 'Platform Administrator', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-08-19 23:09:41', '2026-08-02 23:00:17', '2026-08-19 21:09:41'),
 (2, 2, 'Programme', 'Manager', 'programme.manager', 'programme.manager@investhoodit.co.za', '+27 11 234 5679', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'masters', 'Programme Manager', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-08-04 02:09:22', '2026-08-02 23:00:17', '2026-08-04 00:09:22'),
 (3, 3, 'Programme', 'Officer', 'programme.officer', 'programme.officer@investhoodit.co.za', '+27 11 234 5680', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Programme Officer', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', NULL, '2026-08-02 23:00:17', '2026-08-02 23:00:17'),
 (4, 4, 'Recruitment', 'Specialist', 'recruiter', 'recruiter@investhoodit.co.za', '+27 11 234 5681', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Recruiter', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', NULL, '2026-08-02 23:00:17', '2026-08-02 23:00:17'),
@@ -1342,8 +1406,8 @@ INSERT INTO `users` (`id`, `role_id`, `first_name`, `last_name`, `username`, `em
 (6, 6, 'Skills', 'Assessor', 'assessor', 'assessor@investhoodit.co.za', '+27 11 234 5683', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Skills Assessor', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', NULL, '2026-08-02 23:00:17', '2026-08-02 23:00:17'),
 (7, 7, 'Finance', 'Officer', 'finance.officer', 'finance.officer@investhoodit.co.za', '+27 11 234 5684', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Finance Officer', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-08-04 02:08:15', '2026-08-02 23:00:17', '2026-08-04 00:08:15'),
 (8, 8, 'Information', 'Officer', 'info.officer', 'info.officer@investhoodit.co.za', '+27 11 234 5685', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Information Officer', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', NULL, '2026-08-02 23:00:17', '2026-08-02 23:00:17'),
-(9, 9, 'Hlobisile', 'Mthembu', 'Sky', 'candidate@gmail.com', '+27 12 345 3433', '1995-06-15', 'female', 'gauteng', 'employed', 'degree', 'Software Developer', '$2y$10$3Y8qIUV3YCaRu6plnDqGJOMWrnQucYeYZEDU2rcXRaaYBwxPs5Qnq', NULL, 'active', NULL, '2026-08-19 11:42:36', '2026-08-02 23:00:17', '2026-08-19 09:52:30'),
-(10, 9, 'Delani', 'Sibande', 'Deco', 'sibanded1030@gmail.com', '0794065577', '1997-12-12', 'male', 'gauteng', 'recent-graduate', 'degree', 'Software Developer', '$2y$10$mlDKcbt12tR.64VpNTWm9uG6Wx7xVMglKNAtAN3BvCZdhS88jbv8C', NULL, 'active', NULL, '2026-08-06 16:31:12', '2026-08-04 00:12:28', '2026-08-06 14:31:12');
+(9, 9, 'Hlobisile', 'Mthembu', 'Sky', 'candidate@gmail.com', '+27 12 345 3433', '1995-06-15', 'female', 'gauteng', 'employed', 'degree', 'Software Developer', '$2y$10$3Y8qIUV3YCaRu6plnDqGJOMWrnQucYeYZEDU2rcXRaaYBwxPs5Qnq', NULL, 'active', NULL, '2026-08-21 02:51:25', '2026-08-02 23:00:17', '2026-08-21 00:51:25'),
+(10, 9, 'Delani', 'Sibande', 'Deco', 'sibanded1030@gmail.com', '0794065577', '1997-12-12', 'male', 'gauteng', 'recent-graduate', 'degree', 'Software Developer', '$2y$10$mlDKcbt12tR.64VpNTWm9uG6Wx7xVMglKNAtAN3BvCZdhS88jbv8C', NULL, 'active', NULL, '2026-08-19 13:45:09', '2026-08-04 00:12:28', '2026-08-19 11:45:09');
 
 -- --------------------------------------------------------
 
@@ -1432,7 +1496,21 @@ INSERT INTO `user_sessions` (`id`, `user_id`, `session_hash`, `ip_address`, `use
 (62, 9, 'bc959ad4b40ea2f88df2392bfa9314af904ca2a106b1761e6fa834c61c439e78', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 11:01:07', '2026-08-19 11:01:07', '2026-08-19 11:05:59', 0),
 (63, 9, 'b6a01eeadc4f2557cbc59919d8d6fe995fbc5c7dfc88a660d672d4d7b1aa6c13', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 11:42:37', '2026-08-19 11:42:37', '2026-08-19 12:03:16', 0),
 (64, 5, '114233ed070e354777af19c9a2207790de8de7e6a858de995324a49470bc3070', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 12:04:51', '2026-08-19 12:04:51', '2026-08-19 12:05:10', 0),
-(65, 1, '6de633dc0a44cee013538d19c9c7cbf37c78a1f236df2f4dd6a0daaa3f7b922b', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 12:05:47', '2026-08-19 12:05:47', '2026-08-19 12:16:48', 0);
+(65, 1, '6de633dc0a44cee013538d19c9c7cbf37c78a1f236df2f4dd6a0daaa3f7b922b', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 12:05:47', '2026-08-19 12:05:47', '2026-08-19 12:16:48', 0),
+(66, 9, '37141758687919c17b7deb19d7fc544ba594aa6cd41fe4b31067738ce9dfcbea', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 12:31:31', '2026-08-19 12:31:31', NULL, 1),
+(67, 9, '3be307da852c570f0a162b58bb39907a815100509f0d1f236f3d2c5370c3375f', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 13:37:55', '2026-08-19 13:37:55', '2026-08-19 13:44:48', 0),
+(68, 10, 'a43082e97b5b03e9a0f2bec6fd8e2b8cfa2435e8dd764b4481e2b6454c53e2f5', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 13:45:09', '2026-08-19 13:45:09', '2026-08-19 13:45:52', 0),
+(69, 9, '83d57dc0d6e65412a35962275da3c61d85e1db421c6ffe53d4264433bb0a1388', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 13:46:13', '2026-08-19 13:46:13', NULL, 1),
+(70, 9, '07eb3e49aa9096f9a67b4132bb96a6ddeafbef646c0b81fbf6c338bdfc13722b', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 15:08:45', '2026-08-19 15:08:45', NULL, 1),
+(71, 9, '9eb2edb39a770e85b75627fb25becda77fefdee6019893ee78e59c4939fc7e63', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 16:17:59', '2026-08-19 16:17:59', NULL, 1),
+(72, 9, 'eca776b8f0d05eadfc6dbed19bf973d4be57e4d2efb9efa54f57837d9d0fdd83', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 16:39:09', '2026-08-19 16:39:09', '2026-08-19 16:40:11', 0),
+(73, 9, 'ef39f6248c98791834a55107a0bb92e556bc2bf8930ebb75331250211034f0fe', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 22:24:44', '2026-08-19 22:24:44', '2026-08-19 22:24:52', 0),
+(74, 1, 'd76b7ec9f7327d591879184edd6b17543c877b12034aaed33b81554c698db3d3', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 22:25:46', '2026-08-19 22:25:46', NULL, 1),
+(75, 1, '38321df5bc6590132e71419bfdc00f8318da10819ccf000d1bb4a88bd87d249e', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 23:09:41', '2026-08-19 23:09:41', NULL, 1),
+(76, 9, 'd49655cfacec13ced600c2b6f1f252a749c69b57db3af3de24a1f7cdb0343de6', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-20 00:59:44', '2026-08-20 00:59:44', NULL, 1),
+(77, 9, '77bfec1b4fb81bb28c2f27fb0359d215d1f25190c641a33f3dd59d7698e9f519', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-20 10:54:36', '2026-08-20 10:54:36', NULL, 1),
+(78, 9, 'd3cfd646360480ac6e23734e47e8185b31045c4cf0128afaec5733c254354a87', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-21 02:42:57', '2026-08-21 02:42:57', NULL, 1),
+(79, 9, 'f19a74a06b96b6adb1f05936d98fc1b330a191de877ad3998eb3dd361aba376e', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-21 02:51:25', '2026-08-21 02:51:25', NULL, 1);
 
 -- --------------------------------------------------------
 
@@ -1490,6 +1568,24 @@ ALTER TABLE `applications`
   ADD KEY `idx_applications_opportunity` (`opportunity_id`),
   ADD KEY `idx_applications_status` (`status`),
   ADD KEY `idx_applications_created` (`created_at`);
+
+--
+-- Indexes for table `application_documents`
+--
+ALTER TABLE `application_documents`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_app_docs_application_type` (`application_id`,`document_type`),
+  ADD KEY `idx_app_docs_application` (`application_id`),
+  ADD KEY `idx_app_docs_type` (`document_type`);
+
+--
+-- Indexes for table `application_responses`
+--
+ALTER TABLE `application_responses`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_app_responses_application_question` (`application_id`,`question_id`),
+  ADD KEY `idx_app_responses_application` (`application_id`),
+  ADD KEY `idx_app_responses_question` (`question_id`);
 
 --
 -- Indexes for table `audit_logs`
@@ -1689,6 +1785,14 @@ ALTER TABLE `opportunity_eligibility`
   ADD UNIQUE KEY `uq_opp_elig_opportunity` (`opportunity_id`);
 
 --
+-- Indexes for table `opportunity_questions`
+--
+ALTER TABLE `opportunity_questions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_opp_questions_opportunity` (`opportunity_id`),
+  ADD KEY `idx_opp_questions_section` (`section`);
+
+--
 -- Indexes for table `opportunity_responsibilities`
 --
 ALTER TABLE `opportunity_responsibilities`
@@ -1818,13 +1922,25 @@ ALTER TABLE `work_experience`
 -- AUTO_INCREMENT for table `applications`
 --
 ALTER TABLE `applications`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `application_documents`
+--
+ALTER TABLE `application_documents`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `application_responses`
+--
+ALTER TABLE `application_responses`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `audit_logs`
 --
 ALTER TABLE `audit_logs`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=202;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=204;
 
 --
 -- AUTO_INCREMENT for table `availability_statuses`
@@ -1920,7 +2036,7 @@ ALTER TABLE `email_verifications`
 -- AUTO_INCREMENT for table `login_attempts`
 --
 ALTER TABLE `login_attempts`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
 
 --
 -- AUTO_INCREMENT for table `notification_preferences`
@@ -1951,6 +2067,12 @@ ALTER TABLE `opportunity_documents`
 --
 ALTER TABLE `opportunity_eligibility`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT for table `opportunity_questions`
+--
+ALTER TABLE `opportunity_questions`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `opportunity_responsibilities`
@@ -2022,7 +2144,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `user_sessions`
 --
 ALTER TABLE `user_sessions`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=66;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=80;
 
 --
 -- AUTO_INCREMENT for table `user_settings`
@@ -2046,6 +2168,19 @@ ALTER TABLE `work_experience`
 ALTER TABLE `applications`
   ADD CONSTRAINT `fk_applications_candidate` FOREIGN KEY (`candidate_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_applications_opportunity` FOREIGN KEY (`opportunity_id`) REFERENCES `opportunities` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `application_documents`
+--
+ALTER TABLE `application_documents`
+  ADD CONSTRAINT `fk_app_docs_application` FOREIGN KEY (`application_id`) REFERENCES `applications` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `application_responses`
+--
+ALTER TABLE `application_responses`
+  ADD CONSTRAINT `fk_app_responses_application` FOREIGN KEY (`application_id`) REFERENCES `applications` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_app_responses_question` FOREIGN KEY (`question_id`) REFERENCES `opportunity_questions` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Constraints for table `audit_logs`
@@ -2181,6 +2316,12 @@ ALTER TABLE `opportunity_documents`
 --
 ALTER TABLE `opportunity_eligibility`
   ADD CONSTRAINT `fk_opp_elig_opportunity` FOREIGN KEY (`opportunity_id`) REFERENCES `opportunities` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `opportunity_questions`
+--
+ALTER TABLE `opportunity_questions`
+  ADD CONSTRAINT `fk_opp_questions_opportunity` FOREIGN KEY (`opportunity_id`) REFERENCES `opportunities` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Constraints for table `opportunity_responsibilities`

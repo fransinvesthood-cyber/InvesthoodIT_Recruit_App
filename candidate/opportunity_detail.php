@@ -18,21 +18,21 @@ $user = current_user();
 // Get opportunity ID
 $oppId = (int) ($_GET['id'] ?? 0);
 if (!$oppId) {
-    flash('error', 'Opportunity not found.');
+    set_flash('error', 'Opportunity not found.', 'The requested opportunity could not be found.');
     redirect('candidate/opportunities.php');
 }
 
 // Fetch full opportunity details
 $opportunity = CandidateOpportunitiesController::getOpportunityDetail($oppId);
 if (!$opportunity) {
-    flash('error', 'Opportunity not found.');
+    set_flash('error', 'Opportunity not found.', 'The requested opportunity could not be found.');
     redirect('candidate/opportunities.php');
 }
 
 // Check if visible to candidate (must be published and open)
 $today = date('Y-m-d');
 if ($opportunity['status'] !== 'published') {
-    flash('error', 'This opportunity is not available.');
+    set_flash('error', 'This opportunity is not available.', 'This opportunity is no longer available.');
     redirect('candidate/opportunities.php');
 }
 
@@ -40,17 +40,19 @@ if ($opportunity['status'] !== 'published') {
 $isSaved = SavedOpportunity::isSaved($userId, $oppId);
 
 // Check application dates
-$isBeforeOpening = !empty($opportunity['application_open_date']) && $opportunity['application_open_date'] > $today;
+$isBeforeOpen = !empty($opportunity['application_open_date']) && $opportunity['application_open_date'] > $today;
 $isAfterClosing = !empty($opportunity['application_close_date']) && $opportunity['application_close_date'] < $today;
+
+// Determine application action based on candidate state
+$appAction = CandidateApplicationsController::getApplicationAction($userId, $oppId);
+$appActionType = $appAction['action'];
+$existingApplication = $appAction['application'];
 
 // Calculate days until close
 $daysUntilClose = null;
 if (!empty($opportunity['application_close_date']) && !$isAfterClosing) {
     $daysUntilClose = (int) ((strtotime($opportunity['application_close_date']) - time()) / 86400);
 }
-
-// Check profile readiness
-$readiness = CandidateOpportunitiesController::checkProfileReadiness($userId, $oppId);
 
 $flashes = render_flashes();
 ?>
@@ -356,7 +358,7 @@ $flashes = render_flashes();
                   <span class="opp-detail__card-value">
                     <?php if (!empty($opportunity['application_open_date'])): ?>
                       <?= format_date($opportunity['application_open_date'], 'd M Y') ?>
-                      <?php if ($isBeforeOpening): ?>
+                      <?php if ($isBeforeOpen): ?>
                         <span class="opp-detail__status-badge opp-detail__status-badge--pending">Not Yet Open</span>
                       <?php endif; ?>
                     <?php else: ?>
@@ -405,7 +407,7 @@ $flashes = render_flashes();
               <div class="opp-detail__card opp-detail__card--action">
                 <h3 class="opp-detail__card-title">Ready to Apply?</h3>
 
-                <?php if ($isBeforeOpening): ?>
+                <?php if ($isBeforeOpen): ?>
                   <button class="btn btn--disabled btn--full" disabled>
                     <i class="fas fa-clock"></i> Applications Not Yet Open
                   </button>
@@ -417,11 +419,37 @@ $flashes = render_flashes();
                   </button>
                   <p class="opp-detail__card-info">Applications closed on <?= format_date($opportunity['application_close_date'], 'd M Y') ?></p>
 
-                <?php else: ?>
-                  <a href="<?= url('candidate/opportunities.php') ?>" class="btn btn--primary btn--full">
-                    <i class="fas fa-arrow-right"></i> Apply Now
+                <?php elseif ($appActionType === 'continue' && $existingApplication): ?>
+                  <a href="<?= url('candidate/application_start.php?id=' . (int) $existingApplication['id']) ?>" class="btn btn--primary btn--full">
+                    <i class="fas fa-arrow-right"></i> Continue Application
                   </a>
-                  <p class="opp-detail__card-info">Coming soon: Online application form</p>
+                  <p class="opp-detail__card-info">You have an application in progress.</p>
+
+                <?php elseif ($appActionType === 'view' && $existingApplication): ?>
+                  <a href="<?= url('candidate/application_detail.php?id=' . (int) $existingApplication['id']) ?>" class="btn btn--outline btn--full">
+                    <i class="fas fa-eye"></i> View Application
+                  </a>
+                  <p class="opp-detail__card-info">You have already applied for this opportunity.</p>
+
+                <?php elseif ($appActionType === 'apply_again' && $existingApplication): ?>
+                  <form method="POST" action="<?= url('candidate/application_actions.php') ?>" onsubmit="this.querySelector('button').disabled = true;">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="opportunity_id" value="<?= (int) $opportunity['id'] ?>">
+                    <button type="submit" class="btn btn--primary btn--full">
+                      <i class="fas fa-redo"></i> Apply Again
+                    </button>
+                  </form>
+                  <p class="opp-detail__card-info">Your previous application was withdrawn.</p>
+
+                <?php else: ?>
+                  <form method="POST" action="<?= url('candidate/application_actions.php') ?>" id="applyNowForm">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="opportunity_id" value="<?= (int) $opportunity['id'] ?>">
+                    <button type="submit" class="btn btn--primary btn--full" id="applyNowBtn">
+                      <i class="fas fa-arrow-right"></i> Apply Now
+                    </button>
+                  </form>
+                  <p class="opp-detail__card-info">Begin your application for this opportunity.</p>
 
                 <?php endif; ?>
               </div>
