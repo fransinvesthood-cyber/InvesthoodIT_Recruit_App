@@ -1,9 +1,12 @@
 <?php
 /**
  * ================================================
- * INVESTHOOD IT - Supervisor Dashboard
+ * INVESTHOOD IT - Supervisor Cohorts
  * ================================================
  * Role: Supervisor
+ *
+ * Displays cohorts assigned to the logged-in
+ * Supervisor through cohorts.supervisor_id.
  */
 require_once __DIR__ . '/../includes/bootstrap.php';
 require_role('supervisor');
@@ -14,149 +17,73 @@ $flashes = render_flashes();
 | Supervisor
 |--------------------------------------------------------------------------
 */
-$supervisorId = (int) ($user['id'] ?? $user['user_id'] ?? 0);
-
-if ($supervisorId <= 0) {
-    http_response_code(403);
-    exit('Invalid Supervisor account.');
-}
+$supervisorId = (int) ($user['id'] ?? 0);
 /*
 |--------------------------------------------------------------------------
-| Dashboard Statistics
+| Cohorts
 |--------------------------------------------------------------------------
+|
+| Only cohorts assigned to the logged-in Supervisor are returned.
+|
 */
-$assignedCohorts   = 0;
-$totalCandidates   = 0;
-$activeCandidates  = 0;
-$completedCandidates = 0;
-$completionRate    = 0;
-/*
-|--------------------------------------------------------------------------
-| Assigned Cohorts
-|--------------------------------------------------------------------------
-*/
+$cohorts = [];
 $stmt = Database::prepare("
-    SELECT COUNT(*) AS total
-    FROM cohorts
-    WHERE supervisor_id = ?
-", 'i', [$supervisorId]);
-$result = $stmt->get_result();
-$row = $result->fetch_assoc();
-$assignedCohorts = (int) ($row['total'] ?? 0);
-$stmt->close();
-/*
-|--------------------------------------------------------------------------
-| Total Candidates
-|--------------------------------------------------------------------------
-|
-| Unique candidates participating in cohorts assigned to this Supervisor.
-| Withdrawn candidates are excluded.
-|
-|--------------------------------------------------------------------------
-*/
-$stmt = Database::prepare("
-    SELECT COUNT(DISTINCT cp.user_id) AS total
-    FROM cohort_participants cp
-    INNER JOIN cohorts c
-        ON c.id = cp.cohort_id
-    WHERE c.supervisor_id = ?
-      AND cp.status <> 'withdrawn'
-", 'i', [$supervisorId]);
-$result = $stmt->get_result();
-$row = $result->fetch_assoc();
-$totalCandidates = (int) ($row['total'] ?? 0);
-$stmt->close();
-/*
-|--------------------------------------------------------------------------
-| Active Candidates
-|--------------------------------------------------------------------------
-*/
-$stmt = Database::prepare("
-    SELECT COUNT(DISTINCT cp.user_id) AS total
-    FROM cohort_participants cp
-    INNER JOIN cohorts c
-        ON c.id = cp.cohort_id
-    WHERE c.supervisor_id = ?
-      AND cp.status = 'active'
-", 'i', [$supervisorId]);
-$result = $stmt->get_result();
-$row = $result->fetch_assoc();
-$activeCandidates = (int) ($row['total'] ?? 0);
-$stmt->close();
-/*
-|--------------------------------------------------------------------------
-| Completed Candidates
-|--------------------------------------------------------------------------
-*/
-$stmt = Database::prepare("
-    SELECT COUNT(DISTINCT cp.user_id) AS total
-    FROM cohort_participants cp
-    INNER JOIN cohorts c
-        ON c.id = cp.cohort_id
-    WHERE c.supervisor_id = ?
-      AND cp.status = 'completed'
-", 'i', [$supervisorId]);
-$result = $stmt->get_result();
-$row = $result->fetch_assoc();
-$completedCandidates = (int) ($row['total'] ?? 0);
-$stmt->close();
-/*
-|--------------------------------------------------------------------------
-| Completion Rate
-|--------------------------------------------------------------------------
-|
-| Completed candidates / eligible candidates * 100
-|
-| Withdrawn candidates are excluded.
-|
-|--------------------------------------------------------------------------
-*/
-if ($totalCandidates > 0) {
-    $completionRate = round(
-        ($completedCandidates / $totalCandidates) * 100
-    );
-}
-/*
-|--------------------------------------------------------------------------
-| Candidate Progress
-|--------------------------------------------------------------------------
-|
-| Displays candidates assigned to this Supervisor through their cohorts.
-|--------------------------------------------------------------------------
-*/
-$candidates = [];
-$stmt = Database::prepare("
-    SELECT DISTINCT
-        cp.user_id,
-        u.first_name,
-        u.last_name,
-        u.email,
-        cp.status AS participation_status,
-        cp.selected_at,
-        cp.onboarded_at,
-        cp.completed_at,
-        c.id AS cohort_id,
-        c.name AS cohort_name,
+    SELECT
+        c.id,
+        c.name,
+        c.start_date,
+        c.end_date,
+        c.status,
         p.id AS programme_id,
-        p.name AS programme_name
-    FROM cohort_participants cp
-    INNER JOIN cohorts c
-        ON c.id = cp.cohort_id
+        p.name AS programme_name,
+        COUNT(
+            DISTINCT CASE
+                WHEN cp.status <> 'withdrawn'
+                THEN cp.user_id
+            END
+        ) AS candidate_count,
+        COUNT(
+            DISTINCT CASE
+                WHEN cp.status = 'active'
+                THEN cp.user_id
+            END
+        ) AS active_count,
+        COUNT(
+            DISTINCT CASE
+                WHEN cp.status = 'completed'
+                THEN cp.user_id
+            END
+        ) AS completed_count
+    FROM cohorts c
     INNER JOIN programmes p
         ON p.id = c.programme_id
-    INNER JOIN users u
-        ON u.id = cp.user_id
+    LEFT JOIN cohort_participants cp
+        ON cp.cohort_id = c.id
     WHERE c.supervisor_id = ?
-      AND cp.status <> 'withdrawn'
+    GROUP BY
+        c.id,
+        c.name,
+        c.start_date,
+        c.end_date,
+        c.status,
+        p.id,
+        p.name
     ORDER BY
         c.start_date ASC,
-        u.first_name ASC,
-        u.last_name ASC
-    LIMIT 10
+        c.id ASC
 ", 'i', [$supervisorId]);
 $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) {
-    $candidates[] = $row;
+    $candidateCount = (int) ($row['candidate_count'] ?? 0);
+    $completedCount = (int) ($row['completed_count'] ?? 0);
+    $progress = 0;
+    if ($candidateCount > 0) {
+        $progress = round(
+            ($completedCount / $candidateCount) * 100
+        );
+    }
+    $row['progress'] = $progress;
+    $cohorts[] = $row;
 }
 $stmt->close();
 ?>
@@ -164,9 +91,12 @@ $stmt->close();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
     <title>
-        Supervisor Dashboard | Investhood IT
+        My Cohorts | Supervisor | Investhood IT
     </title>
     <link
         rel="preconnect"
@@ -211,7 +141,7 @@ $stmt->close();
         <header class="dash-header">
             <div class="dash-header__left">
                 <h1 class="dash-header__title">
-                    Supervisor Dashboard
+                    My Cohorts
                 </h1>
             </div>
             <div class="dash-header__right">
@@ -229,31 +159,32 @@ $stmt->close();
         ================================================== -->
         <div class="dash-content">
             <!-- =================================================
-                 WELCOME
+                 WELCOME / INTRO
             ================================================== -->
             <div class="welcome-card">
                 <div class="welcome-card__bg"></div>
                 <div class="welcome-card__content">
                     <h1 class="welcome-card__greeting">
-                        Welcome,
+                        My
                         <span class="text-gradient">
-                            <?= e($user['fullname'] ?? 'Supervisor') ?>
+                            Cohorts
                         </span>
                     </h1>
                     <p>
-                        Monitor your assigned cohorts, supervise candidates,
-                        track progress, and generate reports.
+                        View and monitor the cohorts assigned to you,
+                        including candidate participation and completion
+                        progress.
                     </p>
                 </div>
             </div>
             <!-- =================================================
-                 OVERVIEW
+                 COHORT SUMMARY
             ================================================== -->
             <div
                 class="overview-grid"
                 style="margin-top:2rem;"
             >
-                <!-- Assigned Cohorts -->
+                <!-- Total Cohorts -->
                 <div class="overview-card">
                     <div
                         class="overview-card__icon overview-card__icon--primary"
@@ -262,14 +193,14 @@ $stmt->close();
                     </div>
                     <div class="overview-card__info">
                         <span class="overview-card__number">
-                            <?= number_format($assignedCohorts) ?>
+                            <?= number_format(count($cohorts)) ?>
                         </span>
                         <span class="overview-card__label">
                             Assigned Cohorts
                         </span>
                     </div>
                 </div>
-                <!-- Candidates -->
+                <!-- Total Candidates -->
                 <div class="overview-card">
                     <div
                         class="overview-card__icon overview-card__icon--cyan"
@@ -278,7 +209,13 @@ $stmt->close();
                     </div>
                     <div class="overview-card__info">
                         <span class="overview-card__number">
-                            <?= number_format($totalCandidates) ?>
+                            <?php
+                            $totalCandidates = 0;
+                            foreach ($cohorts as $cohort) {
+                                $totalCandidates += (int) $cohort['candidate_count'];
+                            }
+                            echo number_format($totalCandidates);
+                            ?>
                         </span>
                         <span class="overview-card__label">
                             Candidates
@@ -294,7 +231,13 @@ $stmt->close();
                     </div>
                     <div class="overview-card__info">
                         <span class="overview-card__number">
-                            <?= number_format($activeCandidates) ?>
+                            <?php
+                            $totalActive = 0;
+                            foreach ($cohorts as $cohort) {
+                                $totalActive += (int) $cohort['active_count'];
+                            }
+                            echo number_format($totalActive);
+                            ?>
                         </span>
                         <span class="overview-card__label">
                             Active Candidates
@@ -303,131 +246,173 @@ $stmt->close();
                 </div>
                 <!-- Completed Candidates -->
                 <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--primary">
-                        <i class="fas fa-graduation-cap"></i>
+                    <div
+                        class="overview-card__icon overview-card__icon--primary"
+                    >
+                        <i class="fas fa-check-circle"></i>
                     </div>
-
                     <div class="overview-card__info">
                         <span class="overview-card__number">
-                            <?= number_format($completedCandidates) ?>
+                            <?php
+                            $totalCompleted = 0;
+                            foreach ($cohorts as $cohort) {
+                                $totalCompleted += (int) $cohort['completed_count'];
+                            }
+                            echo number_format($totalCompleted);
+                            ?>
                         </span>
-
                         <span class="overview-card__label">
                             Completed Candidates
                         </span>
                     </div>
                 </div>
-                <!-- Completion Rate -->
-                <div class="overview-card">
-                    <div
-                        class="overview-card__icon overview-card__icon--primary"
-                    >
-                        <i class="fas fa-chart-line"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= $completionRate ?>%
-                        </span>
-                        <span class="overview-card__label">
-                            Completion Rate
-                        </span>
-                    </div>
-                </div>
             </div>
             <!-- =================================================
-                 CANDIDATE PROGRESS
+                 COHORT LIST
             ================================================== -->
             <div style="margin-top:2rem;">
                 <div class="welcome-card">
                     <div class="welcome-card__content">
                         <h2 style="margin-bottom:0.5rem;">
-                            Candidate Progress
+                            Assigned Cohorts
                         </h2>
                         <p>
-                            Monitor candidates assigned to your cohorts.
+                            Monitor the programmes and candidates
+                            assigned to your cohorts.
                         </p>
                     </div>
                 </div>
             </div>
-            <?php if (empty($candidates)): ?>
+            <?php if (empty($cohorts)): ?>
+                <!-- =================================================
+                     EMPTY STATE
+                ================================================== -->
                 <div
                     class="welcome-card"
                     style="margin-top:1rem;"
                 >
                     <div class="welcome-card__content">
                         <h3>
-                            No Candidates Assigned
+                            No Cohorts Assigned
                         </h3>
                         <p>
-                            You currently have no candidates assigned
-                            through your cohorts.
+                            You currently have no cohorts assigned
+                            to you.
                         </p>
                     </div>
                 </div>
             <?php else: ?>
+                <!-- =================================================
+                     COHORT CARDS
+                ================================================== -->
                 <div
                     class="overview-grid"
                     style="margin-top:1rem;"
                 >
-                    <?php foreach ($candidates as $candidate): ?>
+                    <?php foreach ($cohorts as $cohort): ?>
                         <div class="overview-card">
                             <div
                                 class="overview-card__icon overview-card__icon--primary"
                             >
-                                <i class="fas fa-user"></i>
+                                <i class="fas fa-layer-group"></i>
                             </div>
                             <div class="overview-card__info">
+                                <!-- Cohort Name -->
                                 <span
                                     class="overview-card__label"
                                     style="font-weight:600;"
                                 >
-                                    <?= e(
-                                        trim(
-                                            $candidate['first_name'] .
-                                            ' ' .
-                                            $candidate['last_name']
-                                        )
-                                    ) ?>
+                                    <?= e($cohort['name']) ?>
                                 </span>
+                                <!-- Programme -->
                                 <span
                                     class="overview-card__label"
                                     style="margin-top:0.35rem;"
                                 >
-                                    <?= e($candidate['programme_name']) ?>
+                                    <i class="fas fa-graduation-cap"></i>
+                                    <?= e($cohort['programme_name']) ?>
                                 </span>
+                                <!-- Dates -->
                                 <span
                                     class="overview-card__label"
                                     style="margin-top:0.35rem;"
                                 >
-                                    <?= e($candidate['cohort_name']) ?>
+                                    <i class="fas fa-calendar"></i>
+                                    <?php if (!empty($cohort['start_date'])): ?>
+                                        <?= e($cohort['start_date']) ?>
+                                    <?php else: ?>
+                                        Start date not set
+                                    <?php endif; ?>
+                                    &nbsp;–&nbsp;
+                                    <?php if (!empty($cohort['end_date'])): ?>
+                                        <?= e($cohort['end_date']) ?>
+                                    <?php else: ?>
+                                        End date not set
+                                    <?php endif; ?>
                                 </span>
+                                <!-- Status -->
                                 <span
                                     class="overview-card__label"
                                     style="margin-top:0.35rem;"
                                 >
+                                    <i class="fas fa-circle"></i>
                                     Status:
                                     <?= e(
                                         ucfirst(
-                                            $candidate['participation_status']
+                                            $cohort['status']
                                         )
                                     ) ?>
+                                </span>
+                                <!-- Candidates -->
+                                <span
+                                    class="overview-card__label"
+                                    style="margin-top:0.35rem;"
+                                >
+                                    <i class="fas fa-users"></i>
+                                    <?= number_format(
+                                        (int) $cohort['candidate_count']
+                                    ) ?>
+                                    Candidates
+                                </span>
+                                <!-- Active -->
+                                <span
+                                    class="overview-card__label"
+                                    style="margin-top:0.35rem;"
+                                >
+                                    <i class="fas fa-user-check"></i>
+                                    <?= number_format(
+                                        (int) $cohort['active_count']
+                                    ) ?>
+                                    Active
+                                </span>
+                                <!-- Completed -->
+                                <span
+                                    class="overview-card__label"
+                                    style="margin-top:0.35rem;"
+                                >
+                                    <i class="fas fa-check-circle"></i>
+                                    <?= number_format(
+                                        (int) $cohort['completed_count']
+                                    ) ?>
+                                    Completed
+                                </span>
+                                <!-- Progress -->
+                                <span
+                                    class="overview-card__number"
+                                    style="
+                                        font-size:1.5rem;
+                                        margin-top:0.75rem;
+                                    "
+                                >
+                                    <?= (int) $cohort['progress'] ?>%
+                                </span>
+                                <span class="overview-card__label">
+                                    Completion Progress
                                 </span>
                             </div>
                         </div>
                     <?php endforeach; ?>
                 </div>
-                <?php if ($totalCandidates > 10): ?>
-                    <div style="margin-top:1rem;">
-                        <a
-                            href="<?= url('supervisor/candidates.php') ?>"
-                            class="sidebar__link"
-                            style="display:inline-flex;"
-                        >
-                            <i class="fas fa-users"></i>
-                            View All Candidates
-                        </a>
-                    </div>
-                <?php endif; ?>
             <?php endif; ?>
         </div>
     </main>

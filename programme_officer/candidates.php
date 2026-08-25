@@ -1,57 +1,32 @@
 <?php
 /**
  * ================================================
- * INVESTHOOD IT - Supervisor Dashboard
+ * INVESTHOOD IT - Programme Officer Candidates
  * ================================================
- * Role: Supervisor
+ * Role: Programme Officer
+ *
+ * Displays candidates participating in programmes
+ * managed/overseen by the current Programme Officer.
+ *
+ * Existing database relationships are used.
  */
 require_once __DIR__ . '/../includes/bootstrap.php';
-require_role('supervisor');
+require_role('programme_officer');
 $user = current_user();
 $flashes = render_flashes();
+$officerId = (int) ($user['id'] ?? 0);
 /*
 |--------------------------------------------------------------------------
-| Supervisor
+| Candidate Statistics
 |--------------------------------------------------------------------------
 */
-$supervisorId = (int) ($user['id'] ?? $user['user_id'] ?? 0);
-
-if ($supervisorId <= 0) {
-    http_response_code(403);
-    exit('Invalid Supervisor account.');
-}
-/*
-|--------------------------------------------------------------------------
-| Dashboard Statistics
-|--------------------------------------------------------------------------
-*/
-$assignedCohorts   = 0;
-$totalCandidates   = 0;
-$activeCandidates  = 0;
+$totalCandidates = 0;
+$activeCandidates = 0;
 $completedCandidates = 0;
-$completionRate    = 0;
-/*
-|--------------------------------------------------------------------------
-| Assigned Cohorts
-|--------------------------------------------------------------------------
-*/
-$stmt = Database::prepare("
-    SELECT COUNT(*) AS total
-    FROM cohorts
-    WHERE supervisor_id = ?
-", 'i', [$supervisorId]);
-$result = $stmt->get_result();
-$row = $result->fetch_assoc();
-$assignedCohorts = (int) ($row['total'] ?? 0);
-$stmt->close();
+$withdrawnCandidates = 0;
 /*
 |--------------------------------------------------------------------------
 | Total Candidates
-|--------------------------------------------------------------------------
-|
-| Unique candidates participating in cohorts assigned to this Supervisor.
-| Withdrawn candidates are excluded.
-|
 |--------------------------------------------------------------------------
 */
 $stmt = Database::prepare("
@@ -59,9 +34,10 @@ $stmt = Database::prepare("
     FROM cohort_participants cp
     INNER JOIN cohorts c
         ON c.id = cp.cohort_id
-    WHERE c.supervisor_id = ?
-      AND cp.status <> 'withdrawn'
-", 'i', [$supervisorId]);
+    INNER JOIN programmes p
+        ON p.id = c.programme_id
+    WHERE p.created_by = ?
+", 'i', [$officerId]);
 $result = $stmt->get_result();
 $row = $result->fetch_assoc();
 $totalCandidates = (int) ($row['total'] ?? 0);
@@ -76,9 +52,11 @@ $stmt = Database::prepare("
     FROM cohort_participants cp
     INNER JOIN cohorts c
         ON c.id = cp.cohort_id
-    WHERE c.supervisor_id = ?
+    INNER JOIN programmes p
+        ON p.id = c.programme_id
+    WHERE p.created_by = ?
       AND cp.status = 'active'
-", 'i', [$supervisorId]);
+", 'i', [$officerId]);
 $result = $stmt->get_result();
 $row = $result->fetch_assoc();
 $activeCandidates = (int) ($row['total'] ?? 0);
@@ -93,52 +71,58 @@ $stmt = Database::prepare("
     FROM cohort_participants cp
     INNER JOIN cohorts c
         ON c.id = cp.cohort_id
-    WHERE c.supervisor_id = ?
+    INNER JOIN programmes p
+        ON p.id = c.programme_id
+    WHERE p.created_by = ?
       AND cp.status = 'completed'
-", 'i', [$supervisorId]);
+", 'i', [$officerId]);
 $result = $stmt->get_result();
 $row = $result->fetch_assoc();
 $completedCandidates = (int) ($row['total'] ?? 0);
 $stmt->close();
 /*
 |--------------------------------------------------------------------------
-| Completion Rate
-|--------------------------------------------------------------------------
-|
-| Completed candidates / eligible candidates * 100
-|
-| Withdrawn candidates are excluded.
-|
+| Withdrawn Candidates
 |--------------------------------------------------------------------------
 */
-if ($totalCandidates > 0) {
-    $completionRate = round(
-        ($completedCandidates / $totalCandidates) * 100
-    );
-}
+$stmt = Database::prepare("
+    SELECT COUNT(DISTINCT cp.user_id) AS total
+    FROM cohort_participants cp
+    INNER JOIN cohorts c
+        ON c.id = cp.cohort_id
+    INNER JOIN programmes p
+        ON p.id = c.programme_id
+    WHERE p.created_by = ?
+      AND cp.status = 'withdrawn'
+", 'i', [$officerId]);
+$result = $stmt->get_result();
+$row = $result->fetch_assoc();
+$withdrawnCandidates = (int) ($row['total'] ?? 0);
+$stmt->close();
 /*
 |--------------------------------------------------------------------------
-| Candidate Progress
-|--------------------------------------------------------------------------
-|
-| Displays candidates assigned to this Supervisor through their cohorts.
+| Candidate List
 |--------------------------------------------------------------------------
 */
 $candidates = [];
 $stmt = Database::prepare("
-    SELECT DISTINCT
+    SELECT
         cp.user_id,
         u.first_name,
         u.last_name,
         u.email,
+        u.phone,
         cp.status AS participation_status,
         cp.selected_at,
         cp.onboarded_at,
         cp.completed_at,
         c.id AS cohort_id,
         c.name AS cohort_name,
+        c.start_date AS cohort_start_date,
+        c.end_date AS cohort_end_date,
         p.id AS programme_id,
-        p.name AS programme_name
+        p.name AS programme_name,
+        p.type AS programme_type
     FROM cohort_participants cp
     INNER JOIN cohorts c
         ON c.id = cp.cohort_id
@@ -146,14 +130,13 @@ $stmt = Database::prepare("
         ON p.id = c.programme_id
     INNER JOIN users u
         ON u.id = cp.user_id
-    WHERE c.supervisor_id = ?
-      AND cp.status <> 'withdrawn'
+    WHERE p.created_by = ?
     ORDER BY
+        p.name ASC,
         c.start_date ASC,
         u.first_name ASC,
         u.last_name ASC
-    LIMIT 10
-", 'i', [$supervisorId]);
+", 'i', [$officerId]);
 $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) {
     $candidates[] = $row;
@@ -164,14 +147,13 @@ $stmt->close();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>
-        Supervisor Dashboard | Investhood IT
-    </title>
-    <link
-        rel="preconnect"
-        href="https://fonts.googleapis.com"
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
     >
+    <title>
+        Candidates | Programme Officer | Investhood IT
+    </title>
     <link
         rel="preconnect"
         href="https://fonts.googleapis.com"
@@ -211,13 +193,13 @@ $stmt->close();
         <header class="dash-header">
             <div class="dash-header__left">
                 <h1 class="dash-header__title">
-                    Supervisor Dashboard
+                    Candidates
                 </h1>
             </div>
             <div class="dash-header__right">
                 <div class="dash-header__user">
                     <img
-                        src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Supervisor') ?>&background=1a56db&color=fff&size=80"
+                        src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Programme Officer') ?>&background=1a56db&color=fff&size=80"
                         alt=""
                         class="dash-header__avatar"
                     >
@@ -235,44 +217,25 @@ $stmt->close();
                 <div class="welcome-card__bg"></div>
                 <div class="welcome-card__content">
                     <h1 class="welcome-card__greeting">
-                        Welcome,
-                        <span class="text-gradient">
-                            <?= e($user['fullname'] ?? 'Supervisor') ?>
-                        </span>
+                        Candidate Management
                     </h1>
                     <p>
-                        Monitor your assigned cohorts, supervise candidates,
-                        track progress, and generate reports.
+                        View and monitor candidates participating
+                        in your programmes.
                     </p>
                 </div>
             </div>
             <!-- =================================================
-                 OVERVIEW
+                 STATISTICS
             ================================================== -->
             <div
                 class="overview-grid"
                 style="margin-top:2rem;"
             >
-                <!-- Assigned Cohorts -->
+                <!-- Total -->
                 <div class="overview-card">
                     <div
                         class="overview-card__icon overview-card__icon--primary"
-                    >
-                        <i class="fas fa-layer-group"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($assignedCohorts) ?>
-                        </span>
-                        <span class="overview-card__label">
-                            Assigned Cohorts
-                        </span>
-                    </div>
-                </div>
-                <!-- Candidates -->
-                <div class="overview-card">
-                    <div
-                        class="overview-card__icon overview-card__icon--cyan"
                     >
                         <i class="fas fa-users"></i>
                     </div>
@@ -281,14 +244,14 @@ $stmt->close();
                             <?= number_format($totalCandidates) ?>
                         </span>
                         <span class="overview-card__label">
-                            Candidates
+                            Total Candidates
                         </span>
                     </div>
                 </div>
-                <!-- Active Candidates -->
+                <!-- Active -->
                 <div class="overview-card">
                     <div
-                        class="overview-card__icon overview-card__icon--amber"
+                        class="overview-card__icon overview-card__icon--cyan"
                     >
                         <i class="fas fa-user-check"></i>
                     </div>
@@ -301,50 +264,51 @@ $stmt->close();
                         </span>
                     </div>
                 </div>
-                <!-- Completed Candidates -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--primary">
-                        <i class="fas fa-graduation-cap"></i>
-                    </div>
-
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($completedCandidates) ?>
-                        </span>
-
-                        <span class="overview-card__label">
-                            Completed Candidates
-                        </span>
-                    </div>
-                </div>
-                <!-- Completion Rate -->
+                <!-- Completed -->
                 <div class="overview-card">
                     <div
                         class="overview-card__icon overview-card__icon--primary"
                     >
-                        <i class="fas fa-chart-line"></i>
+                        <i class="fas fa-user-graduate"></i>
                     </div>
                     <div class="overview-card__info">
                         <span class="overview-card__number">
-                            <?= $completionRate ?>%
+                            <?= number_format($completedCandidates) ?>
                         </span>
                         <span class="overview-card__label">
-                            Completion Rate
+                            Completed
+                        </span>
+                    </div>
+                </div>
+                <!-- Withdrawn -->
+                <div class="overview-card">
+                    <div
+                        class="overview-card__icon overview-card__icon--amber"
+                    >
+                        <i class="fas fa-user-minus"></i>
+                    </div>
+                    <div class="overview-card__info">
+                        <span class="overview-card__number">
+                            <?= number_format($withdrawnCandidates) ?>
+                        </span>
+                        <span class="overview-card__label">
+                            Withdrawn
                         </span>
                     </div>
                 </div>
             </div>
             <!-- =================================================
-                 CANDIDATE PROGRESS
+                 CANDIDATES
             ================================================== -->
             <div style="margin-top:2rem;">
                 <div class="welcome-card">
                     <div class="welcome-card__content">
                         <h2 style="margin-bottom:0.5rem;">
-                            Candidate Progress
+                            Programme Candidates
                         </h2>
                         <p>
-                            Monitor candidates assigned to your cohorts.
+                            Candidates currently associated with
+                            your programmes.
                         </p>
                     </div>
                 </div>
@@ -356,11 +320,11 @@ $stmt->close();
                 >
                     <div class="welcome-card__content">
                         <h3>
-                            No Candidates Assigned
+                            No Candidates Found
                         </h3>
                         <p>
-                            You currently have no candidates assigned
-                            through your cohorts.
+                            There are currently no candidates
+                            associated with your programmes.
                         </p>
                     </div>
                 </div>
@@ -370,6 +334,15 @@ $stmt->close();
                     style="margin-top:1rem;"
                 >
                     <?php foreach ($candidates as $candidate): ?>
+                        <?php
+                        $candidateName = trim(
+                            $candidate['first_name'] .
+                            ' ' .
+                            $candidate['last_name']
+                        );
+                        $status = $candidate['participation_status'];
+                        $statusLabel = ucfirst($status);
+                        ?>
                         <div class="overview-card">
                             <div
                                 class="overview-card__icon overview-card__icon--primary"
@@ -377,57 +350,54 @@ $stmt->close();
                                 <i class="fas fa-user"></i>
                             </div>
                             <div class="overview-card__info">
+                                <!-- Candidate -->
                                 <span
                                     class="overview-card__label"
                                     style="font-weight:600;"
                                 >
-                                    <?= e(
-                                        trim(
-                                            $candidate['first_name'] .
-                                            ' ' .
-                                            $candidate['last_name']
-                                        )
-                                    ) ?>
+                                    <?= e($candidateName) ?>
                                 </span>
+                                <!-- Email -->
                                 <span
                                     class="overview-card__label"
                                     style="margin-top:0.35rem;"
                                 >
+                                    <?= e($candidate['email']) ?>
+                                </span>
+                                <!-- Programme -->
+                                <span
+                                    class="overview-card__label"
+                                    style="margin-top:0.35rem;"
+                                >
+                                    <strong>
+                                        Programme:
+                                    </strong>
                                     <?= e($candidate['programme_name']) ?>
                                 </span>
+                                <!-- Cohort -->
                                 <span
                                     class="overview-card__label"
                                     style="margin-top:0.35rem;"
                                 >
+                                    <strong>
+                                        Cohort:
+                                    </strong>
                                     <?= e($candidate['cohort_name']) ?>
                                 </span>
+                                <!-- Status -->
                                 <span
                                     class="overview-card__label"
                                     style="margin-top:0.35rem;"
                                 >
-                                    Status:
-                                    <?= e(
-                                        ucfirst(
-                                            $candidate['participation_status']
-                                        )
-                                    ) ?>
+                                    <strong>
+                                        Status:
+                                    </strong>
+                                    <?= e($statusLabel) ?>
                                 </span>
                             </div>
                         </div>
                     <?php endforeach; ?>
                 </div>
-                <?php if ($totalCandidates > 10): ?>
-                    <div style="margin-top:1rem;">
-                        <a
-                            href="<?= url('supervisor/candidates.php') ?>"
-                            class="sidebar__link"
-                            style="display:inline-flex;"
-                        >
-                            <i class="fas fa-users"></i>
-                            View All Candidates
-                        </a>
-                    </div>
-                <?php endif; ?>
             <?php endif; ?>
         </div>
     </main>
