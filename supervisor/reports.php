@@ -1,202 +1,582 @@
 <?php
-/**
- * ================================================
- * INVESTHOOD IT - Supervisor Reports
- * ================================================
- * Role: Supervisor
- *
- * Reports are restricted to cohorts assigned to
- * the currently authenticated Supervisor through
- * cohorts.supervisor_id.
- */
 require_once __DIR__ . '/../includes/bootstrap.php';
 require_role('supervisor');
 $user = current_user();
 $flashes = render_flashes();
+$currentPage = 'reports';
+/*
+|--------------------------------------------------------------------------
+| Database
+|--------------------------------------------------------------------------
+*/
+$conn = Database::getConnection();
 /*
 |--------------------------------------------------------------------------
 | Supervisor
 |--------------------------------------------------------------------------
 */
-$supervisorId = (int) ($user['id'] ?? 0);
-/*
-|--------------------------------------------------------------------------
-| Report Statistics
-|--------------------------------------------------------------------------
-*/
-$assignedCohorts     = 0;
-$totalCandidates     = 0;
-$selectedCandidates  = 0;
-$onboardedCandidates = 0;
-$activeCandidates    = 0;
-$completedCandidates = 0;
-$withdrawnCandidates = 0;
-$completionRate      = 0;
-/*
-|--------------------------------------------------------------------------
-| Assigned Cohorts
-|--------------------------------------------------------------------------
-*/
-$stmt = Database::prepare("
-    SELECT COUNT(*) AS total
-    FROM cohorts
-    WHERE supervisor_id = ?
-", 'i', [$supervisorId]);
-$result = $stmt->get_result();
-$row = $result->fetch_assoc();
-$assignedCohorts = (int) ($row['total'] ?? 0);
-$stmt->close();
-/*
-|--------------------------------------------------------------------------
-| Candidate Status Summary
-|--------------------------------------------------------------------------
-|
-| Candidates are counted only from cohorts assigned to the
-| currently logged-in Supervisor.
-|
-|--------------------------------------------------------------------------
-*/
-$stmt = Database::prepare("
-    SELECT
-        COUNT(DISTINCT CASE
-            WHEN cp.status <> 'withdrawn'
-            THEN cp.user_id
-        END) AS total_candidates,
-        COUNT(DISTINCT CASE
-            WHEN cp.status = 'selected'
-            THEN cp.user_id
-        END) AS selected_candidates,
-        COUNT(DISTINCT CASE
-            WHEN cp.status = 'onboarded'
-            THEN cp.user_id
-        END) AS onboarded_candidates,
-        COUNT(DISTINCT CASE
-            WHEN cp.status = 'active'
-            THEN cp.user_id
-        END) AS active_candidates,
-        COUNT(DISTINCT CASE
-            WHEN cp.status = 'completed'
-            THEN cp.user_id
-        END) AS completed_candidates,
-        COUNT(DISTINCT CASE
-            WHEN cp.status = 'withdrawn'
-            THEN cp.user_id
-        END) AS withdrawn_candidates
-    FROM cohort_participants cp
-    INNER JOIN cohorts c
-        ON c.id = cp.cohort_id
-    WHERE c.supervisor_id = ?
-", 'i', [$supervisorId]);
-$result = $stmt->get_result();
-$row = $result->fetch_assoc();
-$totalCandidates     = (int) ($row['total_candidates'] ?? 0);
-$selectedCandidates  = (int) ($row['selected_candidates'] ?? 0);
-$onboardedCandidates = (int) ($row['onboarded_candidates'] ?? 0);
-$activeCandidates    = (int) ($row['active_candidates'] ?? 0);
-$completedCandidates = (int) ($row['completed_candidates'] ?? 0);
-$withdrawnCandidates = (int) ($row['withdrawn_candidates'] ?? 0);
-$stmt->close();
-/*
-|--------------------------------------------------------------------------
-| Completion Rate
-|--------------------------------------------------------------------------
-*/
-if ($totalCandidates > 0) {
-    $completionRate = round(
-        ($completedCandidates / $totalCandidates) * 100
-    );
+$supervisorId = (int)(
+    $user['id']
+    ?? $user['user_id']
+    ?? 0
+);
+if ($supervisorId <= 0) {
+    http_response_code(403);
+    exit('Invalid Supervisor account.');
 }
 /*
 |--------------------------------------------------------------------------
-| Cohort Performance
+| Supervisor Details
 |--------------------------------------------------------------------------
 */
+$firstName = trim(
+    (string)(
+        $user['first_name']
+        ?? ''
+    )
+);
+$lastName = trim(
+    (string)(
+        $user['last_name']
+        ?? ''
+    )
+);
+$supervisorName = trim(
+    $firstName . ' ' . $lastName
+);
+if ($supervisorName === '') {
+    $supervisorName = 'Supervisor';
+}
+/*
+|--------------------------------------------------------------------------
+| Filters
+|--------------------------------------------------------------------------
+*/
+$programmeId = (int)(
+    $_GET['programme_id']
+    ?? 0
+);
+$cohortId = (int)(
+    $_GET['cohort_id']
+    ?? 0
+);
+$cohortStatus = trim(
+    (string)(
+        $_GET['status']
+        ?? ''
+    )
+);
+$dateFrom = trim(
+    (string)(
+        $_GET['date_from']
+        ?? ''
+    )
+);
+$dateTo = trim(
+    (string)(
+        $_GET['date_to']
+        ?? ''
+    )
+);
+/*
+|--------------------------------------------------------------------------
+| Validate Dates
+|--------------------------------------------------------------------------
+*/
+if (
+    $dateFrom !== ''
+    &&
+    !preg_match(
+        '/^\d{4}-\d{2}-\d{2}$/',
+        $dateFrom
+    )
+) {
+    $dateFrom = '';
+}
+if (
+    $dateTo !== ''
+    &&
+    !preg_match(
+        '/^\d{4}-\d{2}-\d{2}$/',
+        $dateTo
+    )
+) {
+    $dateTo = '';
+}
+/*
+|--------------------------------------------------------------------------
+| Helpers
+|--------------------------------------------------------------------------
+*/
+function supervisorReportDate(
+    ?string $date
+): string {
+    if (
+        empty($date)
+        ||
+        $date === '0000-00-00'
+    ) {
+        return '—';
+    }
+    $timestamp = strtotime($date);
+    if (!$timestamp) {
+        return '—';
+    }
+    return date(
+        'd M Y',
+        $timestamp
+    );
+}
+function supervisorReportStatusLabel(
+    ?string $status
+): string {
+    $status = trim(
+        (string)$status
+    );
+    if ($status === '') {
+        return 'Unknown';
+    }
+    return ucwords(
+        str_replace(
+            '_',
+            ' ',
+            $status
+        )
+    );
+}
+function supervisorReportStatusClass(
+    ?string $status
+): string {
+    switch (
+        strtolower(
+            trim(
+                (string)$status
+            )
+        )
+    ) {
+        case 'active':
+            return 'success';
+        case 'completed':
+            return 'primary';
+        case 'withdrawn':
+            return 'danger';
+        case 'inactive':
+        case 'closed':
+            return 'secondary';
+        case 'upcoming':
+        case 'pending':
+            return 'warning';
+        default:
+            return 'neutral';
+    }
+}
+function supervisorReportCompletionRate(
+    int $currentCandidates,
+    int $completedCandidates
+): int {
+    if ($currentCandidates <= 0) {
+        return 0;
+    }
+    return (int)round(
+        (
+            $completedCandidates
+            /
+            $currentCandidates
+        )
+        * 100
+    );
+}
+function supervisorReportInitials(
+    string $name
+): string {
+    $parts = preg_split(
+        '/\s+/',
+        trim($name)
+    );
+    $initials = '';
+    foreach (
+        array_slice(
+            $parts,
+            0,
+            2
+        )
+        as $part
+    ) {
+        if ($part !== '') {
+            $initials .= strtoupper(
+                substr(
+                    $part,
+                    0,
+                    1
+                )
+            );
+        }
+    }
+    return $initials !== ''
+        ? $initials
+        : 'C';
+}
+/*
+|--------------------------------------------------------------------------
+| Assigned Programmes Filter
+|--------------------------------------------------------------------------
+*/
+$stmt = Database::prepare(
+    "
+        SELECT DISTINCT
+            p.id,
+            p.name
+        FROM programmes p
+        INNER JOIN cohorts c
+            ON c.programme_id = p.id
+        WHERE c.supervisor_id = ?
+        ORDER BY p.name ASC
+    ",
+    'i',
+    [$supervisorId]
+);
+$result = $stmt->get_result();
+$programmes = [];
+while (
+    $row = $result->fetch_assoc()
+) {
+    $programmes[] = $row;
+}
+$stmt->close();
+/*
+|--------------------------------------------------------------------------
+| Assigned Cohorts Filter
+|--------------------------------------------------------------------------
+*/
+$cohortSql = "
+    SELECT
+        c.id,
+        c.name,
+        c.status,
+        p.name AS programme_name
+    FROM cohorts c
+    INNER JOIN programmes p
+        ON p.id = c.programme_id
+    WHERE c.supervisor_id = ?
+";
+$cohortTypes = 'i';
+$cohortParams = [
+    $supervisorId
+];
+if ($programmeId > 0) {
+    $cohortSql .= "
+        AND p.id = ?
+    ";
+    $cohortTypes .= 'i';
+    $cohortParams[] =
+        $programmeId;
+}
+$cohortSql .= "
+    ORDER BY
+        CASE
+            WHEN c.status = 'active'
+            THEN 1
+            ELSE 2
+        END,
+        c.name ASC
+";
+$stmt = Database::prepare(
+    $cohortSql,
+    $cohortTypes,
+    $cohortParams
+);
+$result = $stmt->get_result();
 $cohorts = [];
-$stmt = Database::prepare("
+while (
+    $row = $result->fetch_assoc()
+) {
+    $cohorts[] = $row;
+}
+$stmt->close();
+/*
+|--------------------------------------------------------------------------
+| Available Cohort Statuses
+|--------------------------------------------------------------------------
+*/
+$stmt = Database::prepare(
+    "
+        SELECT DISTINCT
+            c.status
+        FROM cohorts c
+        WHERE c.supervisor_id = ?
+          AND c.status IS NOT NULL
+          AND c.status <> ''
+        ORDER BY c.status ASC
+    ",
+    'i',
+    [$supervisorId]
+);
+$result = $stmt->get_result();
+$statuses = [];
+while (
+    $row = $result->fetch_assoc()
+) {
+    $statuses[] =
+        $row['status'];
+}
+$stmt->close();
+/*
+|--------------------------------------------------------------------------
+| Report Query
+|--------------------------------------------------------------------------
+*/
+$sql = "
     SELECT
         c.id,
         c.name AS cohort_name,
+        c.status AS cohort_status,
         c.start_date,
         c.end_date,
-        c.status AS cohort_status,
         p.id AS programme_id,
         p.name AS programme_name,
         p.type AS programme_type,
-        COUNT(DISTINCT CASE
-            WHEN cp.status <> 'withdrawn'
-            THEN cp.user_id
-        END) AS candidate_count,
-        COUNT(DISTINCT CASE
-            WHEN cp.status = 'selected'
-            THEN cp.user_id
-        END) AS selected_count,
-        COUNT(DISTINCT CASE
-            WHEN cp.status = 'onboarded'
-            THEN cp.user_id
-        END) AS onboarded_count,
-        COUNT(DISTINCT CASE
-            WHEN cp.status = 'active'
-            THEN cp.user_id
-        END) AS active_count,
-        COUNT(DISTINCT CASE
-            WHEN cp.status = 'completed'
-            THEN cp.user_id
-        END) AS completed_count,
-        COUNT(DISTINCT CASE
-            WHEN cp.status = 'withdrawn'
-            THEN cp.user_id
-        END) AS withdrawn_count
+        p.status AS programme_status,
+        COUNT(
+            DISTINCT CASE
+                WHEN cp.status <> 'withdrawn'
+                THEN cp.user_id
+            END
+        ) AS current_candidates,
+        COUNT(
+            DISTINCT CASE
+                WHEN cp.status = 'active'
+                THEN cp.user_id
+            END
+        ) AS active_candidates,
+        COUNT(
+            DISTINCT CASE
+                WHEN cp.status = 'completed'
+                THEN cp.user_id
+            END
+        ) AS completed_candidates,
+        COUNT(
+            DISTINCT CASE
+                WHEN cp.status = 'withdrawn'
+                THEN cp.user_id
+            END
+        ) AS withdrawn_candidates
     FROM cohorts c
     INNER JOIN programmes p
         ON p.id = c.programme_id
     LEFT JOIN cohort_participants cp
         ON cp.cohort_id = c.id
     WHERE c.supervisor_id = ?
+";
+$types = 'i';
+$params = [
+    $supervisorId
+];
+/*
+|--------------------------------------------------------------------------
+| Programme Filter
+|--------------------------------------------------------------------------
+*/
+if ($programmeId > 0) {
+    $sql .= "
+        AND p.id = ?
+    ";
+    $types .= 'i';
+    $params[] =
+        $programmeId;
+}
+/*
+|--------------------------------------------------------------------------
+| Cohort Filter
+|--------------------------------------------------------------------------
+*/
+if ($cohortId > 0) {
+    $sql .= "
+        AND c.id = ?
+    ";
+    $types .= 'i';
+    $params[] =
+        $cohortId;
+}
+/*
+|--------------------------------------------------------------------------
+| Cohort Status Filter
+|--------------------------------------------------------------------------
+*/
+if ($cohortStatus !== '') {
+    $sql .= "
+        AND c.status = ?
+    ";
+    $types .= 's';
+    $params[] =
+        $cohortStatus;
+}
+/*
+|--------------------------------------------------------------------------
+| Date Filters
+|--------------------------------------------------------------------------
+*/
+if ($dateFrom !== '') {
+    $sql .= "
+        AND (
+            c.end_date IS NULL
+            OR c.end_date >= ?
+        )
+    ";
+    $types .= 's';
+    $params[] =
+        $dateFrom;
+}
+if ($dateTo !== '') {
+    $sql .= "
+        AND (
+            c.start_date IS NULL
+            OR c.start_date <= ?
+        )
+    ";
+    $types .= 's';
+    $params[] =
+        $dateTo;
+}
+/*
+|--------------------------------------------------------------------------
+| Group / Sort
+|--------------------------------------------------------------------------
+*/
+$sql .= "
     GROUP BY
         c.id,
         c.name,
+        c.status,
         c.start_date,
         c.end_date,
-        c.status,
         p.id,
         p.name,
-        p.type
+        p.type,
+        p.status
     ORDER BY
-        c.start_date ASC,
-        c.id ASC
-", 'i', [$supervisorId]);
+        CASE
+            WHEN c.status = 'active'
+            THEN 1
+            ELSE 2
+        END,
+        c.start_date DESC,
+        c.name ASC
+";
+$stmt = Database::prepare(
+    $sql,
+    $types,
+    $params
+);
 $result = $stmt->get_result();
-while ($row = $result->fetch_assoc()) {
-    $candidateCount = (int) $row['candidate_count'];
-    $completedCount = (int) $row['completed_count'];
-    $progress = 0;
-    if ($candidateCount > 0) {
-        $progress = round(
-            ($completedCount / $candidateCount) * 100
+$reportRows = [];
+while (
+    $row = $result->fetch_assoc()
+) {
+    $row['current_candidates'] =
+        (int)$row['current_candidates'];
+    $row['active_candidates'] =
+        (int)$row['active_candidates'];
+    $row['completed_candidates'] =
+        (int)$row['completed_candidates'];
+    $row['withdrawn_candidates'] =
+        (int)$row['withdrawn_candidates'];
+    $row['completion_rate'] =
+        supervisorReportCompletionRate(
+            $row['current_candidates'],
+            $row['completed_candidates']
         );
-    }
-    $row['progress'] = $progress;
-    $cohorts[] = $row;
+    $reportRows[] =
+        $row;
 }
 $stmt->close();
 /*
 |--------------------------------------------------------------------------
-| Status Helper
+| Aggregate Report KPIs
 |--------------------------------------------------------------------------
 */
-function reportStatusClass(string $status): string
-{
-    return match (strtolower($status)) {
-        'active'     => 'status-active',
-        'completed'  => 'status-completed',
-        'withdrawn'  => 'status-withdrawn',
-        'onboarded'  => 'status-onboarded',
-        'selected'   => 'status-selected',
-        'open'        => 'status-active',
-        'closed'      => 'status-withdrawn',
-        default      => 'status-default',
-    };
+$totalCohorts =
+    count($reportRows);
+$totalCurrentCandidates = 0;
+$totalActiveCandidates = 0;
+$totalCompletedCandidates = 0;
+$totalWithdrawnCandidates = 0;
+foreach (
+    $reportRows
+    as $row
+) {
+    $totalCurrentCandidates +=
+        $row['current_candidates'];
+    $totalActiveCandidates +=
+        $row['active_candidates'];
+    $totalCompletedCandidates +=
+        $row['completed_candidates'];
+    $totalWithdrawnCandidates +=
+        $row['withdrawn_candidates'];
 }
+$overallCompletionRate =
+    supervisorReportCompletionRate(
+        $totalCurrentCandidates,
+        $totalCompletedCandidates
+    );
+/*
+|--------------------------------------------------------------------------
+| Attention Needed
+|--------------------------------------------------------------------------
+|
+| Active candidates in cohorts ending within the next 30 days.
+|
+|--------------------------------------------------------------------------
+*/
+$attentionSql = "
+    SELECT
+        c.id AS cohort_id,
+        c.name AS cohort_name,
+        c.end_date,
+        p.name AS programme_name,
+        COUNT(
+            DISTINCT cp.user_id
+        ) AS active_candidates
+    FROM cohorts c
+    INNER JOIN programmes p
+        ON p.id = c.programme_id
+    INNER JOIN cohort_participants cp
+        ON cp.cohort_id = c.id
+    WHERE c.supervisor_id = ?
+      AND cp.status = 'active'
+      AND c.end_date IS NOT NULL
+      AND c.end_date >= CURDATE()
+      AND c.end_date <= DATE_ADD(
+            CURDATE(),
+            INTERVAL 30 DAY
+      )
+    GROUP BY
+        c.id,
+        c.name,
+        c.end_date,
+        p.name
+    ORDER BY
+        c.end_date ASC
+    LIMIT 6
+";
+$stmt = Database::prepare(
+    $attentionSql,
+    'i',
+    [$supervisorId]
+);
+$result = $stmt->get_result();
+$attentionRows = [];
+while (
+    $row = $result->fetch_assoc()
+) {
+    $row['active_candidates'] =
+        (int)(
+            $row['active_candidates']
+            ?? 0
+        );
+    $attentionRows[] =
+        $row;
+}
+$stmt->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -207,8 +587,37 @@ function reportStatusClass(string $status): string
         content="width=device-width, initial-scale=1.0"
     >
     <title>
-        Supervisor Reports | Investhood IT
+        Cohort Progress Report
     </title>
+    <!-- ============================================================
+         EARLY THEME
+    ============================================================= -->
+    <script>
+        (function () {
+            try {
+                const savedTheme =
+                    localStorage.getItem(
+                        'investhood-supervisor-theme'
+                    );
+                document.documentElement
+                    .setAttribute(
+                        'data-theme',
+                        savedTheme === 'dark'
+                            ? 'dark'
+                            : 'light'
+                    );
+            } catch (error) {
+                document.documentElement
+                    .setAttribute(
+                        'data-theme',
+                        'light'
+                    );
+            }
+        })();
+    </script>
+    <!-- ============================================================
+         FONTS / ICONS
+    ============================================================= -->
     <link
         rel="preconnect"
         href="https://fonts.googleapis.com"
@@ -219,515 +628,1419 @@ function reportStatusClass(string $status): string
         crossorigin
     >
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
         rel="stylesheet"
     >
     <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-        crossorigin="anonymous"
     >
     <link
         rel="stylesheet"
         href="<?= url('css/styles.css') ?>"
     >
     <style>
-        .report-section {
-            margin-top: 2rem;
+        /* ============================================================
+           PAGE
+        ============================================================ */
+        * {
+            box-sizing: border-box;
         }
-        .report-table-wrapper {
+        body.dashboard-page {
+            margin: 0;
+            font-family:
+                'Inter',
+                sans-serif;
+            background:
+                var(--sv-page-bg, #f5f7fb);
+            color:
+                var(--sv-text, #111827);
+        }
+        .dashboard {
+            display: flex !important;
+            gap: 0 !important;
+            width: 100%;
+            min-height: 100vh;
+        }
+        .dashboard__main {
+            flex: 1;
+            min-width: 0;
+            width: auto !important;
+            margin-left: 0 !important;
+            overflow-x: hidden;
+        }
+        /* ============================================================
+           CONTENT
+        ============================================================ */
+        .report-page {
+            width: 100%;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding:
+                1.5rem;
+        }
+        /* ============================================================
+           BREADCRUMB
+        ============================================================ */
+        .report-breadcrumb {
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+            flex-wrap: wrap;
+            color:
+                var(--sv-text-soft, #64748b);
+            font-size: .7rem;
+        }
+        .report-breadcrumb a {
+            color:
+                var(--sv-text-soft, #64748b);
+            text-decoration: none;
+        }
+        .report-breadcrumb a:hover {
+            color:
+                var(--sv-primary, #2563eb);
+        }
+        .report-breadcrumb i {
+            font-size: .5rem;
+        }
+        /* ============================================================
+           HERO
+        ============================================================ */
+        .report-hero {
+            position: relative;
+            margin-bottom: 1.25rem;
+            padding:
+                1.55rem 1.65rem;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.25rem;
+            border-radius: 22px;
+            background:
+                linear-gradient(
+                    135deg,
+                    #2563eb 0%,
+                    #4f46e5 50%,
+                    #7c3aed 100%
+                );
+            color: #fff;
+            box-shadow:
+                0 16px 40px
+                rgba(37,99,235,.18);
+        }
+        .report-hero::after {
+            content: '';
+            width: 260px;
+            height: 260px;
+            position: absolute;
+            right: -80px;
+            top: -130px;
+            border-radius: 50%;
+            background:
+                rgba(255,255,255,.08);
+        }
+        .report-hero__content {
+            position: relative;
+            z-index: 2;
+        }
+        .report-hero__eyebrow {
+            display: block;
+            margin-bottom: .4rem;
+            color:
+                rgba(255,255,255,.78);
+            font-size: .63rem;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+        .report-hero h2 {
+            margin:
+                0 0 .45rem;
+            font-size:
+                clamp(
+                    1.35rem,
+                    3vw,
+                    2rem
+                );
+            font-weight: 800;
+        }
+        .report-hero p {
+            max-width: 700px;
+            margin: 0;
+            color:
+                rgba(255,255,255,.82);
+            font-size: .75rem;
+            line-height: 1.6;
+        }
+        .report-hero__score {
+            min-width: 150px;
+            position: relative;
+            z-index: 2;
+            padding: 1rem;
+            border:
+                1px solid
+                rgba(255,255,255,.16);
+            border-radius: 18px;
+            background:
+                rgba(255,255,255,.10);
+            backdrop-filter:
+                blur(12px);
+            text-align: center;
+        }
+        .report-hero__score strong {
+            display: block;
+            font-size: 1.65rem;
+            font-weight: 800;
+        }
+        .report-hero__score span {
+            display: block;
+            margin-top: .2rem;
+            color:
+                rgba(255,255,255,.78);
+            font-size: .61rem;
+        }
+        /* ============================================================
+           KPI GRID
+        ============================================================ */
+        .report-kpis {
+            margin-bottom: 1.25rem;
+            display: grid;
+            grid-template-columns:
+                repeat(
+                    5,
+                    minmax(0, 1fr)
+                );
+            gap: 1rem;
+        }
+        .report-kpi {
+            padding: 1rem;
+            border:
+                1px solid
+                var(--sv-border, #e5e7eb);
+            border-radius: 17px;
+            background:
+                var(--sv-card-bg, #fff);
+            box-shadow:
+                var(
+                    --sv-shadow,
+                    0 8px 25px
+                    rgba(15,23,42,.05)
+                );
+        }
+        .report-kpi__top {
+            margin-bottom: .8rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .6rem;
+        }
+        .report-kpi__icon {
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 11px;
+            font-size: .72rem;
+        }
+        .report-kpi__icon--blue {
+            background:
+                rgba(37,99,235,.10);
+            color: #2563eb;
+        }
+        .report-kpi__icon--purple {
+            background:
+                rgba(124,58,237,.10);
+            color: #7c3aed;
+        }
+        .report-kpi__icon--green {
+            background:
+                rgba(34,197,94,.10);
+            color: #16a34a;
+        }
+        .report-kpi__icon--orange {
+            background:
+                rgba(245,158,11,.12);
+            color: #d97706;
+        }
+        .report-kpi__icon--red {
+            background:
+                rgba(239,68,68,.10);
+            color: #dc2626;
+        }
+        .report-kpi strong {
+            display: block;
+            color:
+                var(--sv-text, #111827);
+            font-size: 1.25rem;
+            font-weight: 800;
+        }
+        .report-kpi span {
+            color:
+                var(--sv-text-soft, #64748b);
+            font-size: .62rem;
+        }
+        /* ============================================================
+           CARD
+        ============================================================ */
+        .report-card {
+            margin-bottom: 1.25rem;
+            overflow: hidden;
+            border:
+                1px solid
+                var(--sv-border, #e5e7eb);
+            border-radius: 18px;
+            background:
+                var(--sv-card-bg, #fff);
+            box-shadow:
+                var(
+                    --sv-shadow,
+                    0 8px 25px
+                    rgba(15,23,42,.05)
+                );
+        }
+        .report-card__header {
+            padding:
+                1rem 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            border-bottom:
+                1px solid
+                var(--sv-border, #e5e7eb);
+        }
+        .report-card__title strong {
+            display: block;
+            color:
+                var(--sv-text, #111827);
+            font-size: .78rem;
+        }
+        .report-card__title span {
+            display: block;
+            margin-top: .2rem;
+            color:
+                var(--sv-text-soft, #64748b);
+            font-size: .58rem;
+        }
+        /* ============================================================
+           FILTERS
+        ============================================================ */
+        .report-filters {
+            padding: 1rem;
+        }
+        .report-filter-grid {
+            display: grid;
+            grid-template-columns:
+                1.1fr
+                1.1fr
+                .8fr
+                .8fr
+                .8fr
+                auto;
+            gap: .8rem;
+            align-items: end;
+        }
+        .report-field label {
+            display: block;
+            margin-bottom: .35rem;
+            color:
+                var(--sv-text-soft, #64748b);
+            font-size: .56rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+        .report-field select,
+        .report-field input {
+            width: 100%;
+            min-height: 42px;
+            padding:
+                .65rem .75rem;
+            border:
+                1px solid
+                var(--sv-border, #e5e7eb);
+            border-radius: 11px;
+            outline: none;
+            background:
+                var(--sv-card-soft, #f8fafc);
+            color:
+                var(--sv-text, #111827);
+            font-family: inherit;
+            font-size: .67rem;
+        }
+        .report-field select:focus,
+        .report-field input:focus {
+            border-color:
+                rgba(37,99,235,.45);
+            box-shadow:
+                0 0 0 3px
+                rgba(37,99,235,.08);
+        }
+        .report-filter-actions {
+            display: flex;
+            gap: .5rem;
+        }
+        .report-button {
+            min-height: 42px;
+            padding:
+                .65rem .9rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .45rem;
+            border: 0;
+            border-radius: 11px;
+            font-family: inherit;
+            font-size: .62rem;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .report-button--primary {
+            background:
+                var(--sv-primary, #2563eb);
+            color: #fff;
+        }
+        .report-button--secondary {
+            border:
+                1px solid
+                var(--sv-border, #e5e7eb);
+            background:
+                var(--sv-card-bg, #fff);
+            color:
+                var(--sv-text, #111827);
+        }
+        /* ============================================================
+           TABLE
+        ============================================================ */
+        .report-table-wrap {
+            width: 100%;
             overflow-x: auto;
-            margin-top: 1rem;
         }
         .report-table {
             width: 100%;
             border-collapse: collapse;
-            background: #fff;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-        .report-table th,
-        .report-table td {
-            padding: 0.9rem 1rem;
-            text-align: left;
-            border-bottom: 1px solid #e5e7eb;
-            white-space: nowrap;
         }
         .report-table th {
-            font-size: 0.8rem;
-            font-weight: 700;
+            padding:
+                .7rem .8rem;
+            border-bottom:
+                1px solid
+                var(--sv-border, #e5e7eb);
+            background:
+                var(--sv-card-soft, #f8fafc);
+            color:
+                var(--sv-text-soft, #64748b);
+            font-size: .54rem;
+            font-weight: 800;
+            letter-spacing: .04em;
+            text-align: left;
             text-transform: uppercase;
-            color: #6b7280;
-            background: #f9fafb;
+            white-space: nowrap;
         }
         .report-table td {
-            font-size: 0.9rem;
-            color: #374151;
+            padding:
+                .85rem .8rem;
+            border-bottom:
+                1px solid
+                var(--sv-border, #e5e7eb);
+            color:
+                var(--sv-text, #111827);
+            font-size: .63rem;
+            vertical-align: middle;
         }
-        .report-table tr:last-child td {
-            border-bottom: none;
+        .report-table tbody tr:last-child td {
+            border-bottom: 0;
         }
-        .report-status {
+        .report-table tbody tr:hover {
+            background:
+                var(--sv-card-soft, #f8fafc);
+        }
+        /* ============================================================
+           COHORT
+        ============================================================ */
+        .report-cohort {
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+            min-width: 175px;
+        }
+        .report-cohort__avatar {
+            width: 37px;
+            height: 37px;
+            flex:
+                0 0 37px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 11px;
+            background:
+                linear-gradient(
+                    135deg,
+                    #2563eb,
+                    #7c3aed
+                );
+            color: #fff;
+            font-size: .62rem;
+            font-weight: 800;
+        }
+        .report-cohort strong {
+            display: block;
+            color:
+                var(--sv-text, #111827);
+            font-size: .65rem;
+        }
+        .report-cohort span {
+            display: block;
+            margin-top: .15rem;
+            color:
+                var(--sv-text-soft, #64748b);
+            font-size: .55rem;
+        }
+        /* ============================================================
+           BADGE
+        ============================================================ */
+        .report-badge {
             display: inline-flex;
             align-items: center;
-            padding: 0.3rem 0.65rem;
+            padding:
+                .28rem .48rem;
             border-radius: 999px;
-            font-size: 0.75rem;
-            font-weight: 600;
+            font-size: .53rem;
+            font-weight: 700;
         }
-        .status-active {
-            background: #dcfce7;
-            color: #166534;
+        .report-badge--success {
+            background:
+                rgba(34,197,94,.10);
+            color: #16a34a;
         }
-        .status-completed {
-            background: #dbeafe;
-            color: #1d4ed8;
+        .report-badge--primary {
+            background:
+                rgba(37,99,235,.10);
+            color: #2563eb;
         }
-        .status-withdrawn {
-            background: #fee2e2;
-            color: #b91c1c;
+        .report-badge--danger {
+            background:
+                rgba(239,68,68,.10);
+            color: #dc2626;
         }
-        .status-onboarded {
-            background: #e0f2fe;
-            color: #0369a1;
+        .report-badge--warning {
+            background:
+                rgba(245,158,11,.12);
+            color: #d97706;
         }
-        .status-selected {
-            background: #fef3c7;
-            color: #92400e;
+        .report-badge--secondary,
+        .report-badge--neutral {
+            background:
+                var(--sv-card-soft, #f8fafc);
+            color:
+                var(--sv-text-soft, #64748b);
         }
-        .status-default {
-            background: #f3f4f6;
-            color: #374151;
+        /* ============================================================
+           PROGRESS
+        ============================================================ */
+        .report-progress {
+            min-width: 150px;
         }
-        .progress-container {
-            min-width: 120px;
+        .report-progress__header {
+            margin-bottom: .35rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .6rem;
+            color:
+                var(--sv-text-soft, #64748b);
+            font-size: .54rem;
         }
-        .progress-bar {
+        .report-progress__header strong {
+            color:
+                var(--sv-text, #111827);
+            font-size: .56rem;
+        }
+        .report-progress__track {
             width: 100%;
             height: 7px;
-            background: #e5e7eb;
-            border-radius: 999px;
             overflow: hidden;
-        }
-        .progress-bar__fill {
-            height: 100%;
-            background: #1a56db;
             border-radius: 999px;
+            background:
+                var(--sv-card-soft, #f1f5f9);
         }
-        .progress-value {
-            display: block;
-            margin-top: 0.3rem;
-            font-size: 0.75rem;
-            font-weight: 600;
+        .report-progress__bar {
+            height: 100%;
+            border-radius: inherit;
+            background:
+                linear-gradient(
+                    90deg,
+                    #2563eb,
+                    #7c3aed
+                );
         }
-        .report-actions {
+        /* ============================================================
+           GRID LOWER
+        ============================================================ */
+        .report-lower-grid {
+            display: grid;
+            grid-template-columns:
+                1.35fr
+                .65fr;
+            gap: 1rem;
+        }
+        /* ============================================================
+           OUTCOME SUMMARY
+        ============================================================ */
+        .report-outcomes {
+            padding: 1rem;
+        }
+        .report-outcome {
+            padding:
+                .85rem 0;
             display: flex;
-            justify-content: flex-end;
-            gap: 0.75rem;
-            margin-top: 1rem;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            border-bottom:
+                1px solid
+                var(--sv-border, #e5e7eb);
         }
-        .report-button {
+        .report-outcome:last-child {
+            border-bottom: 0;
+        }
+        .report-outcome__left {
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+        }
+        .report-outcome__icon {
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            font-size: .65rem;
+        }
+        .report-outcome strong {
+            display: block;
+            color:
+                var(--sv-text, #111827);
+            font-size: .64rem;
+        }
+        .report-outcome span {
+            display: block;
+            margin-top: .15rem;
+            color:
+                var(--sv-text-soft, #64748b);
+            font-size: .54rem;
+        }
+        .report-outcome__value {
+            font-size: .8rem !important;
+            font-weight: 800;
+        }
+        /* ============================================================
+           ATTENTION
+        ============================================================ */
+        .report-attention {
+            padding: 1rem;
+        }
+        .report-attention__item {
+            padding:
+                .75rem;
+            margin-bottom: .65rem;
+            border:
+                1px solid
+                rgba(245,158,11,.18);
+            border-radius: 12px;
+            background:
+                rgba(245,158,11,.055);
+        }
+        .report-attention__item:last-child {
+            margin-bottom: 0;
+        }
+        .report-attention__item strong {
+            display: block;
+            color:
+                var(--sv-text, #111827);
+            font-size: .63rem;
+        }
+        .report-attention__item span {
+            display: block;
+            margin-top: .2rem;
+            color:
+                var(--sv-text-soft, #64748b);
+            font-size: .55rem;
+            line-height: 1.5;
+        }
+        .report-attention__action {
+            margin-top: .5rem;
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.65rem 1rem;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            background: #fff;
-            color: #374151;
-            cursor: pointer;
-            font-weight: 600;
+            gap: .3rem;
+            color:
+                var(--sv-primary, #2563eb);
+            font-size: .55rem;
+            font-weight: 700;
             text-decoration: none;
         }
-        .report-button:hover {
-            background: #f9fafb;
+        /* ============================================================
+           EMPTY
+        ============================================================ */
+        .report-empty {
+            padding:
+                3rem 1rem;
+            text-align: center;
         }
-        @media print {
-            .sidebar,
-            .dash-header__right,
-            .report-actions {
-                display: none !important;
+        .report-empty__icon {
+            width: 58px;
+            height: 58px;
+            margin:
+                0 auto .8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            background:
+                var(--sv-primary-soft, #eff6ff);
+            color:
+                var(--sv-primary, #2563eb);
+            font-size: 1rem;
+        }
+        .report-empty strong {
+            display: block;
+            color:
+                var(--sv-text, #111827);
+            font-size: .75rem;
+        }
+        .report-empty span {
+            display: block;
+            max-width: 400px;
+            margin:
+                .35rem auto 0;
+            color:
+                var(--sv-text-soft, #64748b);
+            font-size: .6rem;
+            line-height: 1.5;
+        }
+        /* ============================================================
+           SECURITY NOTICE
+        ============================================================ */
+        .report-security {
+            margin-top: 1.25rem;
+            padding:
+                .9rem 1rem;
+            display: flex;
+            align-items: flex-start;
+            gap: .7rem;
+            border:
+                1px solid
+                rgba(37,99,235,.12);
+            border-radius: 14px;
+            background:
+                var(--sv-primary-soft, #eff6ff);
+        }
+        .report-security i {
+            margin-top: .1rem;
+            color:
+                var(--sv-primary, #2563eb);
+        }
+        .report-security strong {
+            display: block;
+            color:
+                var(--sv-text, #111827);
+            font-size: .62rem;
+        }
+        .report-security span {
+            display: block;
+            margin-top: .2rem;
+            color:
+                var(--sv-text-soft, #64748b);
+            font-size: .55rem;
+            line-height: 1.5;
+        }
+        /* ============================================================
+           DARK MODE
+        ============================================================ */
+        html[data-theme="dark"]
+        .report-table tbody tr:hover {
+            background:
+                rgba(255,255,255,.025);
+        }
+        html[data-theme="dark"]
+        .report-field select,
+        html[data-theme="dark"]
+        .report-field input {
+            color-scheme: dark;
+        }
+        /* ============================================================
+           RESPONSIVE
+        ============================================================ */
+        @media(max-width:1250px) {
+            .report-kpis {
+                grid-template-columns:
+                    repeat(
+                        3,
+                        minmax(0, 1fr)
+                    );
             }
+            .report-filter-grid {
+                grid-template-columns:
+                    repeat(
+                        3,
+                        minmax(0, 1fr)
+                    );
+            }
+        }
+        @media(max-width:900px) {
             .dashboard__main {
+                width: 100% !important;
+                margin-left: 0 !important;
+            }
+            .report-page {
+                padding: 1rem;
+            }
+            .report-hero {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+            .report-hero__score {
                 width: 100%;
             }
-            .dash-content {
-                padding: 0;
+            .report-lower-grid {
+                grid-template-columns: 1fr;
             }
-            .welcome-card {
-                box-shadow: none;
-                border: none;
+        }
+        @media(max-width:700px) {
+            .report-kpis {
+                grid-template-columns:
+                    repeat(
+                        2,
+                        minmax(0, 1fr)
+                    );
             }
-            .overview-card {
-                break-inside: avoid;
+            .report-filter-grid {
+                grid-template-columns:
+                    1fr;
             }
-            .report-table {
-                font-size: 11px;
+            .report-filter-actions {
+                width: 100%;
             }
-            body {
-                background: #fff;
+            .report-filter-actions
+            .report-button {
+                flex: 1;
+            }
+        }
+        @media(max-width:430px) {
+            .report-kpis {
+                grid-template-columns: 1fr;
+            }
+            .report-hero {
+                padding: 1.2rem;
             }
         }
     </style>
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
-    <!-- =====================================================
-         SIDEBAR
-    ====================================================== -->
-    <?php require_once __DIR__ . '/sidebar.php'; ?>
-    <!-- =====================================================
-         MAIN CONTENT
-    ====================================================== -->
+    <?php
+    require_once __DIR__ . '/sidebar.php';
+    ?>
     <main class="dashboard__main">
-        <!-- =================================================
-             HEADER
-        ================================================== -->
-        <header class="dash-header">
-            <div class="dash-header__left">
-                <h1 class="dash-header__title">
-                    Supervisor Reports
-                </h1>
-            </div>
-            <div class="dash-header__right">
-                <div class="dash-header__user">
-                    <img
-                        src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Supervisor') ?>&background=1a56db&color=fff&size=80"
-                        alt=""
-                        class="dash-header__avatar"
-                    >
-                </div>
-            </div>
-        </header>
-        <!-- =================================================
-             CONTENT
-        ================================================== -->
-        <div class="dash-content">
-            <!-- =================================================
-                 REPORT HEADER
-            ================================================== -->
-            <div class="welcome-card">
-                <div class="welcome-card__bg"></div>
-                <div class="welcome-card__content">
-                    <h1 class="welcome-card__greeting">
-                        Supervisor
-                        <span class="text-gradient">
-                            Reports
-                        </span>
-                    </h1>
+        <?php
+        require_once __DIR__ . '/navbar.php';
+        ?>
+        <div class="report-page">
+            <!-- ====================================================
+                 FLASH MESSAGES
+            ===================================================== -->
+            <?= $flashes ?>
+            <!-- ====================================================
+                 BREADCRUMB
+            ===================================================== -->
+            <nav class="report-breadcrumb">
+                <a
+                    href="<?= url(
+                        'supervisor/dashboard.php'
+                    ) ?>"
+                >
+                    Dashboard
+                </a>
+                <i class="fas fa-chevron-right"></i>
+                <span>
+                    Cohort Progress
+                </span>
+            </nav>
+            <!-- ====================================================
+                 HERO
+            ===================================================== -->
+            <section class="report-hero">
+                <div class="report-hero__content">
+                    <span class="report-hero__eyebrow">
+                        Supervisor Reporting
+                    </span>
+                    <h2>
+                        Cohort Progress Report
+                    </h2>
                     <p>
-                        Review the performance of your assigned cohorts
-                        and monitor candidate progress.
+                        Monitor candidate participation, completion,
+                        withdrawals and overall progress across the
+                        cohorts assigned to you.
                     </p>
                 </div>
-            </div>
-            <!-- =================================================
-                 REPORT ACTIONS
-            ================================================== -->
-            <div class="report-actions">
-                <button
-                    type="button"
-                    class="report-button"
-                    onclick="window.print()"
-                >
-                    <i class="fas fa-print"></i>
-                    Print Report
-                </button>
-            </div>
-            <!-- =================================================
-                 OVERVIEW
-            ================================================== -->
-            <div
-                class="overview-grid"
-                style="margin-top:1rem;"
-            >
-                <!-- Assigned Cohorts -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--primary">
-                        <i class="fas fa-layer-group"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($assignedCohorts) ?>
-                        </span>
-                        <span class="overview-card__label">
-                            Assigned Cohorts
-                        </span>
-                    </div>
+                <div class="report-hero__score">
+                    <strong>
+                        <?= $overallCompletionRate ?>%
+                    </strong>
+                    <span>
+                        Overall completion rate
+                    </span>
                 </div>
-                <!-- Candidates -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--cyan">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($totalCandidates) ?>
-                        </span>
-                        <span class="overview-card__label">
-                            Candidates
-                        </span>
-                    </div>
-                </div>
-                <!-- Active -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--amber">
-                        <i class="fas fa-user-check"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($activeCandidates) ?>
-                        </span>
-                        <span class="overview-card__label">
-                            Active Candidates
-                        </span>
-                    </div>
-                </div>
-                <!-- Completed -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--primary">
-                        <i class="fas fa-user-graduate"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($completedCandidates) ?>
-                        </span>
-                        <span class="overview-card__label">
-                            Completed Candidates
-                        </span>
-                    </div>
-                </div>
-            </div>
-            <!-- =================================================
-                 STATUS SUMMARY
-            ================================================== -->
-            <div class="report-section">
-                <div class="welcome-card">
-                    <div class="welcome-card__content">
-                        <h2 style="margin-bottom:0.5rem;">
-                            Candidate Status Summary
-                        </h2>
-                        <p>
-                            Current status distribution across your
-                            assigned cohorts.
-                        </p>
-                    </div>
-                </div>
-                <div
-                    class="overview-grid"
-                    style="margin-top:1rem;"
-                >
-                    <div class="overview-card">
-                        <div class="overview-card__icon overview-card__icon--amber">
-                            <i class="fas fa-user-clock"></i>
-                        </div>
-                        <div class="overview-card__info">
-                            <span class="overview-card__number">
-                                <?= number_format($selectedCandidates) ?>
-                            </span>
-                            <span class="overview-card__label">
-                                Selected
-                            </span>
+            </section>
+            <!-- ====================================================
+                 KPI CARDS
+            ===================================================== -->
+            <section class="report-kpis">
+                <article class="report-kpi">
+                    <div class="report-kpi__top">
+                        <div
+                            class="
+                                report-kpi__icon
+                                report-kpi__icon--blue
+                            "
+                        >
+                            <i class="fas fa-people-group"></i>
                         </div>
                     </div>
-                    <div class="overview-card">
-                        <div class="overview-card__icon overview-card__icon--cyan">
-                            <i class="fas fa-user-plus"></i>
-                        </div>
-                        <div class="overview-card__info">
-                            <span class="overview-card__number">
-                                <?= number_format($onboardedCandidates) ?>
-                            </span>
-                            <span class="overview-card__label">
-                                Onboarded
-                            </span>
-                        </div>
-                    </div>
-                    <div class="overview-card">
-                        <div class="overview-card__icon overview-card__icon--primary">
-                            <i class="fas fa-user-check"></i>
-                        </div>
-                        <div class="overview-card__info">
-                            <span class="overview-card__number">
-                                <?= number_format($activeCandidates) ?>
-                            </span>
-                            <span class="overview-card__label">
-                                Active
-                            </span>
+                    <strong>
+                        <?= number_format(
+                            $totalCohorts
+                        ) ?>
+                    </strong>
+                    <span>
+                        Assigned Cohorts
+                    </span>
+                </article>
+                <article class="report-kpi">
+                    <div class="report-kpi__top">
+                        <div
+                            class="
+                                report-kpi__icon
+                                report-kpi__icon--purple
+                            "
+                        >
+                            <i class="fas fa-users"></i>
                         </div>
                     </div>
-                    <div class="overview-card">
-                        <div class="overview-card__icon overview-card__icon--primary">
-                            <i class="fas fa-graduation-cap"></i>
-                        </div>
-                        <div class="overview-card__info">
-                            <span class="overview-card__number">
-                                <?= number_format($completedCandidates) ?>
-                            </span>
-                            <span class="overview-card__label">
-                                Completed
-                            </span>
+                    <strong>
+                        <?= number_format(
+                            $totalCurrentCandidates
+                        ) ?>
+                    </strong>
+                    <span>
+                        Current Candidates
+                    </span>
+                </article>
+                <article class="report-kpi">
+                    <div class="report-kpi__top">
+                        <div
+                            class="
+                                report-kpi__icon
+                                report-kpi__icon--orange
+                            "
+                        >
+                            <i class="fas fa-person-running"></i>
                         </div>
                     </div>
-                    <div class="overview-card">
-                        <div class="overview-card__icon overview-card__icon--amber">
+                    <strong>
+                        <?= number_format(
+                            $totalActiveCandidates
+                        ) ?>
+                    </strong>
+                    <span>
+                        Active Candidates
+                    </span>
+                </article>
+                <article class="report-kpi">
+                    <div class="report-kpi__top">
+                        <div
+                            class="
+                                report-kpi__icon
+                                report-kpi__icon--green
+                            "
+                        >
+                            <i class="fas fa-circle-check"></i>
+                        </div>
+                    </div>
+                    <strong>
+                        <?= number_format(
+                            $totalCompletedCandidates
+                        ) ?>
+                    </strong>
+                    <span>
+                        Completed
+                    </span>
+                </article>
+                <article class="report-kpi">
+                    <div class="report-kpi__top">
+                        <div
+                            class="
+                                report-kpi__icon
+                                report-kpi__icon--red
+                            "
+                        >
                             <i class="fas fa-user-minus"></i>
                         </div>
-                        <div class="overview-card__info">
-                            <span class="overview-card__number">
-                                <?= number_format($withdrawnCandidates) ?>
-                            </span>
-                            <span class="overview-card__label">
-                                Withdrawn
-                            </span>
-                        </div>
                     </div>
-                    <div class="overview-card">
-                        <div class="overview-card__icon overview-card__icon--primary">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                        <div class="overview-card__info">
-                            <span class="overview-card__number">
-                                <?= $completionRate ?>%
-                            </span>
-                            <span class="overview-card__label">
-                                Completion Rate
-                            </span>
-                        </div>
+                    <strong>
+                        <?= number_format(
+                            $totalWithdrawnCandidates
+                        ) ?>
+                    </strong>
+                    <span>
+                        Withdrawn
+                    </span>
+                </article>
+            </section>
+            <!-- ====================================================
+                 FILTERS
+            ===================================================== -->
+            <section class="report-card">
+                <div class="report-card__header">
+                    <div class="report-card__title">
+                        <strong>
+                            Report Filters
+                        </strong>
+                        <span>
+                            Refine the report using your assigned
+                            programmes and cohorts.
+                        </span>
                     </div>
+                    <i
+                        class="fas fa-filter"
+                        style="
+                            color:
+                            var(--sv-text-soft,#64748b)
+                        "
+                    ></i>
                 </div>
-            </div>
-            <!-- =================================================
-                 COHORT PERFORMANCE
-            ================================================== -->
-            <div class="report-section">
-                <div class="welcome-card">
-                    <div class="welcome-card__content">
-                        <h2 style="margin-bottom:0.5rem;">
+                <form
+                    method="GET"
+                    action=""
+                    class="report-filters"
+                >
+                    <div class="report-filter-grid">
+                        <!-- PROGRAMME -->
+                        <div class="report-field">
+                            <label for="programme_id">
+                                Programme
+                            </label>
+                            <select
+                                name="programme_id"
+                                id="programme_id"
+                            >
+                                <option value="0">
+                                    All Programmes
+                                </option>
+                                <?php foreach (
+                                    $programmes
+                                    as $programme
+                                ): ?>
+                                    <option
+                                        value="<?= (int)$programme['id'] ?>"
+                                        <?= $programmeId
+                                            ===
+                                            (int)$programme['id']
+                                                ? 'selected'
+                                                : '' ?>
+                                    >
+                                        <?= e(
+                                            $programme['name']
+                                        ) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <!-- COHORT -->
+                        <div class="report-field">
+                            <label for="cohort_id">
+                                Cohort
+                            </label>
+                            <select
+                                name="cohort_id"
+                                id="cohort_id"
+                            >
+                                <option value="0">
+                                    All Cohorts
+                                </option>
+                                <?php foreach (
+                                    $cohorts
+                                    as $cohort
+                                ): ?>
+                                    <option
+                                        value="<?= (int)$cohort['id'] ?>"
+                                        <?= $cohortId
+                                            ===
+                                            (int)$cohort['id']
+                                                ? 'selected'
+                                                : '' ?>
+                                    >
+                                        <?= e(
+                                            $cohort['name']
+                                        ) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <!-- STATUS -->
+                        <div class="report-field">
+                            <label for="status">
+                                Cohort Status
+                            </label>
+                            <select
+                                name="status"
+                                id="status"
+                            >
+                                <option value="">
+                                    All Statuses
+                                </option>
+                                <?php foreach (
+                                    $statuses
+                                    as $status
+                                ): ?>
+                                    <option
+                                        value="<?= e($status) ?>"
+                                        <?= $cohortStatus
+                                            === $status
+                                                ? 'selected'
+                                                : '' ?>
+                                    >
+                                        <?= e(
+                                            supervisorReportStatusLabel(
+                                                $status
+                                            )
+                                        ) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <!-- FROM -->
+                        <div class="report-field">
+                            <label for="date_from">
+                                From
+                            </label>
+                            <input
+                                type="date"
+                                name="date_from"
+                                id="date_from"
+                                value="<?= e(
+                                    $dateFrom
+                                ) ?>"
+                            >
+                        </div>
+                        <!-- TO -->
+                        <div class="report-field">
+                            <label for="date_to">
+                                To
+                            </label>
+                            <input
+                                type="date"
+                                name="date_to"
+                                id="date_to"
+                                value="<?= e(
+                                    $dateTo
+                                ) ?>"
+                            >
+                        </div>
+                        <!-- ACTIONS -->
+                        <div class="report-filter-actions">
+                            <button
+                                type="submit"
+                                class="
+                                    report-button
+                                    report-button--primary
+                                "
+                            >
+                                <i class="fas fa-filter"></i>
+                                Filter
+                            </button>
+                            <?php if (
+                                $programmeId > 0
+                                ||
+                                $cohortId > 0
+                                ||
+                                $cohortStatus !== ''
+                                ||
+                                $dateFrom !== ''
+                                ||
+                                $dateTo !== ''
+                            ): ?>
+                                <a
+                                    href="<?= url(
+                                        'supervisor/reports.php'
+                                    ) ?>"
+                                    class="
+                                        report-button
+                                        report-button--secondary
+                                    "
+                                >
+                                    Reset
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </form>
+            </section>
+            <!-- ====================================================
+                 COHORT REPORT
+            ===================================================== -->
+            <section class="report-card">
+                <div class="report-card__header">
+                    <div class="report-card__title">
+                        <strong>
                             Cohort Performance
-                        </h2>
-                        <p>
-                            Performance summary for cohorts assigned
-                            to you.
-                        </p>
+                        </strong>
+                        <span>
+                            <?= number_format(
+                                count($reportRows)
+                            ) ?>
+                            cohort<?= count($reportRows) === 1
+                                ? ''
+                                : 's' ?>
+                            in this report
+                        </span>
                     </div>
+                    <i
+                        class="fas fa-chart-column"
+                        style="
+                            color:
+                            var(--sv-primary,#2563eb)
+                        "
+                    ></i>
                 </div>
-                <?php if (empty($cohorts)): ?>
-                    <div
-                        class="welcome-card"
-                        style="margin-top:1rem;"
-                    >
-                        <div class="welcome-card__content">
-                            <h3>
-                                No Assigned Cohorts
-                            </h3>
-                            <p>
-                                You currently have no cohorts assigned
-                                to you.
-                            </p>
+                <?php if (
+                    empty($reportRows)
+                ): ?>
+                    <div class="report-empty">
+                        <div class="report-empty__icon">
+                            <i class="fas fa-chart-column"></i>
                         </div>
+                        <strong>
+                            No cohort data found
+                        </strong>
+                        <span>
+                            No assigned cohorts match the current
+                            report filters.
+                        </span>
                     </div>
                 <?php else: ?>
-                    <div class="report-table-wrapper">
+                    <div class="report-table-wrap">
                         <table class="report-table">
                             <thead>
-                                <tr>
-                                    <th>
-                                        Cohort
-                                    </th>
-                                    <th>
-                                        Programme
-                                    </th>
-                                    <th>
-                                        Status
-                                    </th>
-                                    <th>
-                                        Candidates
-                                    </th>
-                                    <th>
-                                        Selected
-                                    </th>
-                                    <th>
-                                        Onboarded
-                                    </th>
-                                    <th>
-                                        Active
-                                    </th>
-                                    <th>
-                                        Completed
-                                    </th>
-                                    <th>
-                                        Withdrawn
-                                    </th>
-                                    <th>
-                                        Progress
-                                    </th>
-                                </tr>
+                            <tr>
+                                <th>
+                                    Cohort
+                                </th>
+                                <th>
+                                    Status
+                                </th>
+                                <th>
+                                    Dates
+                                </th>
+                                <th>
+                                    Current
+                                </th>
+                                <th>
+                                    Active
+                                </th>
+                                <th>
+                                    Completed
+                                </th>
+                                <th>
+                                    Withdrawn
+                                </th>
+                                <th>
+                                    Completion
+                                </th>
+                                <th>
+                                    Action
+                                </th>
+                            </tr>
                             </thead>
                             <tbody>
-                            <?php foreach ($cohorts as $cohort): ?>
+                            <?php foreach (
+                                $reportRows
+                                as $row
+                            ): ?>
                                 <tr>
+                                    <!-- COHORT -->
                                     <td>
-                                        <strong>
-                                            <?= e($cohort['cohort_name']) ?>
-                                        </strong>
+                                        <div class="report-cohort">
+                                            <div class="report-cohort__avatar">
+                                                <?= e(
+                                                    supervisorReportInitials(
+                                                        $row[
+                                                            'cohort_name'
+                                                        ]
+                                                    )
+                                                ) ?>
+                                            </div>
+                                            <div>
+                                                <strong>
+                                                    <?= e(
+                                                        $row[
+                                                            'cohort_name'
+                                                        ]
+                                                    ) ?>
+                                                </strong>
+                                                <span>
+                                                    <?= e(
+                                                        $row[
+                                                            'programme_name'
+                                                        ]
+                                                    ) ?>
+                                                    <?php if (
+                                                        !empty(
+                                                            $row[
+                                                                'programme_type'
+                                                            ]
+                                                        )
+                                                    ): ?>
+                                                        ·
+                                                        <?= e(
+                                                            $row[
+                                                                'programme_type'
+                                                            ]
+                                                        ) ?>
+                                                    <?php endif; ?>
+                                                </span>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td>
-                                        <?= e($cohort['programme_name']) ?>
-                                    </td>
+                                    <!-- STATUS -->
                                     <td>
                                         <span
-                                            class="report-status <?= e(reportStatusClass($cohort['cohort_status'])) ?>"
+                                            class="
+                                                report-badge
+                                                report-badge--<?= e(
+                                                    supervisorReportStatusClass(
+                                                        $row[
+                                                            'cohort_status'
+                                                        ]
+                                                    )
+                                                ) ?>
+                                            "
                                         >
                                             <?= e(
-                                                ucfirst(
-                                                    $cohort['cohort_status']
+                                                supervisorReportStatusLabel(
+                                                    $row[
+                                                        'cohort_status'
+                                                    ]
                                                 )
                                             ) ?>
                                         </span>
                                     </td>
+                                    <!-- DATES -->
+                                    <td>
+                                        <?= e(
+                                            supervisorReportDate(
+                                                $row[
+                                                    'start_date'
+                                                ]
+                                            )
+                                        ) ?>
+                                        <br>
+                                        <small
+                                            style="
+                                                color:
+                                                var(--sv-text-soft,#64748b)
+                                            "
+                                        >
+                                            to
+                                            <?= e(
+                                                supervisorReportDate(
+                                                    $row[
+                                                        'end_date'
+                                                    ]
+                                                )
+                                            ) ?>
+                                        </small>
+                                    </td>
                                     <td>
                                         <?= number_format(
-                                            (int) $cohort['candidate_count']
+                                            $row[
+                                                'current_candidates'
+                                            ]
                                         ) ?>
                                     </td>
                                     <td>
                                         <?= number_format(
-                                            (int) $cohort['selected_count']
+                                            $row[
+                                                'active_candidates'
+                                            ]
                                         ) ?>
                                     </td>
                                     <td>
                                         <?= number_format(
-                                            (int) $cohort['onboarded_count']
+                                            $row[
+                                                'completed_candidates'
+                                            ]
                                         ) ?>
                                     </td>
                                     <td>
                                         <?= number_format(
-                                            (int) $cohort['active_count']
+                                            $row[
+                                                'withdrawn_candidates'
+                                            ]
                                         ) ?>
                                     </td>
+                                    <!-- PROGRESS -->
                                     <td>
-                                        <?= number_format(
-                                            (int) $cohort['completed_count']
-                                        ) ?>
-                                    </td>
-                                    <td>
-                                        <?= number_format(
-                                            (int) $cohort['withdrawn_count']
-                                        ) ?>
-                                    </td>
-                                    <td>
-                                        <div class="progress-container">
-                                            <div class="progress-bar">
+                                        <div class="report-progress">
+                                            <div class="report-progress__header">
+                                                <span>
+                                                    Progress
+                                                </span>
+                                                <strong>
+                                                    <?= (int)$row[
+                                                        'completion_rate'
+                                                    ] ?>%
+                                                </strong>
+                                            </div>
+                                            <div class="report-progress__track">
                                                 <div
-                                                    class="progress-bar__fill"
-                                                    style="width:<?= (int) $cohort['progress'] ?>%;"
+                                                    class="report-progress__bar"
+                                                    style="
+                                                        width:
+                                                        <?= max(
+                                                            0,
+                                                            min(
+                                                                100,
+                                                                (int)$row[
+                                                                    'completion_rate'
+                                                                ]
+                                                            )
+                                                        ) ?>%;
+                                                    "
                                                 ></div>
                                             </div>
-                                            <span class="progress-value">
-                                                <?= (int) $cohort['progress'] ?>%
-                                            </span>
                                         </div>
+                                    </td>
+                                    <!-- ACTION -->
+                                    <td>
+                                        <a
+                                            href="<?= url(
+                                                'supervisor/cohort_view.php?id=' .
+                                                (int)$row['id']
+                                            ) ?>"
+                                            class="
+                                                report-button
+                                                report-button--secondary
+                                            "
+                                        >
+                                            <i class="fas fa-eye"></i>
+                                            View
+                                        </a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -735,6 +2048,226 @@ function reportStatusClass(string $status): string
                         </table>
                     </div>
                 <?php endif; ?>
+            </section>
+            <!-- ====================================================
+                 LOWER ANALYTICS
+            ===================================================== -->
+            <div class="report-lower-grid">
+                <!-- OUTCOMES -->
+                <section class="report-card">
+                    <div class="report-card__header">
+                        <div class="report-card__title">
+                            <strong>
+                                Candidate Outcome Summary
+                            </strong>
+                            <span>
+                                Participation distribution across
+                                this report.
+                            </span>
+                        </div>
+                    </div>
+                    <div class="report-outcomes">
+                        <!-- ACTIVE -->
+                        <div class="report-outcome">
+                            <div class="report-outcome__left">
+                                <div
+                                    class="
+                                        report-outcome__icon
+                                        report-kpi__icon--orange
+                                    "
+                                >
+                                    <i class="fas fa-person-running"></i>
+                                </div>
+                                <div>
+                                    <strong>
+                                        Active Candidates
+                                    </strong>
+                                    <span>
+                                        Currently participating
+                                    </span>
+                                </div>
+                            </div>
+                            <strong class="report-outcome__value">
+                                <?= number_format(
+                                    $totalActiveCandidates
+                                ) ?>
+                            </strong>
+                        </div>
+                        <!-- COMPLETED -->
+                        <div class="report-outcome">
+                            <div class="report-outcome__left">
+                                <div
+                                    class="
+                                        report-outcome__icon
+                                        report-kpi__icon--green
+                                    "
+                                >
+                                    <i class="fas fa-circle-check"></i>
+                                </div>
+                                <div>
+                                    <strong>
+                                        Completed Candidates
+                                    </strong>
+                                    <span>
+                                        Successfully completed
+                                    </span>
+                                </div>
+                            </div>
+                            <strong class="report-outcome__value">
+                                <?= number_format(
+                                    $totalCompletedCandidates
+                                ) ?>
+                            </strong>
+                        </div>
+                        <!-- WITHDRAWN -->
+                        <div class="report-outcome">
+                            <div class="report-outcome__left">
+                                <div
+                                    class="
+                                        report-outcome__icon
+                                        report-kpi__icon--red
+                                    "
+                                >
+                                    <i class="fas fa-user-minus"></i>
+                                </div>
+                                <div>
+                                    <strong>
+                                        Withdrawn Candidates
+                                    </strong>
+                                    <span>
+                                        No longer participating
+                                    </span>
+                                </div>
+                            </div>
+                            <strong class="report-outcome__value">
+                                <?= number_format(
+                                    $totalWithdrawnCandidates
+                                ) ?>
+                            </strong>
+                        </div>
+                        <!-- COMPLETION RATE -->
+                        <div class="report-outcome">
+                            <div class="report-outcome__left">
+                                <div
+                                    class="
+                                        report-outcome__icon
+                                        report-kpi__icon--blue
+                                    "
+                                >
+                                    <i class="fas fa-chart-line"></i>
+                                </div>
+                                <div>
+                                    <strong>
+                                        Overall Completion Rate
+                                    </strong>
+                                    <span>
+                                        Completed ÷ current candidates
+                                    </span>
+                                </div>
+                            </div>
+                            <strong class="report-outcome__value">
+                                <?= $overallCompletionRate ?>%
+                            </strong>
+                        </div>
+                    </div>
+                </section>
+                <!-- ATTENTION -->
+                <section class="report-card">
+                    <div class="report-card__header">
+                        <div class="report-card__title">
+                            <strong>
+                                Attention Needed
+                            </strong>
+                            <span>
+                                Cohorts ending within 30 days
+                                with active candidates.
+                            </span>
+                        </div>
+                    </div>
+                    <div class="report-attention">
+                        <?php if (
+                            empty($attentionRows)
+                        ): ?>
+                            <div class="report-empty">
+                                <div class="report-empty__icon">
+                                    <i class="fas fa-circle-check"></i>
+                                </div>
+                                <strong>
+                                    Nothing urgent
+                                </strong>
+                                <span>
+                                    No active cohorts currently
+                                    require immediate attention.
+                                </span>
+                            </div>
+                        <?php else: ?>
+                            <?php foreach (
+                                $attentionRows
+                                as $attention
+                            ): ?>
+                                <article class="report-attention__item">
+                                    <strong>
+                                        <?= e(
+                                            $attention[
+                                                'cohort_name'
+                                            ]
+                                        ) ?>
+                                    </strong>
+                                    <span>
+                                        <?= number_format(
+                                            $attention[
+                                                'active_candidates'
+                                            ]
+                                        ) ?>
+                                        active candidate<?= $attention[
+                                            'active_candidates'
+                                        ] === 1
+                                            ? ''
+                                            : 's' ?>.
+                                        Cohort ends
+                                        <?= e(
+                                            supervisorReportDate(
+                                                $attention[
+                                                    'end_date'
+                                                ]
+                                            )
+                                        ) ?>.
+                                    </span>
+                                    <a
+                                        href="<?= url(
+                                            'supervisor/cohort_view.php?id=' .
+                                            (int)$attention[
+                                                'cohort_id'
+                                            ]
+                                        ) ?>"
+                                        class="report-attention__action"
+                                    >
+                                        Review cohort
+                                        <i class="fas fa-arrow-right"></i>
+                                    </a>
+                                </article>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                </section>
+            </div>
+            <!-- ====================================================
+                 SECURITY NOTICE
+            ===================================================== -->
+            <div class="report-security">
+                <i class="fas fa-shield-halved"></i>
+                <div>
+                    <strong>
+                        Supervisor-scoped reporting
+                    </strong>
+                    <span>
+                        This report only includes cohorts assigned
+                        to your Supervisor account. Candidate
+                        assignment, cohort transfer, programme
+                        administration and Supervisor reassignment
+                        remain restricted.
+                    </span>
+                </div>
             </div>
         </div>
     </main>

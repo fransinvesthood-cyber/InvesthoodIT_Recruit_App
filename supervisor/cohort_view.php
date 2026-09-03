@@ -1,18 +1,18 @@
 <?php
 /**
  * ================================================================
- * INVESTHOOD IT - SUPERVISOR / CANDIDATES
+ * INVESTHOOD IT - SUPERVISOR / COHORT VIEW
  * ================================================================
  *
  * Supervisor permissions:
- *  - View candidates in assigned cohorts only
- *  - Search and filter candidates
+ *  - View only cohorts assigned to them
+ *  - View participants in assigned cohorts
  *  - Open candidate profiles
  *  - Update candidate participation status
  *
  * Supervisor cannot:
  *  - Assign candidates
- *  - Move candidates between cohorts
+ *  - Move candidates
  *  - Reassign supervisors
  *  - Modify programme ownership
  * ================================================================
@@ -21,7 +21,7 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 require_role('supervisor');
 $user = current_user();
 $flashes = render_flashes();
-$currentPage = 'candidates';
+$currentPage = 'cohorts';
 /*
 |--------------------------------------------------------------------------
 | Supervisor
@@ -65,6 +65,23 @@ if ($supervisorName === '') {
 }
 /*
 |--------------------------------------------------------------------------
+| Cohort ID
+|--------------------------------------------------------------------------
+*/
+$cohortId = (int)(
+    $_GET['id']
+    ?? $_GET['cohort_id']
+    ?? 0
+);
+if ($cohortId <= 0) {
+    header(
+        'Location: ' .
+        url('supervisor/cohorts.php')
+    );
+    exit;
+}
+/*
+|--------------------------------------------------------------------------
 | Filters
 |--------------------------------------------------------------------------
 */
@@ -80,19 +97,57 @@ $statusFilter = trim(
         ?? ''
     )
 );
-$cohortFilter = (int)(
-    $_GET['cohort_id']
-    ?? 0
-);
 /*
 |--------------------------------------------------------------------------
-| Statistics
+| Load Cohort
+|--------------------------------------------------------------------------
+*/
+$stmt = Database::prepare(
+    "
+        SELECT
+            c.id,
+            c.name AS cohort_name,
+            c.programme_id,
+            c.supervisor_id,
+            c.status AS cohort_status,
+            c.start_date,
+            c.end_date,
+            p.name AS programme_name,
+            p.type AS programme_type,
+            p.status AS programme_status
+        FROM cohorts c
+        INNER JOIN programmes p
+            ON p.id = c.programme_id
+        WHERE c.id = ?
+          AND c.supervisor_id = ?
+        LIMIT 1
+    ",
+    'ii',
+    [
+        $cohortId,
+        $supervisorId
+    ]
+);
+$cohort = $stmt
+    ->get_result()
+    ->fetch_assoc();
+$stmt->close();
+if (!$cohort) {
+    http_response_code(404);
+    exit(
+        'Cohort not found or you do not have access.'
+    );
+}
+/*
+|--------------------------------------------------------------------------
+| Cohort Statistics
 |--------------------------------------------------------------------------
 */
 $totalCandidates = 0;
 $activeCandidates = 0;
 $completedCandidates = 0;
 $withdrawnCandidates = 0;
+$completionRate = 0;
 /*
 |--------------------------------------------------------------------------
 | Total Current Candidates
@@ -107,11 +162,15 @@ $stmt = Database::prepare(
         FROM cohort_participants cp
         INNER JOIN cohorts c
             ON c.id = cp.cohort_id
-        WHERE c.supervisor_id = ?
+        WHERE cp.cohort_id = ?
+          AND c.supervisor_id = ?
           AND cp.status <> 'withdrawn'
     ",
-    'i',
-    [$supervisorId]
+    'ii',
+    [
+        $cohortId,
+        $supervisorId
+    ]
 );
 $row = $stmt
     ->get_result()
@@ -135,11 +194,15 @@ $stmt = Database::prepare(
         FROM cohort_participants cp
         INNER JOIN cohorts c
             ON c.id = cp.cohort_id
-        WHERE c.supervisor_id = ?
+        WHERE cp.cohort_id = ?
+          AND c.supervisor_id = ?
           AND cp.status = 'active'
     ",
-    'i',
-    [$supervisorId]
+    'ii',
+    [
+        $cohortId,
+        $supervisorId
+    ]
 );
 $row = $stmt
     ->get_result()
@@ -163,11 +226,15 @@ $stmt = Database::prepare(
         FROM cohort_participants cp
         INNER JOIN cohorts c
             ON c.id = cp.cohort_id
-        WHERE c.supervisor_id = ?
+        WHERE cp.cohort_id = ?
+          AND c.supervisor_id = ?
           AND cp.status = 'completed'
     ",
-    'i',
-    [$supervisorId]
+    'ii',
+    [
+        $cohortId,
+        $supervisorId
+    ]
 );
 $row = $stmt
     ->get_result()
@@ -191,11 +258,15 @@ $stmt = Database::prepare(
         FROM cohort_participants cp
         INNER JOIN cohorts c
             ON c.id = cp.cohort_id
-        WHERE c.supervisor_id = ?
+        WHERE cp.cohort_id = ?
+          AND c.supervisor_id = ?
           AND cp.status = 'withdrawn'
     ",
-    'i',
-    [$supervisorId]
+    'ii',
+    [
+        $cohortId,
+        $supervisorId
+    ]
 );
 $row = $stmt
     ->get_result()
@@ -207,74 +278,58 @@ $withdrawnCandidates = (int)(
 $stmt->close();
 /*
 |--------------------------------------------------------------------------
-| Assigned Cohorts For Filter
+| Completion Rate
 |--------------------------------------------------------------------------
 */
-$assignedCohorts = [];
-$stmt = Database::prepare(
-    "
-        SELECT
-            c.id,
-            c.name,
-            c.status,
-            p.name AS programme_name
-        FROM cohorts c
-        INNER JOIN programmes p
-            ON p.id = c.programme_id
-        WHERE c.supervisor_id = ?
-        ORDER BY
-            CASE
-                WHEN c.status = 'active'
-                    THEN 1
-                ELSE 2
-            END,
-            c.name ASC
-    ",
-    'i',
-    [$supervisorId]
-);
-$result = $stmt->get_result();
-while ($row = $result->fetch_assoc()) {
-    $assignedCohorts[] = $row;
+if ($totalCandidates > 0) {
+    $completionRate = (int)round(
+        (
+            $completedCandidates
+            /
+            $totalCandidates
+        ) * 100
+    );
 }
-$stmt->close();
 /*
 |--------------------------------------------------------------------------
-| Available Participation Statuses
+| Available Participant Statuses
 |--------------------------------------------------------------------------
 */
 $participantStatuses = [];
 $stmt = Database::prepare(
     "
-        SELECT DISTINCT
-            cp.status
+        SELECT DISTINCT cp.status
         FROM cohort_participants cp
         INNER JOIN cohorts c
             ON c.id = cp.cohort_id
-        WHERE c.supervisor_id = ?
+        WHERE cp.cohort_id = ?
+          AND c.supervisor_id = ?
           AND cp.status IS NOT NULL
           AND cp.status <> ''
         ORDER BY cp.status ASC
     ",
-    'i',
-    [$supervisorId]
+    'ii',
+    [
+        $cohortId,
+        $supervisorId
+    ]
 );
 $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) {
-    $status = trim(
+    $value = trim(
         (string)(
             $row['status']
             ?? ''
         )
     );
-    if ($status !== '') {
-        $participantStatuses[] = $status;
+    if ($value !== '') {
+        $participantStatuses[] = $value;
     }
 }
 $stmt->close();
 /*
 |--------------------------------------------------------------------------
-| Candidate Query
+| Participant Query
 |--------------------------------------------------------------------------
 */
 $sql = "
@@ -288,25 +343,18 @@ $sql = "
         cp.completed_at,
         u.first_name,
         u.last_name,
-        u.email,
-        c.id AS cohort_id,
-        c.name AS cohort_name,
-        c.status AS cohort_status,
-        p.id AS programme_id,
-        p.name AS programme_name,
-        p.type AS programme_type,
-        p.status AS programme_status
+        u.email
     FROM cohort_participants cp
-    INNER JOIN cohorts c
-        ON c.id = cp.cohort_id
-    INNER JOIN programmes p
-        ON p.id = c.programme_id
     INNER JOIN users u
         ON u.id = cp.user_id
-    WHERE c.supervisor_id = ?
+    INNER JOIN cohorts c
+        ON c.id = cp.cohort_id
+    WHERE cp.cohort_id = ?
+      AND c.supervisor_id = ?
 ";
-$types = 'i';
+$types = 'ii';
 $params = [
+    $cohortId,
     $supervisorId
 ];
 /*
@@ -320,24 +368,20 @@ if ($search !== '') {
             u.first_name LIKE ?
             OR u.last_name LIKE ?
             OR u.email LIKE ?
-            OR c.name LIKE ?
-            OR p.name LIKE ?
         )
     ";
     $term =
         '%' .
         $search .
         '%';
-    $types .= 'sssss';
-    $params[] = $term;
-    $params[] = $term;
+    $types .= 'sss';
     $params[] = $term;
     $params[] = $term;
     $params[] = $term;
 }
 /*
 |--------------------------------------------------------------------------
-| Participation Status Filter
+| Status
 |--------------------------------------------------------------------------
 */
 if ($statusFilter !== '') {
@@ -349,19 +393,7 @@ if ($statusFilter !== '') {
 }
 /*
 |--------------------------------------------------------------------------
-| Cohort Filter
-|--------------------------------------------------------------------------
-*/
-if ($cohortFilter > 0) {
-    $sql .= "
-        AND c.id = ?
-    ";
-    $types .= 'i';
-    $params[] = $cohortFilter;
-}
-/*
-|--------------------------------------------------------------------------
-| Order
+| Ordering
 |--------------------------------------------------------------------------
 */
 $sql .= "
@@ -372,7 +404,6 @@ $sql .= "
             WHEN 'withdrawn' THEN 3
             ELSE 4
         END,
-        c.name ASC,
         u.first_name ASC,
         u.last_name ASC
 ";
@@ -382,9 +413,9 @@ $stmt = Database::prepare(
     $params
 );
 $result = $stmt->get_result();
-$candidates = [];
+$participants = [];
 while ($row = $result->fetch_assoc()) {
-    $candidates[] = $row;
+    $participants[] = $row;
 }
 $stmt->close();
 /*
@@ -392,7 +423,7 @@ $stmt->close();
 | Helpers
 |--------------------------------------------------------------------------
 */
-function supervisorCandidatesStatusLabel(
+function cohortViewStatusLabel(
     string $status
 ): string {
     if ($status === '') {
@@ -406,7 +437,7 @@ function supervisorCandidatesStatusLabel(
         )
     );
 }
-function supervisorCandidatesStatusClass(
+function cohortViewStatusClass(
     string $status
 ): string {
     $status = strtolower(
@@ -414,22 +445,20 @@ function supervisorCandidatesStatusClass(
     );
     switch ($status) {
         case 'active':
-            return 'candidate-status--active';
+            return 'status-pill--active';
         case 'completed':
-            return 'candidate-status--completed';
+            return 'status-pill--completed';
         case 'withdrawn':
-            return 'candidate-status--withdrawn';
-        case 'selected':
-            return 'candidate-status--selected';
-        case 'onboarded':
-            return 'candidate-status--onboarded';
+            return 'status-pill--withdrawn';
+        case 'inactive':
+            return 'status-pill--inactive';
         case 'pending':
-            return 'candidate-status--pending';
+            return 'status-pill--pending';
         default:
-            return 'candidate-status--default';
+            return 'status-pill--default';
     }
 }
-function supervisorCandidatesDate(
+function cohortViewDate(
     ?string $date
 ): string {
     if (empty($date)) {
@@ -444,7 +473,7 @@ function supervisorCandidatesDate(
         $timestamp
     );
 }
-function supervisorCandidateInitials(
+function cohortViewInitials(
     string $firstName,
     string $lastName
 ): string {
@@ -468,7 +497,7 @@ function supervisorCandidateInitials(
     }
     return strtoupper($initials);
 }
-function supervisorCandidateNavbarInitials(
+function cohortViewSupervisorInitials(
     string $firstName,
     string $lastName
 ): string {
@@ -502,11 +531,9 @@ function supervisorCandidateNavbarInitials(
         content="width=device-width, initial-scale=1.0"
     >
     <title>
-        Candidates | Supervisor
+        <?= e($cohort['cohort_name']) ?>
+        | Supervisor
     </title>
-    <!-- ============================================================
-         APPLY SAVED THEME BEFORE PAGE RENDERS
-    ============================================================= -->
     <script>
         (function () {
             const theme =
@@ -547,7 +574,7 @@ function supervisorCandidateNavbarInitials(
 /* ================================================================
    PAGE
 ================================================================ */
-.candidates-page {
+.cohort-view-page {
     padding: 1.5rem;
     display: grid;
     gap: 1.3rem;
@@ -573,11 +600,8 @@ function supervisorCandidateNavbarInitials(
         var(--sv-border, #e5e7eb);
     backdrop-filter:
         blur(18px);
-    -webkit-backdrop-filter:
-        blur(18px);
     transition:
-        background .25s ease,
-        border-color .25s ease;
+        background .25s ease;
 }
 html[data-theme="dark"]
 .supervisor-topbar {
@@ -621,39 +645,7 @@ html[data-theme="dark"]
     color:
         var(--sv-text, #111827);
     font-size: 1.15rem;
-    font-weight: 800;
 }
-/* ================================================================
-   NAVBAR QUICK SEARCH
-================================================================ */
-.supervisor-topbar__search {
-    min-width: 210px;
-    min-height: 41px;
-    padding:
-        .55rem .8rem;
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    border:
-        1px solid
-        var(--sv-border, #e5e7eb);
-    border-radius: 12px;
-    background:
-        var(--sv-card-soft, #f8fafc);
-    color:
-        var(--sv-text-soft, #64748b);
-    text-decoration: none;
-    font-size: .69rem;
-}
-.supervisor-topbar__search:hover {
-    color:
-        var(--sv-primary, #2563eb);
-    border-color:
-        rgba(37,99,235,.3);
-}
-/* ================================================================
-   NAV ICON
-================================================================ */
 .supervisor-topbar__icon {
     width: 41px;
     height: 41px;
@@ -670,15 +662,6 @@ html[data-theme="dark"]
     color:
         var(--sv-text, #111827);
     cursor: pointer;
-    transition:
-        transform .18s ease,
-        border-color .18s ease;
-}
-.supervisor-topbar__icon:hover {
-    transform:
-        translateY(-2px);
-    border-color:
-        rgba(37,99,235,.30);
 }
 .supervisor-topbar__notification-dot {
     width: 7px;
@@ -688,13 +671,7 @@ html[data-theme="dark"]
     right: 8px;
     border-radius: 50%;
     background: #ef4444;
-    border:
-        2px solid
-        var(--sv-card-bg, #fff);
 }
-/* ================================================================
-   NAV USER
-================================================================ */
 .supervisor-topbar__user {
     display: flex;
     align-items: center;
@@ -731,58 +708,65 @@ html[data-theme="dark"]
     font-size: .59rem;
 }
 /* ================================================================
+   BREADCRUMB
+================================================================ */
+.cohort-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    color:
+        var(--sv-text-soft, #64748b);
+    font-size: .67rem;
+}
+.cohort-breadcrumb a {
+    color:
+        var(--sv-text-soft, #64748b);
+    text-decoration: none;
+}
+.cohort-breadcrumb a:hover {
+    color:
+        var(--sv-primary, #2563eb);
+}
+/* ================================================================
    HERO
 ================================================================ */
-.candidates-hero {
+.cohort-view-hero {
     position: relative;
     overflow: hidden;
-    min-height: 190px;
-    padding: 1.7rem;
+    padding: 1.6rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 2rem;
+    gap: 1.5rem;
     border-radius: 22px;
     background:
         linear-gradient(
             135deg,
-            #0f4bc8 0%,
-            #4338ca 48%,
-            #7c3aed 100%
+            #0f4bc8,
+            #4338ca 52%,
+            #7c3aed
         );
     color: #fff;
     box-shadow:
         0 16px 35px
-        rgba(37,99,235,.18);
+        rgba(37,99,235,.17);
 }
-.candidates-hero::before {
+.cohort-view-hero::after {
     content: '';
     position: absolute;
-    width: 300px;
-    height: 300px;
-    right: -100px;
-    top: -140px;
+    width: 250px;
+    height: 250px;
+    right: -70px;
+    top: -110px;
     border-radius: 50%;
     background:
         rgba(255,255,255,.08);
 }
-.candidates-hero::after {
-    content: '';
-    position: absolute;
-    width: 180px;
-    height: 180px;
-    right: 170px;
-    bottom: -135px;
-    border-radius: 50%;
-    background:
-        rgba(255,255,255,.05);
-}
-.candidates-hero__content {
+.cohort-view-hero__content {
     position: relative;
     z-index: 2;
-    max-width: 650px;
 }
-.candidates-hero__eyebrow {
+.cohort-view-hero__badge {
     display: inline-flex;
     align-items: center;
     gap: .4rem;
@@ -797,81 +781,61 @@ html[data-theme="dark"]
     font-size: .64rem;
     font-weight: 700;
 }
-.candidates-hero h2 {
+.cohort-view-hero h2 {
     margin:
-        .75rem 0 .45rem;
-    font-size: 1.62rem;
-    font-weight: 800;
+        .75rem 0 .35rem;
+    font-size: 1.6rem;
 }
-.candidates-hero p {
-    max-width: 610px;
+.cohort-view-hero p {
     margin: 0;
+    opacity: .82;
     font-size: .8rem;
-    line-height: 1.6;
-    opacity: .84;
 }
-.candidates-hero__actions {
+.cohort-view-hero__meta {
     margin-top: 1rem;
     display: flex;
     gap: .55rem;
     flex-wrap: wrap;
 }
-.candidates-hero__action {
-    min-height: 39px;
+.cohort-view-hero__meta span {
     padding:
-        .5rem .75rem;
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-    border-radius: 10px;
+        .4rem .6rem;
+    border-radius: 9px;
     background:
-        rgba(255,255,255,.1);
+        rgba(255,255,255,.10);
     border:
         1px solid
-        rgba(255,255,255,.14);
-    color: #fff;
-    text-decoration: none;
-    font-size: .65rem;
-    font-weight: 700;
+        rgba(255,255,255,.11);
+    font-size: .62rem;
 }
-.candidates-hero__action:hover {
-    background:
-        rgba(255,255,255,.16);
-}
-.candidates-hero__icon {
-    width: 105px;
-    height: 105px;
+.cohort-view-hero__icon {
+    width: 100px;
+    height: 100px;
     position: relative;
     z-index: 2;
-    flex: 0 0 105px;
+    flex: 0 0 100px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 27px;
+    border-radius: 25px;
     background:
         rgba(255,255,255,.10);
     border:
         1px solid
         rgba(255,255,255,.15);
-    font-size: 2.2rem;
+    font-size: 2rem;
 }
 /* ================================================================
-   KPI CARDS
+   STATS
 ================================================================ */
-.candidates-stats {
+.cohort-view-stats {
     display: grid;
     grid-template-columns:
-        repeat(
-            4,
-            minmax(0,1fr)
-        );
+        repeat(4,minmax(0,1fr));
     gap: 1rem;
 }
-.candidate-stat {
-    min-height: 122px;
+.cohort-view-stat {
     padding: 1.1rem;
-    position: relative;
-    overflow: hidden;
     border-radius: 17px;
     background:
         var(--sv-card-bg, #fff);
@@ -880,18 +844,17 @@ html[data-theme="dark"]
         var(--sv-border, #e5e7eb);
     transition:
         transform .2s ease,
-        box-shadow .2s ease,
-        border-color .2s ease;
+        box-shadow .2s ease;
 }
-.candidate-stat:hover {
+.cohort-view-stat:hover {
     transform:
         translateY(-3px);
     box-shadow:
         var(--sv-shadow);
 }
-.candidate-stat__icon {
-    width: 43px;
-    height: 43px;
+.cohort-view-stat__icon {
+    width: 42px;
+    height: 42px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -901,24 +864,109 @@ html[data-theme="dark"]
     color:
         var(--sv-primary, #2563eb);
 }
-.candidate-stat__value {
-    margin-top: .75rem;
+.cohort-view-stat strong {
+    display: block;
+    margin-top: .7rem;
     color:
         var(--sv-text, #111827);
     font-size: 1.5rem;
-    font-weight: 800;
 }
-.candidate-stat__label {
+.cohort-view-stat span {
     display: block;
-    margin-top: .18rem;
+    margin-top: .2rem;
     color:
         var(--sv-text-soft, #64748b);
-    font-size: .69rem;
+    font-size: .7rem;
 }
 /* ================================================================
-   FILTER
+   PROGRESS
 ================================================================ */
-.candidates-filter-card {
+.cohort-overview-grid {
+    display: grid;
+    grid-template-columns:
+        minmax(0,1fr)
+        300px;
+    gap: 1rem;
+}
+.cohort-progress-card,
+.cohort-summary-card {
+    padding: 1.2rem;
+    border-radius: 17px;
+    background:
+        var(--sv-card-bg, #fff);
+    border:
+        1px solid
+        var(--sv-border, #e5e7eb);
+}
+.cohort-progress-card h3,
+.cohort-summary-card h3 {
+    margin:
+        0 0 .9rem;
+    color:
+        var(--sv-text, #111827);
+    font-size: .85rem;
+}
+.cohort-progress-card__heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: .45rem;
+    color:
+        var(--sv-text-soft, #64748b);
+    font-size: .7rem;
+}
+.cohort-progress-card__heading strong {
+    color:
+        var(--sv-text, #111827);
+}
+.cohort-progress-card__track {
+    height: 9px;
+    overflow: hidden;
+    border-radius: 999px;
+    background:
+        rgba(148,163,184,.18);
+}
+.cohort-progress-card__bar {
+    height: 100%;
+    border-radius: inherit;
+    background:
+        linear-gradient(
+            90deg,
+            #2563eb,
+            #7c3aed
+        );
+}
+.cohort-progress-card__caption {
+    margin:
+        .75rem 0 0;
+    color:
+        var(--sv-text-soft, #64748b);
+    font-size: .67rem;
+    line-height: 1.5;
+}
+.cohort-summary-list {
+    display: grid;
+    gap: .65rem;
+}
+.cohort-summary-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: .67rem;
+}
+.cohort-summary-item span {
+    color:
+        var(--sv-text-soft, #64748b);
+}
+.cohort-summary-item strong {
+    color:
+        var(--sv-text, #111827);
+    text-align: right;
+}
+/* ================================================================
+   FILTERS
+================================================================ */
+.participant-filter {
     padding: 1rem;
     display: flex;
     align-items: center;
@@ -931,29 +979,29 @@ html[data-theme="dark"]
         1px solid
         var(--sv-border, #e5e7eb);
 }
-.candidates-filter-card__heading strong {
+.participant-filter__heading strong {
     display: block;
     color:
         var(--sv-text, #111827);
-    font-size: .84rem;
+    font-size: .82rem;
 }
-.candidates-filter-card__heading span {
+.participant-filter__heading span {
     display: block;
-    margin-top: .2rem;
+    margin-top: .18rem;
     color:
         var(--sv-text-soft, #64748b);
     font-size: .65rem;
 }
-.candidates-filter {
+.participant-filter form {
     display: flex;
-    align-items: center;
     gap: .55rem;
+    align-items: center;
     flex-wrap: wrap;
 }
-.candidates-search {
+.participant-search {
     position: relative;
 }
-.candidates-search i {
+.participant-search i {
     position: absolute;
     left: .8rem;
     top: 50%;
@@ -963,41 +1011,32 @@ html[data-theme="dark"]
         var(--sv-text-soft, #64748b);
     font-size: .68rem;
 }
-.candidates-search input {
-    width: 235px;
-    height: 42px;
+.participant-search input,
+.participant-filter select {
+    height: 41px;
+    border:
+        1px solid
+        var(--sv-border, #e5e7eb);
+    border-radius: 10px;
+    background:
+        var(--sv-card-soft, #f8fafc);
+    color:
+        var(--sv-text, #111827);
+    font-family: inherit;
+    font-size: .7rem;
+}
+.participant-search input {
+    width: 220px;
     padding:
         0 .8rem 0 2.15rem;
-    border:
-        1px solid
-        var(--sv-border, #e5e7eb);
-    border-radius: 11px;
-    background:
-        var(--sv-card-soft, #f8fafc);
-    color:
-        var(--sv-text, #111827);
-    font-family: inherit;
-    font-size: .7rem;
-    outline: none;
 }
-.candidates-filter select {
-    min-width: 145px;
-    height: 42px;
+.participant-filter select {
+    min-width: 135px;
     padding:
         0 .7rem;
-    border:
-        1px solid
-        var(--sv-border, #e5e7eb);
-    border-radius: 11px;
-    background:
-        var(--sv-card-soft, #f8fafc);
-    color:
-        var(--sv-text, #111827);
-    font-family: inherit;
-    font-size: .7rem;
 }
-.candidates-filter__submit {
-    height: 42px;
+.participant-filter__button {
+    height: 41px;
     padding:
         0 .85rem;
     display: inline-flex;
@@ -1005,7 +1044,7 @@ html[data-theme="dark"]
     justify-content: center;
     gap: .4rem;
     border: 0;
-    border-radius: 11px;
+    border-radius: 10px;
     background:
         linear-gradient(
             135deg,
@@ -1018,18 +1057,17 @@ html[data-theme="dark"]
     font-weight: 700;
     cursor: pointer;
 }
-.candidates-filter__reset {
-    height: 42px;
+.participant-filter__reset {
+    height: 41px;
     padding:
         0 .75rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: .35rem;
     border:
         1px solid
         var(--sv-border, #e5e7eb);
-    border-radius: 11px;
+    border-radius: 10px;
     background:
         var(--sv-card-bg, #fff);
     color:
@@ -1038,245 +1076,143 @@ html[data-theme="dark"]
     font-size: .68rem;
 }
 /* ================================================================
-   RESULT HEADER
+   PARTICIPANT TABLE
 ================================================================ */
-.candidates-section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-}
-.candidates-section-header h3 {
-    margin: 0;
-    color:
-        var(--sv-text, #111827);
-    font-size: .95rem;
-}
-.candidates-section-header span {
-    color:
-        var(--sv-text-soft, #64748b);
-    font-size: .66rem;
-}
-/* ================================================================
-   TABLE CARD
-================================================================ */
-.candidates-table-card {
+.participant-section {
     overflow: hidden;
-    border-radius: 18px;
+    border-radius: 17px;
     background:
         var(--sv-card-bg, #fff);
     border:
         1px solid
         var(--sv-border, #e5e7eb);
 }
-.candidates-table-card__header {
+.participant-section__header {
     padding: 1rem 1.1rem;
     display: flex;
-    align-items: center;
     justify-content: space-between;
+    align-items: center;
     gap: 1rem;
     border-bottom:
         1px solid
         var(--sv-border, #e5e7eb);
 }
-.candidates-table-card__header strong {
+.participant-section__header h3 {
+    margin: 0;
     color:
         var(--sv-text, #111827);
-    font-size: .82rem;
+    font-size: .85rem;
 }
-.candidates-table-card__header span {
+.participant-section__header span {
     color:
         var(--sv-text-soft, #64748b);
-    font-size: .64rem;
+    font-size: .65rem;
 }
-.candidates-table-wrapper {
+.participant-table-wrapper {
     overflow-x: auto;
 }
-.candidates-table {
+.participant-table {
     width: 100%;
-    min-width: 1100px;
+    min-width: 850px;
     border-collapse: collapse;
 }
-.candidates-table th,
-.candidates-table td {
+.participant-table th,
+.participant-table td {
     padding:
-        .9rem 1rem;
+        .85rem 1rem;
     text-align: left;
-    vertical-align: middle;
     border-bottom:
         1px solid
         var(--sv-border, #e5e7eb);
+    vertical-align: middle;
 }
-.candidates-table tbody tr:last-child td {
+.participant-table tbody tr:last-child td {
     border-bottom: 0;
 }
-.candidates-table tbody tr {
-    transition:
-        background .15s ease;
-}
-.candidates-table tbody tr:hover {
-    background:
-        var(--sv-card-soft, #f8fafc);
-}
-.candidates-table th {
+.participant-table th {
     color:
         var(--sv-text-soft, #64748b);
-    font-size: .59rem;
+    font-size: .61rem;
     font-weight: 800;
-    letter-spacing: .05em;
     text-transform: uppercase;
+    letter-spacing: .05em;
 }
-.candidates-table td {
+.participant-table td {
     color:
         var(--sv-text, #111827);
-    font-size: .69rem;
+    font-size: .7rem;
 }
-/* ================================================================
-   CANDIDATE PROFILE
-================================================================ */
-.candidate-profile {
+.participant-profile {
     display: flex;
     align-items: center;
-    gap: .7rem;
-    min-width: 220px;
+    gap: .65rem;
 }
-.candidate-profile__avatar {
-    width: 42px;
-    height: 42px;
-    flex: 0 0 42px;
+.participant-avatar {
+    width: 39px;
+    height: 39px;
+    flex: 0 0 39px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 12px;
+    border-radius: 11px;
     background:
-        linear-gradient(
-            135deg,
-            rgba(37,99,235,.13),
-            rgba(124,58,237,.11)
-        );
+        var(--sv-primary-soft, #eff6ff);
     color:
         var(--sv-primary, #2563eb);
-    font-size: .66rem;
+    font-size: .67rem;
     font-weight: 800;
 }
-.candidate-profile__info {
-    min-width: 0;
-}
-.candidate-profile__info strong {
+.participant-profile strong {
     display: block;
-    max-width: 190px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    color:
-        var(--sv-text, #111827);
     font-size: .71rem;
 }
-.candidate-profile__info span {
+.participant-profile span {
     display: block;
-    max-width: 200px;
-    margin-top: .14rem;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    margin-top: .12rem;
     color:
         var(--sv-text-soft, #64748b);
     font-size: .61rem;
 }
-/* ================================================================
-   PROGRAMME / COHORT
-================================================================ */
-.candidate-context strong {
-    display: block;
-    color:
-        var(--sv-text, #111827);
-    font-size: .69rem;
-}
-.candidate-context span {
-    display: block;
-    margin-top: .13rem;
-    color:
-        var(--sv-text-soft, #64748b);
-    font-size: .61rem;
-}
-.candidate-cohort-link {
-    color:
-        var(--sv-primary, #2563eb);
-    text-decoration: none;
-    font-weight: 700;
-}
-.candidate-cohort-link:hover {
-    text-decoration: underline;
-}
-/* ================================================================
-   STATUS
-================================================================ */
-.candidate-status {
+.status-pill {
     display: inline-flex;
     align-items: center;
-    gap: .3rem;
     padding:
-        .33rem .58rem;
+        .32rem .56rem;
     border-radius: 999px;
-    font-size: .6rem;
+    font-size: .61rem;
     font-weight: 800;
-    white-space: nowrap;
 }
-.candidate-status::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-}
-.candidate-status--active {
+.status-pill--active {
     background: #dcfce7;
     color: #166534;
 }
-.candidate-status--completed {
+.status-pill--completed {
     background: #dbeafe;
     color: #1d4ed8;
 }
-.candidate-status--withdrawn {
+.status-pill--withdrawn {
     background: #fee2e2;
     color: #991b1b;
 }
-.candidate-status--selected {
-    background: #ede9fe;
-    color: #6d28d9;
-}
-.candidate-status--onboarded {
-    background: #cffafe;
-    color: #155e75;
-}
-.candidate-status--pending {
-    background: #fef3c7;
-    color: #92400e;
-}
-.candidate-status--default {
+.status-pill--inactive {
     background: #f1f5f9;
     color: #475569;
 }
-/* ================================================================
-   DATE
-================================================================ */
-.candidate-date {
-    color:
-        var(--sv-text-soft, #64748b);
-    white-space: nowrap;
-    font-size: .65rem;
+.status-pill--pending {
+    background: #fef3c7;
+    color: #92400e;
 }
-/* ================================================================
-   ACTIONS
-================================================================ */
-.candidate-actions {
+.status-pill--default {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+.participant-actions {
     display: flex;
-    align-items: center;
     gap: .4rem;
 }
-.candidate-action {
-    width: 35px;
-    height: 35px;
+.participant-action {
+    width: 34px;
+    height: 34px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1289,73 +1225,50 @@ html[data-theme="dark"]
     color:
         var(--sv-text-soft, #64748b);
     text-decoration: none;
-    transition:
-        transform .15s ease,
-        border-color .15s ease,
-        background .15s ease;
 }
-.candidate-action:hover {
-    transform:
-        translateY(-1px);
-    border-color:
-        rgba(37,99,235,.30);
-    color:
-        var(--sv-primary, #2563eb);
-}
-.candidate-action--primary {
-    background:
-        #2563eb;
-    border-color:
-        #2563eb;
+.participant-action--primary {
+    background: #2563eb;
+    border-color: #2563eb;
     color: #fff;
-}
-.candidate-action--primary:hover {
-    color: #fff;
-    background:
-        #1d4ed8;
 }
 /* ================================================================
-   EMPTY
+   EMPTY STATE
 ================================================================ */
-.candidates-empty {
-    padding:
-        3.2rem 1rem;
+.participant-empty {
+    padding: 3rem 1rem;
     text-align: center;
 }
-.candidates-empty__icon {
-    width: 66px;
-    height: 66px;
+.participant-empty__icon {
+    width: 62px;
+    height: 62px;
     margin:
-        0 auto .9rem;
+        0 auto .8rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 18px;
+    border-radius: 17px;
     background:
         var(--sv-primary-soft, #eff6ff);
     color:
         var(--sv-primary, #2563eb);
-    font-size: 1.3rem;
+    font-size: 1.2rem;
 }
-.candidates-empty h4 {
+.participant-empty h4 {
     margin: 0;
     color:
         var(--sv-text, #111827);
-    font-size: .9rem;
 }
-.candidates-empty p {
-    max-width: 430px;
+.participant-empty p {
     margin:
-        .4rem auto 0;
+        .35rem 0 0;
     color:
         var(--sv-text-soft, #64748b);
     font-size: .68rem;
-    line-height: 1.5;
 }
 /* ================================================================
    SECURITY NOTICE
 ================================================================ */
-.candidates-security {
+.cohort-security {
     padding: 1rem;
     display: flex;
     gap: .7rem;
@@ -1366,7 +1279,7 @@ html[data-theme="dark"]
         1px solid
         rgba(37,99,235,.12);
 }
-.candidates-security__icon {
+.cohort-security__icon {
     width: 36px;
     height: 36px;
     flex: 0 0 36px;
@@ -1379,13 +1292,13 @@ html[data-theme="dark"]
     color:
         var(--sv-primary, #2563eb);
 }
-.candidates-security strong {
+.cohort-security strong {
     display: block;
     color:
         var(--sv-text, #111827);
     font-size: .7rem;
 }
-.candidates-security p {
+.cohort-security p {
     margin:
         .2rem 0 0;
     color:
@@ -1397,77 +1310,44 @@ html[data-theme="dark"]
    DARK MODE STATUS
 ================================================================ */
 html[data-theme="dark"]
-.candidate-status--active {
+.status-pill--active {
     background:
         rgba(34,197,94,.12);
     color: #86efac;
 }
 html[data-theme="dark"]
-.candidate-status--completed {
+.status-pill--completed {
     background:
         rgba(59,130,246,.13);
     color: #93c5fd;
 }
 html[data-theme="dark"]
-.candidate-status--withdrawn {
+.status-pill--withdrawn {
     background:
         rgba(239,68,68,.13);
     color: #fca5a5;
 }
 html[data-theme="dark"]
-.candidate-status--selected {
+.status-pill--inactive {
     background:
-        rgba(124,58,237,.15);
-    color: #c4b5fd;
-}
-html[data-theme="dark"]
-.candidate-status--onboarded {
-    background:
-        rgba(6,182,212,.13);
-    color: #67e8f9;
-}
-html[data-theme="dark"]
-.candidate-status--pending {
-    background:
-        rgba(245,158,11,.12);
-    color: #fcd34d;
-}
-html[data-theme="dark"]
-.candidate-status--default {
-    background:
-        rgba(148,163,184,.10);
+        rgba(148,163,184,.1);
     color: #cbd5e1;
 }
 /* ================================================================
    RESPONSIVE
 ================================================================ */
 @media(max-width:1100px) {
-    .candidates-stats {
+    .cohort-view-stats {
         grid-template-columns:
-            repeat(
-                2,
-                minmax(0,1fr)
-            );
+            repeat(2,minmax(0,1fr));
     }
 }
 @media(max-width:900px) {
     .supervisor-topbar__menu {
         display: inline-flex;
     }
-}
-@media(max-width:800px) {
-    .candidates-filter-card {
-        align-items: stretch;
-        flex-direction: column;
-    }
-    .candidates-filter {
-        width: 100%;
-    }
-    .candidates-search {
-        flex: 1;
-    }
-    .candidates-search input {
-        width: 100%;
+    .cohort-overview-grid {
+        grid-template-columns: 1fr;
     }
 }
 @media(max-width:700px) {
@@ -1475,52 +1355,48 @@ html[data-theme="dark"]
         padding:
             .7rem 1rem;
     }
-    .supervisor-topbar__search {
-        display: none;
-    }
     .supervisor-topbar__user-copy {
         display: none;
     }
-    .candidates-page {
+    .cohort-view-page {
         padding: 1rem;
     }
-    .candidates-hero__icon {
+    .cohort-view-hero__icon {
         display: none;
     }
-}
-@media(max-width:560px) {
-    .candidates-stats {
-        grid-template-columns:
-            1fr 1fr;
+    .participant-filter {
+        align-items: stretch;
+        flex-direction: column;
     }
-    .candidates-filter {
-        display: grid;
-        grid-template-columns: 1fr;
+    .participant-filter form {
+        width: 100%;
     }
-    .candidates-filter select,
-    .candidates-filter__submit,
-    .candidates-filter__reset {
+    .participant-search {
+        flex: 1;
+    }
+    .participant-search input {
         width: 100%;
     }
 }
-@media(max-width:400px) {
-    .candidates-stats {
+@media(max-width:500px) {
+    .cohort-view-stats {
+        grid-template-columns: 1fr 1fr;
+    }
+    .participant-filter form {
+        display: grid;
         grid-template-columns: 1fr;
+    }
+    .participant-filter select,
+    .participant-filter__button,
+    .participant-filter__reset {
+        width: 100%;
     }
 }
     </style>
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
-    <!-- ============================================================
-         SIDEBAR
-    ============================================================= -->
-    <?php
-    require_once __DIR__ . '/sidebar.php';
-    ?>
-    <!-- ============================================================
-         MAIN
-    ============================================================= -->
+    <?php require_once __DIR__ . '/sidebar.php'; ?>
     <main class="dashboard__main">
         <!-- ========================================================
              NAVBAR
@@ -1528,161 +1404,295 @@ html[data-theme="dark"]
         <?php
         require_once __DIR__ . '/navbar.php';
         ?>
-        <!-- ========================================================
-             CONTENT
-        ========================================================= -->
-        <div class="candidates-page">
+        <div class="cohort-view-page">
             <?= $flashes ?>
+            <!-- BREADCRUMB -->
+            <div class="cohort-breadcrumb">
+                <a
+                    href="<?= url(
+                        'supervisor/dashboard.php'
+                    ) ?>"
+                >
+                    Dashboard
+                </a>
+                <i class="fas fa-chevron-right"></i>
+                <a
+                    href="<?= url(
+                        'supervisor/cohorts.php'
+                    ) ?>"
+                >
+                    My Cohorts
+                </a>
+                <i class="fas fa-chevron-right"></i>
+                <span>
+                    <?= e($cohort['cohort_name']) ?>
+                </span>
+            </div>
             <!-- ====================================================
                  HERO
             ===================================================== -->
-            <section class="candidates-hero">
-                <div class="candidates-hero__content">
-                    <span class="candidates-hero__eyebrow">
-                        <i class="fas fa-user-group"></i>
-                        Candidate Workspace
+            <section class="cohort-view-hero">
+                <div class="cohort-view-hero__content">
+                    <span class="cohort-view-hero__badge">
+                        <i class="fas fa-layer-group"></i>
+                        Assigned Cohort
                     </span>
                     <h2>
-                        Monitor candidate progress
+                        <?= e(
+                            $cohort['cohort_name']
+                        ) ?>
                     </h2>
                     <p>
-                        Review candidates across your assigned cohorts,
-                        monitor participation status and open individual
-                        candidate records for detailed progress tracking.
+                        <?= e(
+                            $cohort['programme_name']
+                        ) ?>
                     </p>
-                    <div class="candidates-hero__actions">
-                        <a
-                            href="<?= url(
-                                'supervisor/cohorts.php'
-                            ) ?>"
-                            class="candidates-hero__action"
-                        >
-                            <i class="fas fa-layer-group"></i>
-                            My Cohorts
-                        </a>
-                        <a
-                            href="#candidateFilters"
-                            class="candidates-hero__action"
-                        >
-                            <i class="fas fa-filter"></i>
-                            Filter Candidates
-                        </a>
+                    <div class="cohort-view-hero__meta">
+                        <span>
+                            <i class="fas fa-briefcase"></i>
+                            <?= e(
+                                cohortViewStatusLabel(
+                                    (string)(
+                                        $cohort[
+                                            'programme_type'
+                                        ]
+                                        ?? 'Programme'
+                                    )
+                                )
+                            ) ?>
+                        </span>
+                        <span>
+                            <i class="fas fa-circle"></i>
+                            <?= e(
+                                cohortViewStatusLabel(
+                                    (string)(
+                                        $cohort[
+                                            'cohort_status'
+                                        ]
+                                        ?? ''
+                                    )
+                                )
+                            ) ?>
+                        </span>
+                        <span>
+                            <i class="far fa-calendar"></i>
+                            <?= e(
+                                cohortViewDate(
+                                    $cohort[
+                                        'start_date'
+                                    ]
+                                    ?? null
+                                )
+                            ) ?>
+                            -
+                            <?= e(
+                                cohortViewDate(
+                                    $cohort[
+                                        'end_date'
+                                    ]
+                                    ?? null
+                                )
+                            ) ?>
+                        </span>
                     </div>
                 </div>
-                <div class="candidates-hero__icon">
-                    <i class="fas fa-users-viewfinder"></i>
+                <div class="cohort-view-hero__icon">
+                    <i class="fas fa-people-group"></i>
                 </div>
             </section>
             <!-- ====================================================
-                 KPIs
+                 STATS
             ===================================================== -->
-            <section class="candidates-stats">
-                <div class="candidate-stat">
-                    <div class="candidate-stat__icon">
+            <section class="cohort-view-stats">
+                <div class="cohort-view-stat">
+                    <div class="cohort-view-stat__icon">
                         <i class="fas fa-users"></i>
                     </div>
-                    <div class="candidate-stat__value">
+                    <strong>
                         <?= number_format(
                             $totalCandidates
                         ) ?>
-                    </div>
-                    <span class="candidate-stat__label">
+                    </strong>
+                    <span>
                         Current Candidates
                     </span>
                 </div>
-                <div class="candidate-stat">
-                    <div class="candidate-stat__icon">
+                <div class="cohort-view-stat">
+                    <div class="cohort-view-stat__icon">
                         <i class="fas fa-user-check"></i>
                     </div>
-                    <div class="candidate-stat__value">
+                    <strong>
                         <?= number_format(
                             $activeCandidates
                         ) ?>
-                    </div>
-                    <span class="candidate-stat__label">
+                    </strong>
+                    <span>
                         Active Candidates
                     </span>
                 </div>
-                <div class="candidate-stat">
-                    <div class="candidate-stat__icon">
+                <div class="cohort-view-stat">
+                    <div class="cohort-view-stat__icon">
                         <i class="fas fa-graduation-cap"></i>
                     </div>
-                    <div class="candidate-stat__value">
+                    <strong>
                         <?= number_format(
                             $completedCandidates
                         ) ?>
-                    </div>
-                    <span class="candidate-stat__label">
+                    </strong>
+                    <span>
                         Completed
                     </span>
                 </div>
-                <div class="candidate-stat">
-                    <div class="candidate-stat__icon">
+                <div class="cohort-view-stat">
+                    <div class="cohort-view-stat__icon">
                         <i class="fas fa-user-minus"></i>
                     </div>
-                    <div class="candidate-stat__value">
+                    <strong>
                         <?= number_format(
                             $withdrawnCandidates
                         ) ?>
-                    </div>
-                    <span class="candidate-stat__label">
+                    </strong>
+                    <span>
                         Withdrawn
                     </span>
                 </div>
             </section>
             <!-- ====================================================
-                 FILTERS
+                 PROGRESS / SUMMARY
             ===================================================== -->
-            <section
-                class="candidates-filter-card"
-                id="candidateFilters"
-            >
-                <div class="candidates-filter-card__heading">
+            <section class="cohort-overview-grid">
+                <div class="cohort-progress-card">
+                    <h3>
+                        Cohort Completion
+                    </h3>
+                    <div class="cohort-progress-card__heading">
+                        <span>
+                            Overall completion progress
+                        </span>
+                        <strong>
+                            <?= $completionRate ?>%
+                        </strong>
+                    </div>
+                    <div class="cohort-progress-card__track">
+                        <div
+                            class="cohort-progress-card__bar"
+                            style="
+                                width:
+                                <?= min(
+                                    100,
+                                    max(
+                                        0,
+                                        $completionRate
+                                    )
+                                ) ?>%;
+                            "
+                        ></div>
+                    </div>
+                    <p class="cohort-progress-card__caption">
+                        <?= number_format(
+                            $completedCandidates
+                        ) ?>
+                        of
+                        <?= number_format(
+                            $totalCandidates
+                        ) ?>
+                        current candidates are marked as completed.
+                    </p>
+                </div>
+                <div class="cohort-summary-card">
+                    <h3>
+                        Cohort Information
+                    </h3>
+                    <div class="cohort-summary-list">
+                        <div class="cohort-summary-item">
+                            <span>
+                                Programme
+                            </span>
+                            <strong>
+                                <?= e(
+                                    $cohort[
+                                        'programme_name'
+                                    ]
+                                ) ?>
+                            </strong>
+                        </div>
+                        <div class="cohort-summary-item">
+                            <span>
+                                Programme Type
+                            </span>
+                            <strong>
+                                <?= e(
+                                    cohortViewStatusLabel(
+                                        (string)(
+                                            $cohort[
+                                                'programme_type'
+                                            ]
+                                            ?? ''
+                                        )
+                                    )
+                                ) ?>
+                            </strong>
+                        </div>
+                        <div class="cohort-summary-item">
+                            <span>
+                                Start
+                            </span>
+                            <strong>
+                                <?= e(
+                                    cohortViewDate(
+                                        $cohort[
+                                            'start_date'
+                                        ]
+                                        ?? null
+                                    )
+                                ) ?>
+                            </strong>
+                        </div>
+                        <div class="cohort-summary-item">
+                            <span>
+                                End
+                            </span>
+                            <strong>
+                                <?= e(
+                                    cohortViewDate(
+                                        $cohort[
+                                            'end_date'
+                                        ]
+                                        ?? null
+                                    )
+                                ) ?>
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- ====================================================
+                 FILTER
+            ===================================================== -->
+            <section class="participant-filter">
+                <div class="participant-filter__heading">
                     <strong>
                         Find a candidate
                     </strong>
                     <span>
-                        Search by name, email, cohort or programme.
+                        Search candidates in this cohort.
                     </span>
                 </div>
-                <form
-                    method="GET"
-                    action=""
-                    class="candidates-filter"
-                >
-                    <div class="candidates-search">
+                <form method="GET">
+                    <input
+                        type="hidden"
+                        name="id"
+                        value="<?= $cohortId ?>"
+                    >
+                    <div class="participant-search">
                         <i class="fas fa-magnifying-glass"></i>
                         <input
                             type="search"
                             name="search"
                             value="<?= e($search) ?>"
-                            placeholder="Search candidates..."
-                            autocomplete="off"
+                            placeholder="Name or email..."
                         >
                     </div>
-                    <!-- COHORT FILTER -->
-                    <select name="cohort_id">
-                        <option value="0">
-                            All cohorts
-                        </option>
-                        <?php foreach (
-                            $assignedCohorts
-                            as $cohort
-                        ): ?>
-                            <option
-                                value="<?= (int)$cohort['id'] ?>"
-                                <?= $cohortFilter
-                                    === (int)$cohort['id']
-                                    ? 'selected'
-                                    : '' ?>
-                            >
-                                <?= e(
-                                    $cohort['name']
-                                ) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <!-- STATUS -->
                     <select name="status">
                         <option value="">
                             All statuses
@@ -1698,7 +1708,7 @@ html[data-theme="dark"]
                                     : '' ?>
                             >
                                 <?= e(
-                                    supervisorCandidatesStatusLabel(
+                                    cohortViewStatusLabel(
                                         $status
                                     )
                                 ) ?>
@@ -1707,7 +1717,7 @@ html[data-theme="dark"]
                     </select>
                     <button
                         type="submit"
-                        class="candidates-filter__submit"
+                        class="participant-filter__button"
                     >
                         <i class="fas fa-filter"></i>
                         Filter
@@ -1716,89 +1726,55 @@ html[data-theme="dark"]
                         $search !== ''
                         ||
                         $statusFilter !== ''
-                        ||
-                        $cohortFilter > 0
                     ): ?>
                         <a
                             href="<?= url(
-                                'supervisor/candidates.php'
+                                'supervisor/cohort_view.php?id=' .
+                                $cohortId
                             ) ?>"
-                            class="candidates-filter__reset"
+                            class="participant-filter__reset"
                         >
-                            <i class="fas fa-rotate-left"></i>
                             Reset
                         </a>
                     <?php endif; ?>
                 </form>
             </section>
             <!-- ====================================================
-                 RESULT HEADER
+                 PARTICIPANTS
             ===================================================== -->
-            <div class="candidates-section-header">
-                <h3>
-                    Candidate Records
-                </h3>
-                <span>
-                    <?= number_format(
-                        count($candidates)
-                    ) ?>
-                    <?= count($candidates) === 1
-                        ? 'record'
-                        : 'records' ?>
-                    displayed
-                </span>
-            </div>
-            <!-- ====================================================
-                 CANDIDATE TABLE
-            ===================================================== -->
-            <section class="candidates-table-card">
-                <div class="candidates-table-card__header">
-                    <strong>
-                        Assigned Cohort Candidates
-                    </strong>
+            <section class="participant-section">
+                <div class="participant-section__header">
+                    <h3>
+                        Cohort Candidates
+                    </h3>
                     <span>
-                        Supervisor-scoped records
+                        <?= number_format(
+                            count($participants)
+                        ) ?>
+                        displayed
                     </span>
                 </div>
                 <?php if (
-                    empty($candidates)
+                    empty($participants)
                 ): ?>
-                    <div class="candidates-empty">
-                        <div class="candidates-empty__icon">
-                            <i class="fas fa-user-group"></i>
+                    <div class="participant-empty">
+                        <div class="participant-empty__icon">
+                            <i class="fas fa-users"></i>
                         </div>
                         <h4>
                             No candidates found
                         </h4>
                         <p>
-                            <?php if (
-                                $search !== ''
-                                ||
-                                $statusFilter !== ''
-                                ||
-                                $cohortFilter > 0
-                            ): ?>
-                                No candidate records matched the
-                                filters you selected.
-                            <?php else: ?>
-                                There are currently no candidates
-                                in your assigned cohorts.
-                            <?php endif; ?>
+                            No candidates matched the selected filters.
                         </p>
                     </div>
                 <?php else: ?>
-                    <div class="candidates-table-wrapper">
-                        <table class="candidates-table">
+                    <div class="participant-table-wrapper">
+                        <table class="participant-table">
                             <thead>
                                 <tr>
                                     <th>
                                         Candidate
-                                    </th>
-                                    <th>
-                                        Programme
-                                    </th>
-                                    <th>
-                                        Cohort
                                     </th>
                                     <th>
                                         Status
@@ -1819,45 +1795,45 @@ html[data-theme="dark"]
                             </thead>
                             <tbody>
                             <?php foreach (
-                                $candidates
-                                as $candidate
+                                $participants
+                                as $participant
                             ): ?>
                                 <?php
-                                $candidateFirstName =
+                                $participantFirstName =
                                     trim(
                                         (string)(
-                                            $candidate[
+                                            $participant[
                                                 'first_name'
                                             ]
                                             ?? ''
                                         )
                                     );
-                                $candidateLastName =
+                                $participantLastName =
                                     trim(
                                         (string)(
-                                            $candidate[
+                                            $participant[
                                                 'last_name'
                                             ]
                                             ?? ''
                                         )
                                     );
-                                $candidateName =
+                                $participantName =
                                     trim(
-                                        $candidateFirstName .
+                                        $participantFirstName .
                                         ' ' .
-                                        $candidateLastName
+                                        $participantLastName
                                     );
                                 if (
-                                    $candidateName === ''
+                                    $participantName === ''
                                 ) {
-                                    $candidateName =
+                                    $participantName =
                                         'Candidate';
                                 }
-                                $candidateStatus =
+                                $participationStatus =
                                     strtolower(
                                         trim(
                                             (string)(
-                                                $candidate[
+                                                $participant[
                                                     'participation_status'
                                                 ]
                                                 ?? ''
@@ -1866,26 +1842,25 @@ html[data-theme="dark"]
                                     );
                                 ?>
                                 <tr>
-                                    <!-- CANDIDATE -->
                                     <td>
-                                        <div class="candidate-profile">
-                                            <div class="candidate-profile__avatar">
+                                        <div class="participant-profile">
+                                            <div class="participant-avatar">
                                                 <?= e(
-                                                    supervisorCandidateInitials(
-                                                        $candidateFirstName,
-                                                        $candidateLastName
+                                                    cohortViewInitials(
+                                                        $participantFirstName,
+                                                        $participantLastName
                                                     )
                                                 ) ?>
                                             </div>
-                                            <div class="candidate-profile__info">
+                                            <div>
                                                 <strong>
                                                     <?= e(
-                                                        $candidateName
+                                                        $participantName
                                                     ) ?>
                                                 </strong>
                                                 <span>
                                                     <?= e(
-                                                        $candidate[
+                                                        $participant[
                                                             'email'
                                                         ]
                                                         ?: 'No email'
@@ -1894,155 +1869,84 @@ html[data-theme="dark"]
                                             </div>
                                         </div>
                                     </td>
-                                    <!-- PROGRAMME -->
-                                    <td>
-                                        <div class="candidate-context">
-                                            <strong>
-                                                <?= e(
-                                                    $candidate[
-                                                        'programme_name'
-                                                    ]
-                                                ) ?>
-                                            </strong>
-                                            <span>
-                                                <?= e(
-                                                    supervisorCandidatesStatusLabel(
-                                                        (string)(
-                                                            $candidate[
-                                                                'programme_type'
-                                                            ]
-                                                            ?? ''
-                                                        )
-                                                    )
-                                                ) ?>
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <!-- COHORT -->
-                                    <td>
-                                        <div class="candidate-context">
-                                            <a
-                                                href="<?= url(
-                                                    'supervisor/cohort_view.php?id=' .
-                                                    (int)$candidate[
-                                                        'cohort_id'
-                                                    ]
-                                                ) ?>"
-                                                class="candidate-cohort-link"
-                                            >
-                                                <?= e(
-                                                    $candidate[
-                                                        'cohort_name'
-                                                    ]
-                                                ) ?>
-                                            </a>
-                                            <span>
-                                                <?= e(
-                                                    supervisorCandidatesStatusLabel(
-                                                        (string)(
-                                                            $candidate[
-                                                                'cohort_status'
-                                                            ]
-                                                            ?? ''
-                                                        )
-                                                    )
-                                                ) ?>
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <!-- STATUS -->
                                     <td>
                                         <span
                                             class="
-                                                candidate-status
-                                                <?= supervisorCandidatesStatusClass(
-                                                    $candidateStatus
+                                                status-pill
+                                                <?= cohortViewStatusClass(
+                                                    $participationStatus
                                                 ) ?>
                                             "
                                         >
                                             <?= e(
-                                                supervisorCandidatesStatusLabel(
-                                                    $candidateStatus
+                                                cohortViewStatusLabel(
+                                                    $participationStatus
                                                 )
                                             ) ?>
                                         </span>
                                     </td>
-                                    <!-- SELECTED -->
                                     <td>
-                                        <span class="candidate-date">
-                                            <?= e(
-                                                supervisorCandidatesDate(
-                                                    $candidate[
-                                                        'selected_at'
-                                                    ]
-                                                    ?? null
-                                                )
-                                            ) ?>
-                                        </span>
+                                        <?= e(
+                                            cohortViewDate(
+                                                $participant[
+                                                    'selected_at'
+                                                ]
+                                                ?? null
+                                            )
+                                        ) ?>
                                     </td>
-                                    <!-- ONBOARDED -->
                                     <td>
-                                        <span class="candidate-date">
-                                            <?= e(
-                                                supervisorCandidatesDate(
-                                                    $candidate[
-                                                        'onboarded_at'
-                                                    ]
-                                                    ?? null
-                                                )
-                                            ) ?>
-                                        </span>
+                                        <?= e(
+                                            cohortViewDate(
+                                                $participant[
+                                                    'onboarded_at'
+                                                ]
+                                                ?? null
+                                            )
+                                        ) ?>
                                     </td>
-                                    <!-- COMPLETED -->
                                     <td>
-                                        <span class="candidate-date">
-                                            <?= e(
-                                                supervisorCandidatesDate(
-                                                    $candidate[
-                                                        'completed_at'
-                                                    ]
-                                                    ?? null
-                                                )
-                                            ) ?>
-                                        </span>
+                                        <?= e(
+                                            cohortViewDate(
+                                                $participant[
+                                                    'completed_at'
+                                                ]
+                                                ?? null
+                                            )
+                                        ) ?>
                                     </td>
-                                    <!-- ACTIONS -->
                                     <td>
-                                        <div class="candidate-actions">
+                                        <div class="participant-actions">
                                             <a
                                                 href="<?= url(
                                                     'supervisor/candidate_view.php?id=' .
-                                                    (int)$candidate[
+                                                    (int)$participant[
                                                         'user_id'
                                                     ] .
                                                     '&cohort_id=' .
-                                                    (int)$candidate[
-                                                        'cohort_id'
-                                                    ]
+                                                    $cohortId
                                                 ) ?>"
-                                                class="candidate-action"
+                                                class="participant-action"
                                                 title="View candidate"
                                             >
                                                 <i class="fas fa-eye"></i>
                                             </a>
                                             <?php if (
-                                                $candidateStatus
+                                                $participationStatus
                                                 !== 'withdrawn'
                                             ): ?>
                                                 <a
                                                     href="<?= url(
                                                         'supervisor/update_candidate_status.php?id=' .
-                                                        (int)$candidate[
+                                                        (int)$participant[
                                                             'user_id'
                                                         ] .
                                                         '&cohort_id=' .
-                                                        (int)$candidate[
-                                                            'cohort_id'
-                                                        ]
+                                                        $cohortId
                                                     ) ?>"
                                                     class="
-                                                        candidate-action
-                                                        candidate-action--primary
+                                                        participant-action
+                                                        participant-action--primary
                                                     "
                                                     title="Update status"
                                                 >
@@ -2059,21 +1963,21 @@ html[data-theme="dark"]
                 <?php endif; ?>
             </section>
             <!-- ====================================================
-                 SECURITY
+                 SECURITY NOTICE
             ===================================================== -->
-            <div class="candidates-security">
-                <div class="candidates-security__icon">
+            <div class="cohort-security">
+                <div class="cohort-security__icon">
                     <i class="fas fa-shield-halved"></i>
                 </div>
                 <div>
                     <strong>
-                        Supervisor candidate access
+                        Supervisor access protection
                     </strong>
                     <p>
-                        Candidate records are restricted to cohorts
-                        assigned to your Supervisor account.
-                        Candidate assignment, cohort transfers and
-                        Supervisor reassignment remain unavailable.
+                        This cohort is visible because it is assigned
+                        to your Supervisor account. Candidate
+                        assignment, cohort reassignment and programme
+                        administration remain restricted.
                     </p>
                 </div>
             </div>
@@ -2091,7 +1995,7 @@ document.addEventListener(
             document.getElementById(
                 'navbarDarkToggle'
             );
-        const navbarIcon =
+        const icon =
             document.getElementById(
                 'navbarDarkIcon'
             );
@@ -2101,8 +2005,8 @@ document.addEventListener(
                     .getAttribute(
                         'data-theme'
                     ) === 'dark';
-            if (navbarIcon) {
-                navbarIcon.className =
+            if (icon) {
+                icon.className =
                     dark
                     ? 'fas fa-sun'
                     : 'fas fa-moon';
