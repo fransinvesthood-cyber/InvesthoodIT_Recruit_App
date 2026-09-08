@@ -1,11 +1,11 @@
 -- phpMyAdmin SQL Dump
--- version 5.2.0
+-- version 5.2.1
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Aug 21, 2026 at 10:56 PM
--- Server version: 10.4.24-MariaDB
--- PHP Version: 8.1.6
+-- Generation Time: Sep 08, 2026 at 02:20 PM
+-- Server version: 10.4.32-MariaDB
+-- PHP Version: 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -29,56 +29,126 @@ SET time_zone = "+00:00";
 
 CREATE TABLE `applications` (
   `id` int(10) UNSIGNED NOT NULL,
-  `application_reference` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `application_reference` varchar(20) NOT NULL,
   `candidate_id` int(10) UNSIGNED NOT NULL,
   `opportunity_id` int(10) UNSIGNED NOT NULL,
-  `status` enum('draft','submitted','eligibility_review','screened','assessment','interview','waitlisted','selected','rejected','withdrawn','expired') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `status` enum('draft','submitted','eligibility_review','screened','assessment','interview','waitlisted','selected','rejected','withdrawn','expired') NOT NULL DEFAULT 'draft',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `submitted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- --------------------------------------------------------
+
 --
--- Dumping data for table `applications`
+-- Table structure for table `assessment_attempts`
 --
 
-INSERT INTO `applications` (`id`, `application_reference`, `candidate_id`, `opportunity_id`, `status`, `created_at`, `updated_at`, `submitted_at`) VALUES
-(1, 'APP-2026-513C8C', 9, 3, 'draft', '2026-08-19 10:35:03', '2026-08-21 00:56:30', NULL);
+CREATE TABLE `assessment_attempts` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `participant_id` int(11) NOT NULL,
+  `outcome_id` int(10) UNSIGNED NOT NULL,
+  `attempt_number` int(11) NOT NULL DEFAULT 1,
+  `assessor_id` int(11) NOT NULL,
+  `moderator_id` int(11) DEFAULT NULL,
+  `status` enum('draft','submitted','in_review','assessed','awaiting_moderation','moderated','final_approved','resubmission_required') NOT NULL DEFAULT 'submitted',
+  `assessor_result` enum('competent','not_yet_competent') DEFAULT NULL,
+  `moderation_status` enum('not_required','pending','approved','changes_requested','rejected') NOT NULL DEFAULT 'pending',
+  `moderator_result` enum('approved','changes_requested','rejected') DEFAULT NULL,
+  `submitted_at` datetime DEFAULT NULL,
+  `assessed_at` datetime DEFAULT NULL,
+  `moderated_at` datetime DEFAULT NULL,
+  `final_approved_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `application_documents`
+-- Table structure for table `assessment_criteria`
 --
 
-CREATE TABLE `application_documents` (
+CREATE TABLE `assessment_criteria` (
   `id` int(10) UNSIGNED NOT NULL,
-  `application_id` int(10) UNSIGNED NOT NULL,
-  `document_type` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `original_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `stored_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `mime_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `file_size` int(10) UNSIGNED NOT NULL DEFAULT 0,
-  `file_checksum` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `outcome_id` int(10) UNSIGNED NOT NULL,
+  `code` varchar(50) NOT NULL,
+  `title` varchar(180) NOT NULL,
+  `description` text DEFAULT NULL,
+  `sort_order` int(11) NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `application_responses`
+-- Table structure for table `assessment_decisions`
 --
 
-CREATE TABLE `application_responses` (
+CREATE TABLE `assessment_decisions` (
   `id` int(10) UNSIGNED NOT NULL,
-  `application_id` int(10) UNSIGNED NOT NULL,
-  `question_id` int(10) UNSIGNED NOT NULL,
-  `response` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `attempt_id` int(10) UNSIGNED NOT NULL,
+  `criterion_id` int(10) UNSIGNED NOT NULL,
+  `result` enum('competent','not_yet_competent') NOT NULL,
+  `feedback` text NOT NULL,
+  `evidence_id` int(10) UNSIGNED DEFAULT NULL,
+  `assessor_id` int(11) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `assessment_evidence`
+--
+
+CREATE TABLE `assessment_evidence` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `attempt_id` int(10) UNSIGNED NOT NULL,
+  `evidence_type` varchar(60) NOT NULL DEFAULT 'document',
+  `title` varchar(180) NOT NULL,
+  `description` text DEFAULT NULL,
+  `file_name` varchar(255) DEFAULT NULL,
+  `file_path` varchar(500) DEFAULT NULL,
+  `submitted_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `assessment_outcomes`
+--
+
+CREATE TABLE `assessment_outcomes` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `code` varchar(50) NOT NULL,
+  `title` varchar(180) NOT NULL,
+  `description` text DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `assessor_activity_log`
+--
+
+CREATE TABLE `assessor_activity_log` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `assessor_id` int(11) NOT NULL,
+  `action` varchar(100) NOT NULL,
+  `description` varchar(500) NOT NULL,
+  `entity_type` varchar(50) DEFAULT NULL,
+  `entity_id` int(11) DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -89,11 +159,11 @@ CREATE TABLE `application_responses` (
 CREATE TABLE `audit_logs` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `action` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `record_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `action` varchar(100) NOT NULL,
+  `record_type` varchar(50) DEFAULT NULL,
   `record_id` int(10) UNSIGNED DEFAULT NULL,
-  `reason` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `ip_address` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `reason` varchar(255) DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -302,9 +372,7 @@ INSERT INTO `audit_logs` (`id`, `user_id`, `action`, `record_type`, `record_id`,
 (198, 9, 'profile_picture_uploaded', 'candidate_profile', NULL, 'Profile picture uploaded', '::1', '2026-08-19 09:49:41'),
 (199, 9, 'profile_updated', 'candidate_profile', NULL, 'Personal information updated', '::1', '2026-08-19 09:50:59'),
 (200, 9, 'profile_updated', 'candidate_profile', NULL, 'Professional information updated', '::1', '2026-08-19 09:52:30'),
-(201, 9, 'qualification_removed', 'qualification', 2, 'Qualification removed', '::1', '2026-08-19 09:54:00'),
-(202, 9, 'profile_picture_removed', 'candidate_profile', NULL, 'Profile picture removed', '::1', '2026-08-19 23:04:24'),
-(203, 9, 'profile_updated', 'candidate_profile', NULL, 'Professional information updated', '::1', '2026-08-19 23:05:44');
+(201, 9, 'qualification_removed', 'qualification', 2, 'Qualification removed', '::1', '2026-08-19 09:54:00');
 
 -- --------------------------------------------------------
 
@@ -314,9 +382,9 @@ INSERT INTO `audit_logs` (`id`, `user_id`, `action`, `record_type`, `record_id`,
 
 CREATE TABLE `availability_statuses` (
   `id` int(10) UNSIGNED NOT NULL,
-  `slug` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `label` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `description` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `slug` varchar(50) NOT NULL,
+  `label` varchar(100) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
   `sort_order` int(11) NOT NULL DEFAULT 0,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
@@ -337,21 +405,39 @@ INSERT INTO `availability_statuses` (`id`, `slug`, `label`, `description`, `sort
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `candidate_consents`
+--
+
+CREATE TABLE `candidate_consents` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `candidate_id` int(11) NOT NULL,
+  `consent_type` enum('recruiter_discovery','client_sharing') NOT NULL,
+  `status` enum('consented','revoked','expired') NOT NULL DEFAULT 'consented',
+  `granted_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `expires_at` datetime DEFAULT NULL,
+  `revoked_at` datetime DEFAULT NULL,
+  `consent_source` varchar(100) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `candidate_profiles`
 --
 
 CREATE TABLE `candidate_profiles` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `professional_title` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `professional_summary` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `career_interests` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `employment_status` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `professional_title` varchar(100) DEFAULT NULL,
+  `professional_summary` text DEFAULT NULL,
+  `career_interests` text DEFAULT NULL,
+  `employment_status` varchar(30) DEFAULT NULL,
   `availability_status_id` int(10) UNSIGNED DEFAULT NULL,
   `availability_date` date DEFAULT NULL,
-  `address` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `city` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `profile_picture` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `address` varchar(255) DEFAULT NULL,
+  `city` varchar(100) DEFAULT NULL,
+  `profile_picture` varchar(255) DEFAULT NULL,
   `completion_percent` tinyint(3) UNSIGNED NOT NULL DEFAULT 0,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -363,7 +449,7 @@ CREATE TABLE `candidate_profiles` (
 --
 
 INSERT INTO `candidate_profiles` (`id`, `user_id`, `professional_title`, `professional_summary`, `career_interests`, `employment_status`, `availability_status_id`, `availability_date`, `address`, `city`, `profile_picture`, `completion_percent`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 9, 'Software Developer', 'I am a motivated Software Developer holding a Degree in Computer Science, with two years of hands-on experience developing web-based applications, databases, and software solutions. I have a strong understanding of Object-Oriented Programming principles and experience working with HTML, CSS, JavaScript, PHP, and MySQL in Agile development environments. I am passionate about learning new technologies, including Java and cloud platforms, and enjoy building reliable, scalable, and user-friendly software solutions while contributing effectively within collaborative development teams.', 'Back-end development', 'unemployed', 1, NULL, '1056 Madiba DR', 'Bronkhorstspruit', NULL, 89, 1, '2026-08-05 00:22:14', '2026-08-19 23:05:44'),
+(1, 9, 'Software Developer', 'I am a motivated Software Developer holding a Degree in Computer Science, with two years of hands-on experience developing web-based applications, databases, and software solutions. I have a strong understanding of Object-Oriented Programming principles and experience working with HTML, CSS, JavaScript, PHP, and MySQL in Agile development environments. I am passionate about learning new technologies, including Java and cloud platforms, and enjoy building reliable, scalable, and user-friendly software solutions while contributing effectively within collaborative development teams.', 'Back-end development', 'employed', 1, NULL, '1056 Madiba DR', 'Bronkhorstspruit', 'b1835299bd2e7dd05a23b958efd25371.png', 100, 1, '2026-08-05 00:22:14', '2026-08-19 09:54:00'),
 (2, 10, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 1, '2026-08-06 14:31:12', '2026-08-06 14:31:12');
 
 -- --------------------------------------------------------
@@ -377,7 +463,7 @@ CREATE TABLE `candidate_saved_opportunities` (
   `candidate_id` int(10) UNSIGNED NOT NULL,
   `opportunity_id` int(10) UNSIGNED NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -389,8 +475,8 @@ CREATE TABLE `candidate_skills` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
   `skill_id` int(10) UNSIGNED NOT NULL,
-  `proficiency` enum('beginner','intermediate','advanced','expert') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'intermediate',
-  `verification_status` enum('unverified','pending','verified','failed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'unverified',
+  `proficiency` enum('beginner','intermediate','advanced','expert') NOT NULL DEFAULT 'intermediate',
+  `verification_status` enum('unverified','pending','verified','failed') NOT NULL DEFAULT 'unverified',
   `verified_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -418,12 +504,12 @@ INSERT INTO `candidate_skills` (`id`, `user_id`, `skill_id`, `proficiency`, `ver
 CREATE TABLE `certifications` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `issuing_organisation` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name` varchar(150) NOT NULL,
+  `issuing_organisation` varchar(150) DEFAULT NULL,
   `year_obtained` year(4) DEFAULT NULL,
   `expiry_date` date DEFAULT NULL,
-  `credential_id` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `verification_status` enum('unverified','pending','verified','failed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'unverified',
+  `credential_id` varchar(100) DEFAULT NULL,
+  `verification_status` enum('unverified','pending','verified','failed') NOT NULL DEFAULT 'unverified',
   `verified_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -434,7 +520,7 @@ CREATE TABLE `certifications` (
 --
 
 INSERT INTO `certifications` (`id`, `user_id`, `name`, `issuing_organisation`, `year_obtained`, `expiry_date`, `credential_id`, `verification_status`, `verified_at`, `created_at`, `updated_at`) VALUES
-(1, 9, 'A+', 'CompTIA', 2025, '2027-12-07', 'CompTIA-1234', 'unverified', NULL, '2026-08-07 09:18:04', '2026-08-07 09:43:49');
+(1, 9, 'A+', 'CompTIA', '2025', '2027-12-07', 'CompTIA-1234', 'unverified', NULL, '2026-08-07 09:18:04', '2026-08-07 09:43:49');
 
 -- --------------------------------------------------------
 
@@ -445,18 +531,19 @@ INSERT INTO `certifications` (`id`, `user_id`, `name`, `issuing_organisation`, `
 CREATE TABLE `cohorts` (
   `id` int(10) UNSIGNED NOT NULL,
   `programme_id` int(10) UNSIGNED NOT NULL,
-  `name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `description` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `supervisor_id` int(10) UNSIGNED DEFAULT NULL,
+  `name` varchar(200) NOT NULL,
+  `description` text DEFAULT NULL,
   `start_date` date DEFAULT NULL,
   `end_date` date DEFAULT NULL,
   `application_open_date` date DEFAULT NULL,
   `application_close_date` date DEFAULT NULL,
   `max_capacity` int(10) UNSIGNED NOT NULL DEFAULT 0,
   `applications_count` int(10) UNSIGNED NOT NULL DEFAULT 0,
-  `location` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `province` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `delivery_mode` enum('on_site','remote','hybrid') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'hybrid',
-  `status` enum('draft','open','closed','active','completed','archived') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `location` varchar(150) DEFAULT NULL,
+  `province` varchar(50) DEFAULT NULL,
+  `delivery_mode` enum('on_site','remote','hybrid') NOT NULL DEFAULT 'hybrid',
+  `status` enum('draft','open','closed','active','completed','archived') NOT NULL DEFAULT 'draft',
   `created_by` int(10) UNSIGNED DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -466,12 +553,12 @@ CREATE TABLE `cohorts` (
 -- Dumping data for table `cohorts`
 --
 
-INSERT INTO `cohorts` (`id`, `programme_id`, `name`, `description`, `start_date`, `end_date`, `application_open_date`, `application_close_date`, `max_capacity`, `applications_count`, `location`, `province`, `delivery_mode`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 1, 'Software Development Programme - Pretoria', 'This cohort is designed for aspiring software developers who are looking to strengthen their technical skills through practical, project-based learning. Participants will gain hands-on experience in developing and maintaining web applications while working with technologies such as HTML, CSS, JavaScript, PHP, and MySQL.\r\nThroughout the programme, participants will work on real-world development tasks, practise database management, use Git for version control, and apply software development principles including debugging, testing, problem-solving, and secure coding practices. The cohort also focuses on professional development, teamwork, communication, and preparing participants for successful careers in the technology industry.', '2026-09-07', '2028-08-31', '2026-08-03', '2026-08-14', 15, 0, 'Pretoria', 'gauteng', 'hybrid', 'active', 1, '2026-08-08 16:49:09', '2026-08-12 07:15:57'),
-(2, 4, '2026 Software Development Cohort', 'This cohort is designed for aspiring software developers who are looking to strengthen their technical skills through practical, project-based learning. Participants will gain hands-on experience in developing and maintaining web applications while working with technologies such as HTML, CSS, JavaScript, PHP, and MySQL.\r\nThroughout the programme, participants will work on real-world development tasks, practise database management, use Git for version control, and apply software development principles including debugging, testing, problem-solving, and secure coding practices. The cohort also focuses on professional development, teamwork, communication, and preparing participants for successful careers in the technology industry.', '2026-09-07', '2028-09-29', '2026-08-03', '2026-08-14', 10, 0, 'Pretoria', 'gauteng', 'hybrid', 'draft', 1, '2026-08-08 17:14:40', '2026-08-08 17:14:40'),
-(4, 2, '2026/2027 IT Support & Technical Services Intake', 'This cohort is designed for recent IT graduates and aspiring technology professionals seeking practical workplace experience and professional development. Participants will gain hands-on exposure to areas such as software development, IT support, databases, networking, cybersecurity, and general technical services. Through structured training, mentorship, practical projects, and workplace activities, participants will have the opportunity to apply their academic knowledge in real-world environments while developing technical, problem-solving, communication, and teamwork skills. The programme aims to prepare participants for successful careers in the technology industry by providing practical experience and continuous professional development.', '2026-09-07', '2027-08-31', '2026-08-03', '2026-08-14', 12, 0, 'Pretoria', 'gauteng', 'on_site', 'active', 1, '2026-08-09 16:18:54', '2026-08-09 19:41:12'),
-(5, 1, 'Software Development Programme - Mbombela', 'This cohort is designed for aspiring software developers who are looking to strengthen their technical skills through practical, project-based learning. Participants will gain hands-on experience in developing and maintaining web applications while working with technologies such as HTML, CSS, JavaScript, PHP, and MySQL.\r\n\r\nThroughout the programme, participants will work on real-world development tasks, practise database management, use Git for version control, and apply software development principles including debugging, testing, problem-solving, and secure coding practices. The cohort also focuses on professional development, teamwork, communication, and preparing participants for successful careers in the technology industry.', '2026-09-07', '2028-08-31', '2026-08-03', '2026-08-14', 10, 0, 'Mbombela', 'mpumalanga', 'hybrid', 'active', 1, '2026-08-09 19:17:13', '2026-08-09 19:20:42'),
-(6, 3, '2027 Software Development WIL Programme Intake', '2027 Software Development WIL Programme Intake is designed to provide students with practical, hands-on experience in software development within a professional working environment. The cohort focuses on applying academic knowledge to real-world projects while developing technical, problem-solving, teamwork, and professional skills.', '2027-01-11', '2027-06-30', '2026-08-10', '2026-10-30', 15, 0, 'Pretoria', 'gauteng', 'on_site', 'active', 1, '2026-08-09 20:00:06', '2026-08-09 20:00:06');
+INSERT INTO `cohorts` (`id`, `programme_id`, `supervisor_id`, `name`, `description`, `start_date`, `end_date`, `application_open_date`, `application_close_date`, `max_capacity`, `applications_count`, `location`, `province`, `delivery_mode`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 1, 5, 'Software Development Programme - Pretoria', 'This cohort is designed for aspiring software developers who are looking to strengthen their technical skills through practical, project-based learning. Participants will gain hands-on experience in developing and maintaining web applications while working with technologies such as HTML, CSS, JavaScript, PHP, and MySQL.\r\nThroughout the programme, participants will work on real-world development tasks, practise database management, use Git for version control, and apply software development principles including debugging, testing, problem-solving, and secure coding practices. The cohort also focuses on professional development, teamwork, communication, and preparing participants for successful careers in the technology industry.', '2026-09-07', '2028-08-31', '2026-08-03', '2026-08-14', 15, 0, 'Pretoria', 'gauteng', 'hybrid', 'active', 1, '2026-08-08 16:49:09', '2026-08-23 22:04:48'),
+(2, 4, NULL, '2026 Software Development Cohort', 'This cohort is designed for aspiring software developers who are looking to strengthen their technical skills through practical, project-based learning. Participants will gain hands-on experience in developing and maintaining web applications while working with technologies such as HTML, CSS, JavaScript, PHP, and MySQL.\r\nThroughout the programme, participants will work on real-world development tasks, practise database management, use Git for version control, and apply software development principles including debugging, testing, problem-solving, and secure coding practices. The cohort also focuses on professional development, teamwork, communication, and preparing participants for successful careers in the technology industry.', '2026-09-07', '2028-09-29', '2026-08-03', '2026-08-14', 10, 0, 'Pretoria', 'gauteng', 'hybrid', 'draft', 1, '2026-08-08 17:14:40', '2026-08-08 17:14:40'),
+(4, 2, NULL, '2026/2027 IT Support & Technical Services Intake', 'This cohort is designed for recent IT graduates and aspiring technology professionals seeking practical workplace experience and professional development. Participants will gain hands-on exposure to areas such as software development, IT support, databases, networking, cybersecurity, and general technical services. Through structured training, mentorship, practical projects, and workplace activities, participants will have the opportunity to apply their academic knowledge in real-world environments while developing technical, problem-solving, communication, and teamwork skills. The programme aims to prepare participants for successful careers in the technology industry by providing practical experience and continuous professional development.', '2026-09-07', '2027-08-31', '2026-08-03', '2026-08-14', 12, 0, 'Pretoria', 'gauteng', 'on_site', 'active', 1, '2026-08-09 16:18:54', '2026-08-09 19:41:12'),
+(5, 1, NULL, 'Software Development Programme - Mbombela', 'This cohort is designed for aspiring software developers who are looking to strengthen their technical skills through practical, project-based learning. Participants will gain hands-on experience in developing and maintaining web applications while working with technologies such as HTML, CSS, JavaScript, PHP, and MySQL.\r\n\r\nThroughout the programme, participants will work on real-world development tasks, practise database management, use Git for version control, and apply software development principles including debugging, testing, problem-solving, and secure coding practices. The cohort also focuses on professional development, teamwork, communication, and preparing participants for successful careers in the technology industry.', '2026-09-07', '2028-08-31', '2026-08-03', '2026-08-14', 10, 0, 'Mbombela', 'mpumalanga', 'hybrid', 'active', 1, '2026-08-09 19:17:13', '2026-08-09 19:20:42'),
+(6, 3, 5, '2027 Software Development WIL Programme Intake', '2027 Software Development WIL Programme Intake is designed to provide students with practical, hands-on experience in software development within a professional working environment. The cohort focuses on applying academic knowledge to real-world projects while developing technical, problem-solving, teamwork, and professional skills.', '2027-01-11', '2027-06-30', '2026-08-10', '2026-10-30', 15, 0, 'Pretoria', 'gauteng', 'on_site', 'active', 1, '2026-08-09 20:00:06', '2026-08-25 12:31:23');
 
 -- --------------------------------------------------------
 
@@ -482,7 +569,7 @@ INSERT INTO `cohorts` (`id`, `programme_id`, `name`, `description`, `start_date`
 CREATE TABLE `cohort_documents` (
   `id` int(10) UNSIGNED NOT NULL,
   `cohort_id` int(10) UNSIGNED NOT NULL,
-  `document_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `document_name` varchar(150) NOT NULL,
   `is_required` tinyint(1) NOT NULL DEFAULT 1,
   `verification_required` tinyint(1) NOT NULL DEFAULT 0,
   `expiry_required` tinyint(1) NOT NULL DEFAULT 0,
@@ -510,20 +597,20 @@ INSERT INTO `cohort_documents` (`id`, `cohort_id`, `document_name`, `is_required
 CREATE TABLE `cohort_eligibility` (
   `id` int(10) UNSIGNED NOT NULL,
   `cohort_id` int(10) UNSIGNED NOT NULL,
-  `qualification_level` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `qualification_name` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `field_of_study` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `institution_requirements` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `qualification_level` varchar(50) DEFAULT NULL,
+  `qualification_name` varchar(150) DEFAULT NULL,
+  `field_of_study` varchar(150) DEFAULT NULL,
+  `institution_requirements` text DEFAULT NULL,
   `min_completion_year` year(4) DEFAULT NULL,
   `max_completion_year` year(4) DEFAULT NULL,
   `min_experience` int(10) UNSIGNED DEFAULT NULL,
   `max_experience` int(10) UNSIGNED DEFAULT NULL,
-  `province` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `city` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `location_restrictions` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `availability` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `citizenship_residency` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `programme_specific` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `province` varchar(50) DEFAULT NULL,
+  `city` varchar(100) DEFAULT NULL,
+  `location_restrictions` text DEFAULT NULL,
+  `availability` text DEFAULT NULL,
+  `citizenship_residency` text DEFAULT NULL,
+  `programme_specific` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -533,9 +620,9 @@ CREATE TABLE `cohort_eligibility` (
 --
 
 INSERT INTO `cohort_eligibility` (`id`, `cohort_id`, `qualification_level`, `qualification_name`, `field_of_study`, `institution_requirements`, `min_completion_year`, `max_completion_year`, `min_experience`, `max_experience`, `province`, `city`, `location_restrictions`, `availability`, `citizenship_residency`, `programme_specific`, `created_at`, `updated_at`) VALUES
-(1, 1, 'diploma', 'Diploma Information Technology', 'Information Technology', '', 2000, 2025, 0, 0, 'gauteng', 'Pretoria', 'Relocate at your own cost', 'Currently available', 'South African citizens only', 'Graduated in the last 3 years\r\nAge range: 18 - 35\r\nNever participated in a graduate programme', '2026-08-09 11:25:04', '2026-08-09 12:02:07'),
+(1, 1, 'diploma', 'Diploma Information Technology', 'Information Technology', '', '2000', '2025', 0, 0, 'gauteng', 'Pretoria', 'Relocate at your own cost', 'Currently available', 'South African citizens only', 'Graduated in the last 3 years\r\nAge range: 18 - 35\r\nNever participated in a graduate programme', '2026-08-09 11:25:04', '2026-08-09 12:02:07'),
 (2, 4, 'diploma', 'Diploma Information Technology', 'Information Technology', '', NULL, NULL, NULL, NULL, 'gauteng', 'Pretoria', '', 'Currently available', '', '', '2026-08-09 16:21:22', '2026-08-09 16:21:22'),
-(3, 5, 'diploma', 'Diploma Information Technology', 'Information Technology', '', 2000, 2025, 0, 0, 'gauteng', 'Pretoria', 'Relocate at your own cost', 'Currently available', 'South African citizens only', '', '2026-08-09 19:17:14', '2026-08-09 19:29:32');
+(3, 5, 'diploma', 'Diploma Information Technology', 'Information Technology', '', '2000', '2025', 0, 0, 'gauteng', 'Pretoria', 'Relocate at your own cost', 'Currently available', 'South African citizens only', '', '2026-08-09 19:17:14', '2026-08-09 19:29:32');
 
 -- --------------------------------------------------------
 
@@ -547,13 +634,22 @@ CREATE TABLE `cohort_participants` (
   `id` int(10) UNSIGNED NOT NULL,
   `cohort_id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `status` enum('selected','onboarded','active','completed','withdrawn') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'selected',
+  `status` enum('selected','onboarded','active','completed','withdrawn') NOT NULL DEFAULT 'selected',
   `selected_at` datetime DEFAULT NULL,
   `onboarded_at` datetime DEFAULT NULL,
   `completed_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `cohort_participants`
+--
+
+INSERT INTO `cohort_participants` (`id`, `cohort_id`, `user_id`, `status`, `selected_at`, `onboarded_at`, `completed_at`, `created_at`, `updated_at`) VALUES
+(1, 1, 9, 'selected', '2026-08-24 13:55:09', NULL, NULL, '2026-08-24 11:55:09', '2026-08-24 11:55:09'),
+(2, 6, 11, 'onboarded', '2026-08-25 10:04:52', '2026-08-25 13:07:57', NULL, '2026-08-25 08:04:52', '2026-08-25 11:08:47'),
+(3, 1, 10, 'onboarded', '2026-08-26 10:12:06', '2026-08-26 10:13:14', '2026-08-31 10:28:11', '2026-08-26 08:12:06', '2026-09-08 09:07:45');
 
 -- --------------------------------------------------------
 
@@ -564,8 +660,8 @@ CREATE TABLE `cohort_participants` (
 CREATE TABLE `cohort_skills` (
   `id` int(10) UNSIGNED NOT NULL,
   `cohort_id` int(10) UNSIGNED NOT NULL,
-  `skill_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `skill_category` enum('required_technical','preferred_technical','required_soft') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'required_technical',
+  `skill_name` varchar(150) NOT NULL,
+  `skill_category` enum('required_technical','preferred_technical','required_soft') NOT NULL DEFAULT 'required_technical',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -601,7 +697,7 @@ INSERT INTO `cohort_skills` (`id`, `cohort_id`, `skill_name`, `skill_category`, 
 CREATE TABLE `cohort_workflow` (
   `id` int(10) UNSIGNED NOT NULL,
   `cohort_id` int(10) UNSIGNED NOT NULL,
-  `stage` enum('application','eligibility_review','screening','assessment','interview','selection','onboarding','active_participant') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `stage` enum('application','eligibility_review','screening','assessment','interview','selection','onboarding','active_participant') NOT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `sort_order` int(11) NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
@@ -656,14 +752,134 @@ INSERT INTO `cohort_workflow` (`id`, `cohort_id`, `stage`, `is_active`, `sort_or
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `commercial_capability_packs`
+--
+
+CREATE TABLE `commercial_capability_packs` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `commercial_manager_id` int(11) NOT NULL,
+  `saved_search_id` int(10) UNSIGNED NOT NULL,
+  `pack_name` varchar(180) NOT NULL,
+  `tender_reference` varchar(120) DEFAULT NULL,
+  `client_name` varchar(180) DEFAULT NULL,
+  `status` enum('draft','generated','archived') NOT NULL DEFAULT 'draft',
+  `total_candidate_count` int(11) NOT NULL DEFAULT 0,
+  `suppressed_group_count` int(11) NOT NULL DEFAULT 0,
+  `criteria_snapshot_json` longtext NOT NULL,
+  `taxonomy_version` varchar(50) NOT NULL,
+  `data_snapshot_at` datetime NOT NULL,
+  `suppression_threshold` int(11) NOT NULL DEFAULT 5,
+  `generated_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `commercial_capability_pack_breakdowns`
+--
+
+CREATE TABLE `commercial_capability_pack_breakdowns` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `capability_pack_id` int(10) UNSIGNED NOT NULL,
+  `dimension_name` varchar(80) NOT NULL,
+  `dimension_value` varchar(160) NOT NULL,
+  `displayed_value` varchar(40) NOT NULL,
+  `raw_candidate_count` int(11) NOT NULL DEFAULT 0,
+  `raw_verified_count` int(11) NOT NULL DEFAULT 0,
+  `verification_rate` decimal(6,2) NOT NULL DEFAULT 0.00,
+  `data_currency_label` varchar(40) NOT NULL,
+  `is_suppressed` tinyint(1) NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `commercial_manager_activity_log`
+--
+
+CREATE TABLE `commercial_manager_activity_log` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `commercial_manager_id` int(11) NOT NULL,
+  `action` varchar(100) NOT NULL,
+  `description` varchar(500) NOT NULL,
+  `entity_type` varchar(50) DEFAULT NULL,
+  `entity_id` int(11) DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `commercial_privacy_rules`
+--
+
+CREATE TABLE `commercial_privacy_rules` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `rule_name` varchar(120) NOT NULL,
+  `small_group_threshold` int(11) NOT NULL DEFAULT 5,
+  `suppressed_fields_json` longtext NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `commercial_privacy_rules`
+--
+
+INSERT INTO `commercial_privacy_rules` (`id`, `rule_name`, `small_group_threshold`, `suppressed_fields_json`, `is_active`, `created_at`, `updated_at`) VALUES
+(1, 'Default US-07 Privacy Rule', 5, '[\"Candidate name\", \"Email address\", \"Phone number\", \"Identity number\", \"Exact home address\", \"Direct profile URL\"]', 1, '2026-09-08 10:06:24', '2026-09-08 10:06:24');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `commercial_saved_searches`
+--
+
+CREATE TABLE `commercial_saved_searches` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `commercial_manager_id` int(11) NOT NULL,
+  `source_search_reference` varchar(120) DEFAULT NULL,
+  `search_name` varchar(160) NOT NULL,
+  `criteria_json` longtext NOT NULL,
+  `taxonomy_version` varchar(50) NOT NULL,
+  `result_count` int(11) NOT NULL DEFAULT 0,
+  `data_snapshot_at` datetime NOT NULL,
+  `source_created_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `commercial_saved_search_breakdowns`
+--
+
+CREATE TABLE `commercial_saved_search_breakdowns` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `saved_search_id` int(10) UNSIGNED NOT NULL,
+  `dimension_name` varchar(80) NOT NULL,
+  `dimension_value` varchar(160) NOT NULL,
+  `candidate_count` int(11) NOT NULL DEFAULT 0,
+  `verified_count` int(11) NOT NULL DEFAULT 0,
+  `most_recent_verification_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `consents`
 --
 
 CREATE TABLE `consents` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `purpose` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` enum('granted','withdrawn') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'granted',
+  `purpose` varchar(50) NOT NULL,
+  `status` enum('granted','withdrawn') NOT NULL DEFAULT 'granted',
   `granted_at` datetime DEFAULT NULL,
   `withdrawn_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -689,8 +905,8 @@ INSERT INTO `consents` (`id`, `user_id`, `purpose`, `status`, `granted_at`, `wit
 CREATE TABLE `deletion_requests` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `status` enum('pending','processing','completed','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
-  `reason` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('pending','processing','completed','cancelled') NOT NULL DEFAULT 'pending',
+  `reason` varchar(500) DEFAULT NULL,
   `requested_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `processed_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -704,14 +920,14 @@ CREATE TABLE `deletion_requests` (
 CREATE TABLE `documents` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `document_type` enum('cv','qualification','supporting') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'supporting',
-  `original_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `stored_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `mime_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `document_type` enum('cv','qualification','supporting') NOT NULL DEFAULT 'supporting',
+  `original_filename` varchar(255) NOT NULL,
+  `stored_filename` varchar(255) NOT NULL,
+  `mime_type` varchar(100) NOT NULL,
   `file_size` int(10) UNSIGNED NOT NULL DEFAULT 0,
-  `file_checksum` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_checksum` varchar(64) NOT NULL,
   `uploaded_by` int(10) UNSIGNED NOT NULL,
-  `verification_status` enum('unverified','pending','verified','failed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'unverified',
+  `verification_status` enum('unverified','pending','verified','failed') NOT NULL DEFAULT 'unverified',
   `expiry_date` date DEFAULT NULL,
   `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -735,7 +951,7 @@ INSERT INTO `documents` (`id`, `user_id`, `document_type`, `original_filename`, 
 CREATE TABLE `email_verifications` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `token_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `token_hash` varchar(64) NOT NULL,
   `expires_at` datetime NOT NULL,
   `used_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
@@ -747,7 +963,70 @@ CREATE TABLE `email_verifications` (
 
 INSERT INTO `email_verifications` (`id`, `user_id`, `token_hash`, `expires_at`, `used_at`, `created_at`) VALUES
 (1, 10, '0e0a14b6986fbb2d6cbc1247d5e55e86e9e3689a847086187e8e2f9afd8a5c53', '2026-08-05 02:12:29', NULL, '2026-08-04 00:12:29'),
-(2, 9, 'c805ab866437e624ee24d5a10a9629f571cfd768ba4ac78644b1577b7c0c2bbb', '2026-08-09 14:10:08', NULL, '2026-08-08 12:10:08');
+(2, 9, 'c805ab866437e624ee24d5a10a9629f571cfd768ba4ac78644b1577b7c0c2bbb', '2026-08-09 14:10:08', NULL, '2026-08-08 12:10:08'),
+(3, 11, 'bd86767642b6d2a71f4ea77d48798a5af5bbfa651ad20231b2dd8d7021676cd1', '2026-08-24 20:59:35', NULL, '2026-08-23 18:59:35');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `finance_activity_log`
+--
+
+CREATE TABLE `finance_activity_log` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `action` varchar(100) NOT NULL,
+  `description` varchar(500) NOT NULL,
+  `entity_type` varchar(50) DEFAULT NULL,
+  `entity_id` bigint(20) DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `finance_attendance_approved`
+--
+
+CREATE TABLE `finance_attendance_approved` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `participant_id` int(11) NOT NULL,
+  `programme_name` varchar(180) NOT NULL,
+  `cohort_name` varchar(180) DEFAULT NULL,
+  `attendance_date` date NOT NULL,
+  `approved_minutes` int(11) NOT NULL DEFAULT 0,
+  `approval_status` enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  `approved_by` int(11) DEFAULT NULL,
+  `approved_at` datetime DEFAULT NULL,
+  `source_attendance_id` bigint(20) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `finance_stipend_settings`
+--
+
+CREATE TABLE `finance_stipend_settings` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `setting_name` varchar(120) NOT NULL,
+  `maker_checker_enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `default_daily_rate` decimal(12,2) NOT NULL DEFAULT 150.00,
+  `minimum_attendance_minutes` int(11) NOT NULL DEFAULT 240,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `finance_stipend_settings`
+--
+
+INSERT INTO `finance_stipend_settings` (`id`, `setting_name`, `maker_checker_enabled`, `default_daily_rate`, `minimum_attendance_minutes`, `is_active`, `created_at`, `updated_at`) VALUES
+(1, 'Default Finance Officer Stipend Rules', 1, 150.00, 240, 1, '2026-09-08 10:02:55', '2026-09-08 10:02:55');
 
 -- --------------------------------------------------------
 
@@ -758,8 +1037,8 @@ INSERT INTO `email_verifications` (`id`, `user_id`, `token_hash`, `expires_at`, 
 CREATE TABLE `login_attempts` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED DEFAULT NULL,
-  `ip_address` varchar(45) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `username` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `username` varchar(100) DEFAULT NULL,
   `successful` tinyint(1) NOT NULL DEFAULT 0,
   `attempted_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -773,7 +1052,7 @@ CREATE TABLE `login_attempts` (
 CREATE TABLE `notification_preferences` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `category` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `category` varchar(50) NOT NULL,
   `enabled` tinyint(1) NOT NULL DEFAULT 1,
   `email_enabled` tinyint(1) NOT NULL DEFAULT 1,
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -802,11 +1081,11 @@ CREATE TABLE `opportunities` (
   `id` int(10) UNSIGNED NOT NULL,
   `programme_id` int(10) UNSIGNED NOT NULL,
   `cohort_id` int(10) UNSIGNED DEFAULT NULL,
-  `title` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type` enum('graduate_programme','internship','learnership','wil','skills_development','mentorship','other') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'other',
-  `organisation` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `short_description` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `full_description` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `title` varchar(200) NOT NULL,
+  `type` enum('graduate_programme','internship','learnership','wil','skills_development','mentorship','other') NOT NULL DEFAULT 'other',
+  `organisation` varchar(200) DEFAULT NULL,
+  `short_description` varchar(500) DEFAULT NULL,
+  `full_description` text DEFAULT NULL,
   `application_open_date` date DEFAULT NULL,
   `application_close_date` date DEFAULT NULL,
   `start_date` date DEFAULT NULL,
@@ -815,11 +1094,11 @@ CREATE TABLE `opportunities` (
   `applications_count` int(10) UNSIGNED NOT NULL DEFAULT 0,
   `min_age` int(10) UNSIGNED DEFAULT NULL,
   `max_age` int(10) UNSIGNED DEFAULT NULL,
-  `province` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `city` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `physical_location` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `work_arrangement` enum('on_site','remote','hybrid') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'hybrid',
-  `status` enum('draft','published','closing_soon','closed','archived') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `province` varchar(50) DEFAULT NULL,
+  `city` varchar(100) DEFAULT NULL,
+  `physical_location` varchar(200) DEFAULT NULL,
+  `work_arrangement` enum('on_site','remote','hybrid') NOT NULL DEFAULT 'hybrid',
+  `status` enum('draft','published','closing_soon','closed','archived') NOT NULL DEFAULT 'draft',
   `created_by` int(10) UNSIGNED DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -848,7 +1127,7 @@ CREATE TABLE `opportunity_applications` (
   `application_data` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -859,7 +1138,7 @@ CREATE TABLE `opportunity_applications` (
 CREATE TABLE `opportunity_documents` (
   `id` int(10) UNSIGNED NOT NULL,
   `opportunity_id` int(10) UNSIGNED NOT NULL,
-  `document_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `document_name` varchar(150) NOT NULL,
   `is_required` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -890,12 +1169,12 @@ INSERT INTO `opportunity_documents` (`id`, `opportunity_id`, `document_name`, `i
 CREATE TABLE `opportunity_eligibility` (
   `id` int(10) UNSIGNED NOT NULL,
   `opportunity_id` int(10) UNSIGNED NOT NULL,
-  `qualification_requirements` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `required_skills` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `preferred_skills` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `min_experience` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `availability_requirements` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `other_requirements` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `qualification_requirements` text DEFAULT NULL,
+  `required_skills` text DEFAULT NULL,
+  `preferred_skills` text DEFAULT NULL,
+  `min_experience` varchar(100) DEFAULT NULL,
+  `availability_requirements` text DEFAULT NULL,
+  `other_requirements` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -912,34 +1191,14 @@ INSERT INTO `opportunity_eligibility` (`id`, `opportunity_id`, `qualification_re
 -- --------------------------------------------------------
 
 --
--- Table structure for table `opportunity_questions`
---
-
-CREATE TABLE `opportunity_questions` (
-  `id` int(10) UNSIGNED NOT NULL,
-  `opportunity_id` int(10) UNSIGNED NOT NULL,
-  `section` enum('eligibility','application') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'application',
-  `question_text` text COLLATE utf8mb4_unicode_ci NOT NULL,
-  `question_type` enum('text','textarea','yes_no','radio','dropdown','checkbox','number','date') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'text',
-  `options` text COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'JSON array of options for radio/dropdown/checkbox',
-  `is_required` tinyint(1) NOT NULL DEFAULT 0,
-  `is_knockout` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Eligibility questions that may knock out',
-  `sort_order` int(11) NOT NULL DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `opportunity_responsibilities`
 --
 
 CREATE TABLE `opportunity_responsibilities` (
   `id` int(10) UNSIGNED NOT NULL,
   `opportunity_id` int(10) UNSIGNED NOT NULL,
-  `type` enum('key_responsibilities','duties','programme_activities','learning_outcomes') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'key_responsibilities',
-  `content` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type` enum('key_responsibilities','duties','programme_activities','learning_outcomes') NOT NULL DEFAULT 'key_responsibilities',
+  `content` text NOT NULL,
   `sort_order` int(11) NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1069,8 +1328,8 @@ INSERT INTO `opportunity_responsibilities` (`id`, `opportunity_id`, `type`, `con
 CREATE TABLE `opportunity_skills` (
   `id` int(10) UNSIGNED NOT NULL,
   `opportunity_id` int(10) UNSIGNED NOT NULL,
-  `skill_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `skill_category` enum('required_technical','preferred_technical','required_soft') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'required_technical',
+  `skill_name` varchar(150) NOT NULL,
+  `skill_category` enum('required_technical','preferred_technical','required_soft') NOT NULL DEFAULT 'required_technical',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -1110,13 +1369,29 @@ INSERT INTO `opportunity_skills` (`id`, `opportunity_id`, `skill_name`, `skill_c
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `participant_outcome_progress`
+--
+
+CREATE TABLE `participant_outcome_progress` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `participant_id` int(11) NOT NULL,
+  `outcome_id` int(10) UNSIGNED NOT NULL,
+  `status` enum('not_started','in_progress','competent','not_yet_competent') NOT NULL DEFAULT 'not_started',
+  `final_attempt_id` int(10) UNSIGNED DEFAULT NULL,
+  `approved_at` datetime DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `password_resets`
 --
 
 CREATE TABLE `password_resets` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `token_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `token_hash` varchar(64) NOT NULL,
   `expires_at` datetime NOT NULL,
   `used_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
@@ -1130,15 +1405,17 @@ CREATE TABLE `password_resets` (
 
 CREATE TABLE `programmes` (
   `id` int(10) UNSIGNED NOT NULL,
-  `name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type` enum('graduate_programme','internship','learnership','wil','skills_development','other') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'other',
-  `description` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `objectives` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `duration` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name` varchar(200) NOT NULL,
+  `type` enum('graduate_programme','internship','learnership','wil','skills_development','other') NOT NULL DEFAULT 'other',
+  `description` text DEFAULT NULL,
+  `objectives` text DEFAULT NULL,
+  `duration` varchar(100) DEFAULT NULL,
   `start_date` date DEFAULT NULL,
   `end_date` date DEFAULT NULL,
-  `status` enum('draft','active','paused','completed','archived') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `status` enum('draft','active','paused','completed','archived') NOT NULL DEFAULT 'draft',
   `created_by` int(10) UNSIGNED DEFAULT NULL,
+  `programme_manager_id` int(10) UNSIGNED DEFAULT NULL,
+  `programme_officer_id` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1147,11 +1424,11 @@ CREATE TABLE `programmes` (
 -- Dumping data for table `programmes`
 --
 
-INSERT INTO `programmes` (`id`, `name`, `type`, `description`, `objectives`, `duration`, `start_date`, `end_date`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'Software Development Graduate Programme', 'graduate_programme', 'A structured graduate development programme designed for recent IT and Computer Science graduates who want to gain practical experience in software development. Graduates will work alongside experienced developers on real-world projects while developing their skills in web development, databases, APIs, version control, testing, and software engineering practices.', 'Provide graduates with practical software development experience. Strengthen programming and problem-solving skills. Develop experience with modern web technologies and databases. Introduce graduates to Git and collaborative development workflows. Develop understanding of software testing, debugging, and maintenance. Encourage professional communication and teamwork. Prepare graduates for long-term careers in software development.', '24 months', '2026-09-07', '2028-08-31', 'active', 1, '2026-08-08 15:16:08', '2026-08-17 07:36:32'),
-(2, 'IT Support & Technical Services Graduate Programme', 'graduate_programme', 'A graduate programme designed to provide practical experience in IT support, troubleshooting, system administration, hardware and software configuration, and user assistance. Graduates will work with IT professionals to resolve technical issues and support the organisation’s day-to-day technology operations.', 'Develop practical IT troubleshooting skills. Gain experience supporting hardware and software systems. Develop skills in diagnosing and resolving technical problems. Introduce graduates to system administration and network fundamentals. Improve customer service and communication skills. Develop knowledge of IT security and best practices. Prepare graduates for careers in IT support and technical services.', '12 months', '2026-09-07', '2027-09-30', 'active', 1, '2026-08-08 15:29:38', '2026-08-09 16:14:02'),
-(3, 'Software Development Work Integrated Learning (WIL) Programme', 'wil', 'A structured Work Integrated Learning programme designed to provide students with practical workplace experience in software development. Participants will have the opportunity to apply the knowledge gained through their academic studies to real-world projects while working alongside experienced IT professionals. The programme focuses on web development, database management, software testing, version control, problem-solving, and professional workplace practices.', 'Provide students with practical experience in a professional IT environment. Apply academic knowledge to real-world software development projects. Develop practical skills in HTML, CSS, JavaScript, PHP, and MySQL. Gain experience in designing, developing, testing, and maintaining web applications. Develop database management and SQL skills. Introduce students to Git and collaborative software development workflows. Improve debugging, troubleshooting, and problem-solving abilities. Develop professional communication, teamwork, and time-management skills. Prepare students for entry-level careers in software development and IT.', '6 months', '2027-01-11', '2027-06-30', 'active', 1, '2026-08-08 15:35:07', '2026-08-08 17:14:12'),
-(4, 'Software Development Graduate Programme (Copy) 2026', 'graduate_programme', 'A structured graduate development programme designed for recent IT and Computer Science graduates who want to gain practical experience in software development. Graduates will work alongside experienced developers on real-world projects while developing their skills in web development, databases, APIs, version control, testing, and software engineering practices.', 'Provide graduates with practical software development experience. Strengthen programming and problem-solving skills. Develop experience with modern web technologies and databases. Introduce graduates to Git and collaborative development workflows. Develop understanding of software testing, debugging, and maintenance. Encourage professional communication and teamwork. Prepare graduates for long-term careers in software development.', '24 months', '2026-09-01', '2028-09-29', 'archived', 1, '2026-08-08 17:14:40', '2026-08-09 13:35:18');
+INSERT INTO `programmes` (`id`, `name`, `type`, `description`, `objectives`, `duration`, `start_date`, `end_date`, `status`, `created_by`, `programme_manager_id`, `programme_officer_id`, `created_at`, `updated_at`) VALUES
+(1, 'Software Development Graduate Programme', 'graduate_programme', 'A structured graduate development programme designed for recent IT and Computer Science graduates who want to gain practical experience in software development. Graduates will work alongside experienced developers on real-world projects while developing their skills in web development, databases, APIs, version control, testing, and software engineering practices.', 'Provide graduates with practical software development experience. Strengthen programming and problem-solving skills. Develop experience with modern web technologies and databases. Introduce graduates to Git and collaborative development workflows. Develop understanding of software testing, debugging, and maintenance. Encourage professional communication and teamwork. Prepare graduates for long-term careers in software development.', '24 months', '2026-09-07', '2028-08-31', 'active', 1, 2, 8, '2026-08-08 15:16:08', '2026-09-08 10:29:02'),
+(2, 'IT Support & Technical Services Graduate Programme', 'graduate_programme', 'A graduate programme designed to provide practical experience in IT support, troubleshooting, system administration, hardware and software configuration, and user assistance. Graduates will work with IT professionals to resolve technical issues and support the organisation’s day-to-day technology operations.', 'Develop practical IT troubleshooting skills. Gain experience supporting hardware and software systems. Develop skills in diagnosing and resolving technical problems. Introduce graduates to system administration and network fundamentals. Improve customer service and communication skills. Develop knowledge of IT security and best practices. Prepare graduates for careers in IT support and technical services.', '12 months', '2026-09-07', '2027-09-30', 'active', 1, 2, 8, '2026-08-08 15:29:38', '2026-09-08 10:29:02'),
+(3, 'Software Development Work Integrated Learning (WIL) Programme', 'wil', 'A structured Work Integrated Learning programme designed to provide students with practical workplace experience in software development. Participants will have the opportunity to apply the knowledge gained through their academic studies to real-world projects while working alongside experienced IT professionals. The programme focuses on web development, database management, software testing, version control, problem-solving, and professional workplace practices.', 'Provide students with practical experience in a professional IT environment. Apply academic knowledge to real-world software development projects. Develop practical skills in HTML, CSS, JavaScript, PHP, and MySQL. Gain experience in designing, developing, testing, and maintaining web applications. Develop database management and SQL skills. Introduce students to Git and collaborative software development workflows. Improve debugging, troubleshooting, and problem-solving abilities. Develop professional communication, teamwork, and time-management skills. Prepare students for entry-level careers in software development and IT.', '6 months', '2027-01-11', '2027-06-30', 'active', 1, 2, 8, '2026-08-08 15:35:07', '2026-09-08 10:27:02'),
+(4, 'Software Development Graduate Programme (Copy) 2026', 'graduate_programme', 'A structured graduate development programme designed for recent IT and Computer Science graduates who want to gain practical experience in software development. Graduates will work alongside experienced developers on real-world projects while developing their skills in web development, databases, APIs, version control, testing, and software engineering practices.', 'Provide graduates with practical software development experience. Strengthen programming and problem-solving skills. Develop experience with modern web technologies and databases. Introduce graduates to Git and collaborative development workflows. Develop understanding of software testing, debugging, and maintenance. Encourage professional communication and teamwork. Prepare graduates for long-term careers in software development.', '24 months', '2026-09-01', '2028-09-29', 'archived', 1, NULL, NULL, '2026-08-08 17:14:40', '2026-08-09 13:35:18');
 
 -- --------------------------------------------------------
 
@@ -1162,20 +1439,20 @@ INSERT INTO `programmes` (`id`, `name`, `type`, `description`, `objectives`, `du
 CREATE TABLE `programme_eligibility` (
   `id` int(10) UNSIGNED NOT NULL,
   `programme_id` int(10) UNSIGNED NOT NULL,
-  `qualification_level` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `qualification_name` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `field_of_study` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `institution_requirements` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `qualification_level` varchar(50) DEFAULT NULL,
+  `qualification_name` varchar(150) DEFAULT NULL,
+  `field_of_study` varchar(150) DEFAULT NULL,
+  `institution_requirements` text DEFAULT NULL,
   `min_completion_year` year(4) DEFAULT NULL,
   `max_completion_year` year(4) DEFAULT NULL,
   `min_experience` int(10) UNSIGNED DEFAULT NULL,
   `max_experience` int(10) UNSIGNED DEFAULT NULL,
-  `province` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `city` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `location_restrictions` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `availability` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `citizenship_residency` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `programme_specific` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `province` varchar(50) DEFAULT NULL,
+  `city` varchar(100) DEFAULT NULL,
+  `location_restrictions` text DEFAULT NULL,
+  `availability` text DEFAULT NULL,
+  `citizenship_residency` text DEFAULT NULL,
+  `programme_specific` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1191,14 +1468,32 @@ INSERT INTO `programme_eligibility` (`id`, `programme_id`, `qualification_level`
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `programme_officer_activity_log`
+--
+
+CREATE TABLE `programme_officer_activity_log` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `programme_officer_id` int(11) NOT NULL,
+  `action` varchar(100) NOT NULL,
+  `description` varchar(500) NOT NULL,
+  `entity_type` varchar(50) DEFAULT NULL,
+  `entity_id` int(11) DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `programme_skills`
 --
 
 CREATE TABLE `programme_skills` (
   `id` int(10) UNSIGNED NOT NULL,
   `programme_id` int(10) UNSIGNED NOT NULL,
-  `skill_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `skill_category` enum('required_technical','preferred_technical','required_soft') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'required_technical',
+  `skill_name` varchar(150) NOT NULL,
+  `skill_category` enum('required_technical','preferred_technical','required_soft') NOT NULL DEFAULT 'required_technical',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -1229,11 +1524,11 @@ INSERT INTO `programme_skills` (`id`, `programme_id`, `skill_name`, `skill_categ
 CREATE TABLE `qualifications` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `institution` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name` varchar(150) NOT NULL,
+  `institution` varchar(150) DEFAULT NULL,
   `year_completed` year(4) DEFAULT NULL,
-  `level` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `verification_status` enum('unverified','pending','verified','failed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'unverified',
+  `level` varchar(50) DEFAULT NULL,
+  `verification_status` enum('unverified','pending','verified','failed') NOT NULL DEFAULT 'unverified',
   `verified_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -1244,7 +1539,57 @@ CREATE TABLE `qualifications` (
 --
 
 INSERT INTO `qualifications` (`id`, `user_id`, `name`, `institution`, `year_completed`, `level`, `verification_status`, `verified_at`, `created_at`, `updated_at`) VALUES
-(1, 9, 'Computer Science', 'University of Pretoria', 2025, 'degree', 'unverified', NULL, '2026-08-06 13:05:54', '2026-08-07 10:32:56');
+(1, 9, 'Computer Science', 'University of Pretoria', '2025', 'degree', 'unverified', NULL, '2026-08-06 13:05:54', '2026-08-07 10:32:56');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `recruiter_activity_log`
+--
+
+CREATE TABLE `recruiter_activity_log` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `recruiter_id` int(11) NOT NULL,
+  `action` varchar(100) NOT NULL,
+  `description` varchar(500) NOT NULL,
+  `entity_type` varchar(50) DEFAULT NULL,
+  `entity_id` int(11) DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `recruiter_shortlists`
+--
+
+CREATE TABLE `recruiter_shortlists` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `recruiter_id` int(11) NOT NULL,
+  `name` varchar(150) NOT NULL,
+  `client_name` varchar(150) DEFAULT NULL,
+  `search_criteria_json` longtext NOT NULL,
+  `taxonomy_version` varchar(50) NOT NULL,
+  `status` enum('draft','active','sent','closed') NOT NULL DEFAULT 'draft',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `recruiter_shortlist_candidates`
+--
+
+CREATE TABLE `recruiter_shortlist_candidates` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `shortlist_id` int(10) UNSIGNED NOT NULL,
+  `candidate_id` int(11) NOT NULL,
+  `added_by` int(11) NOT NULL,
+  `added_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -1255,8 +1600,8 @@ INSERT INTO `qualifications` (`id`, `user_id`, `name`, `institution`, `year_comp
 CREATE TABLE `remember_me_tokens` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `selector` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `validator_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `selector` varchar(64) NOT NULL,
+  `validator_hash` varchar(64) NOT NULL,
   `expires_at` datetime NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1269,9 +1614,9 @@ CREATE TABLE `remember_me_tokens` (
 
 CREATE TABLE `roles` (
   `id` int(10) UNSIGNED NOT NULL,
-  `name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `slug` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `description` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name` varchar(50) NOT NULL,
+  `slug` varchar(50) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -1298,9 +1643,9 @@ INSERT INTO `roles` (`id`, `name`, `slug`, `description`, `created_at`) VALUES
 
 CREATE TABLE `skills` (
   `id` int(10) UNSIGNED NOT NULL,
-  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `category` enum('technical','soft') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'technical',
-  `description` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name` varchar(100) NOT NULL,
+  `category` enum('technical','soft') NOT NULL DEFAULT 'technical',
+  `description` varchar(255) DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1367,26 +1712,142 @@ INSERT INTO `skills` (`id`, `name`, `category`, `description`, `is_active`, `cre
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `skill_taxonomy_versions`
+--
+
+CREATE TABLE `skill_taxonomy_versions` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `version_label` varchar(50) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `is_current` tinyint(1) NOT NULL DEFAULT 0,
+  `effective_from` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stipend_schedules`
+--
+
+CREATE TABLE `stipend_schedules` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `schedule_reference` varchar(80) NOT NULL,
+  `period_start` date NOT NULL,
+  `period_end` date NOT NULL,
+  `programme_name` varchar(180) DEFAULT NULL,
+  `daily_rate` decimal(12,2) NOT NULL,
+  `calculation_basis` varchar(500) NOT NULL,
+  `participant_count` int(11) NOT NULL DEFAULT 0,
+  `total_amount` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `exception_count` int(11) NOT NULL DEFAULT 0,
+  `status` enum('draft','awaiting_approval','approved','rejected','processed','superseded') NOT NULL DEFAULT 'draft',
+  `created_by` int(11) NOT NULL,
+  `submitted_at` datetime DEFAULT NULL,
+  `approved_by` int(11) DEFAULT NULL,
+  `approved_at` datetime DEFAULT NULL,
+  `version_number` int(11) NOT NULL DEFAULT 1,
+  `supersedes_schedule_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stipend_schedule_approval_history`
+--
+
+CREATE TABLE `stipend_schedule_approval_history` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `schedule_id` bigint(20) UNSIGNED NOT NULL,
+  `action` enum('submitted','approved','rejected','processed','revision_created') NOT NULL,
+  `acted_by` int(11) NOT NULL,
+  `action_note` varchar(500) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stipend_schedule_lines`
+--
+
+CREATE TABLE `stipend_schedule_lines` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `schedule_id` bigint(20) UNSIGNED NOT NULL,
+  `participant_id` int(11) NOT NULL,
+  `participant_name_snapshot` varchar(180) NOT NULL,
+  `programme_name_snapshot` varchar(180) DEFAULT NULL,
+  `cohort_name_snapshot` varchar(180) DEFAULT NULL,
+  `approved_minutes` int(11) NOT NULL DEFAULT 0,
+  `eligible_days` decimal(10,4) NOT NULL DEFAULT 0.0000,
+  `daily_rate` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `gross_amount` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `exception_code` varchar(80) DEFAULT NULL,
+  `exception_message` varchar(500) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `supervisor_activity_log`
+--
+
+CREATE TABLE `supervisor_activity_log` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `supervisor_id` int(11) NOT NULL,
+  `action` varchar(100) NOT NULL,
+  `description` varchar(500) NOT NULL,
+  `entity_type` varchar(50) DEFAULT NULL,
+  `entity_id` int(11) DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `supervisor_notifications`
+--
+
+CREATE TABLE `supervisor_notifications` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `supervisor_id` int(10) UNSIGNED NOT NULL,
+  `title` varchar(150) NOT NULL,
+  `message` varchar(500) NOT NULL,
+  `type` enum('info','success','warning','danger','candidate','cohort') NOT NULL DEFAULT 'info',
+  `link` varchar(500) DEFAULT NULL,
+  `is_read` tinyint(1) NOT NULL DEFAULT 0,
+  `read_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `users`
 --
 
 CREATE TABLE `users` (
   `id` int(10) UNSIGNED NOT NULL,
   `role_id` int(10) UNSIGNED NOT NULL,
-  `first_name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `last_name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `username` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `email` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `first_name` varchar(50) NOT NULL,
+  `last_name` varchar(50) NOT NULL,
+  `username` varchar(30) NOT NULL,
+  `email` varchar(100) NOT NULL,
+  `phone` varchar(20) DEFAULT NULL,
   `date_of_birth` date DEFAULT NULL,
-  `gender` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `province` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `employment_status` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `qualification_level` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `professional_title` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `password_hash` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `profile_picture` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` enum('pending','active','suspended','disabled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `gender` varchar(20) DEFAULT NULL,
+  `province` varchar(30) DEFAULT NULL,
+  `employment_status` varchar(30) DEFAULT NULL,
+  `qualification_level` varchar(30) DEFAULT NULL,
+  `professional_title` varchar(100) DEFAULT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `profile_picture` varchar(255) DEFAULT NULL,
+  `status` enum('pending','active','suspended','disabled') NOT NULL DEFAULT 'pending',
   `email_verified_at` datetime DEFAULT NULL,
   `last_login` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -1398,16 +1859,17 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `role_id`, `first_name`, `last_name`, `username`, `email`, `phone`, `date_of_birth`, `gender`, `province`, `employment_status`, `qualification_level`, `professional_title`, `password_hash`, `profile_picture`, `status`, `email_verified_at`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 1, 'Platform', 'Administrator', 'admin', 'admin@investhoodit.co.za', '+27 11 234 5678', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'masters', 'Platform Administrator', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-08-19 23:09:41', '2026-08-02 23:00:17', '2026-08-19 21:09:41'),
-(2, 2, 'Programme', 'Manager', 'programme.manager', 'programme.manager@investhoodit.co.za', '+27 11 234 5679', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'masters', 'Programme Manager', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-08-04 02:09:22', '2026-08-02 23:00:17', '2026-08-04 00:09:22'),
-(3, 3, 'Programme', 'Officer', 'programme.officer', 'programme.officer@investhoodit.co.za', '+27 11 234 5680', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Programme Officer', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', NULL, '2026-08-02 23:00:17', '2026-08-02 23:00:17'),
-(4, 4, 'Recruitment', 'Specialist', 'recruiter', 'recruiter@investhoodit.co.za', '+27 11 234 5681', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Recruiter', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', NULL, '2026-08-02 23:00:17', '2026-08-02 23:00:17'),
-(5, 5, 'Workplace', 'Supervisor', 'supervisor', 'supervisor@investhoodit.co.za', '+27 11 234 5682', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Workplace Supervisor', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-08-19 12:04:51', '2026-08-02 23:00:17', '2026-08-19 10:04:51'),
-(6, 6, 'Skills', 'Assessor', 'assessor', 'assessor@investhoodit.co.za', '+27 11 234 5683', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Skills Assessor', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', NULL, '2026-08-02 23:00:17', '2026-08-02 23:00:17'),
-(7, 7, 'Finance', 'Officer', 'finance.officer', 'finance.officer@investhoodit.co.za', '+27 11 234 5684', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Finance Officer', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-08-04 02:08:15', '2026-08-02 23:00:17', '2026-08-04 00:08:15'),
+(1, 1, 'Platform', 'Administrator', 'admin', 'admin@investhoodit.co.za', '+27 11 234 5678', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'masters', 'Platform Administrator', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-08-24 11:14:29', '2026-08-02 23:00:17', '2026-08-24 09:14:29'),
+(2, 2, 'Programme', 'Manager', 'programme.manager', 'programme.manager@investhoodit.co.za', '+27 11 234 5679', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'masters', 'Programme Manager', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-09-08 11:04:36', '2026-08-02 23:00:17', '2026-09-08 09:04:36'),
+(3, 3, 'Programme', 'Officer', 'programme.officer', 'programme.officer@investhoodit.co.za', '+27 11 234 5680', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Programme Officer', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-09-08 13:44:10', '2026-08-02 23:00:17', '2026-09-08 11:44:10'),
+(4, 4, 'Recruitment', 'Specialist', 'recruiter', 'recruiter@investhoodit.co.za', '+27 11 234 5681', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Recruiter', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-09-08 13:57:36', '2026-08-02 23:00:17', '2026-09-08 11:57:36'),
+(5, 5, 'Workplace', 'Supervisor', 'supervisor', 'supervisor@investhoodit.co.za', '+27 11 234 5682', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Workplace Supervisor', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-09-08 11:44:30', '2026-08-02 23:00:17', '2026-09-08 09:44:30'),
+(6, 6, 'Skills', 'Assessor', 'assessor', 'assessor@investhoodit.co.za', '+27 11 234 5683', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Skills Assessor', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-09-08 14:00:02', '2026-08-02 23:00:17', '2026-09-08 12:00:02'),
+(7, 7, 'Finance', 'Officer', 'finance.officer', 'finance.officer@investhoodit.co.za', '+27 11 234 5684', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Finance Officer', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-09-08 14:02:01', '2026-08-02 23:00:17', '2026-09-08 12:02:01'),
 (8, 8, 'Information', 'Officer', 'info.officer', 'info.officer@investhoodit.co.za', '+27 11 234 5685', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Information Officer', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', NULL, '2026-08-02 23:00:17', '2026-08-02 23:00:17'),
-(9, 9, 'Hlobisile', 'Mthembu', 'Sky', 'candidate@gmail.com', '+27 12 345 3433', '1995-06-15', 'female', 'gauteng', 'employed', 'degree', 'Software Developer', '$2y$10$3Y8qIUV3YCaRu6plnDqGJOMWrnQucYeYZEDU2rcXRaaYBwxPs5Qnq', NULL, 'active', NULL, '2026-08-21 02:51:25', '2026-08-02 23:00:17', '2026-08-21 00:51:25'),
-(10, 9, 'Delani', 'Sibande', 'Deco', 'sibanded1030@gmail.com', '0794065577', '1997-12-12', 'male', 'gauteng', 'recent-graduate', 'degree', 'Software Developer', '$2y$10$mlDKcbt12tR.64VpNTWm9uG6Wx7xVMglKNAtAN3BvCZdhS88jbv8C', NULL, 'active', NULL, '2026-08-19 13:45:09', '2026-08-04 00:12:28', '2026-08-19 11:45:09');
+(9, 9, 'Hlobisile', 'Mthembu', 'Sky', 'candidate@gmail.com', '+27 12 345 3433', '1995-06-15', 'female', 'gauteng', 'employed', 'degree', 'Software Developer', '$2y$10$3Y8qIUV3YCaRu6plnDqGJOMWrnQucYeYZEDU2rcXRaaYBwxPs5Qnq', NULL, 'active', NULL, '2026-08-19 11:42:36', '2026-08-02 23:00:17', '2026-08-19 09:52:30'),
+(10, 9, 'Delani', 'Sibande', 'Deco', 'sibanded1030@gmail.com', '0794065577', '1997-12-12', 'male', 'gauteng', 'recent-graduate', 'degree', 'Software Developer', '$2y$10$mlDKcbt12tR.64VpNTWm9uG6Wx7xVMglKNAtAN3BvCZdhS88jbv8C', NULL, 'active', NULL, '2026-08-06 16:31:12', '2026-08-04 00:12:28', '2026-08-06 14:31:12'),
+(11, 9, 'Frans', 'Test', 'fransTest', 'frans.investhood@gmail.com', '0790561874', '2009-02-23', 'male', 'gauteng', 'unemployed', 'diploma', 'Software Engineer', '$2y$10$VgVPoNP/JB5zChSlla4MGO0RaAUdWkZUq9/.iAcRVhNBpI9E5RMda', NULL, 'active', NULL, NULL, '2026-08-23 18:59:35', '2026-08-24 09:24:09');
 
 -- --------------------------------------------------------
 
@@ -1418,9 +1880,9 @@ INSERT INTO `users` (`id`, `role_id`, `first_name`, `last_name`, `username`, `em
 CREATE TABLE `user_sessions` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `session_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `ip_address` varchar(45) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `user_agent` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `session_hash` varchar(64) NOT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `user_agent` varchar(255) DEFAULT NULL,
   `login_time` datetime NOT NULL,
   `last_activity` datetime NOT NULL,
   `logout_time` datetime DEFAULT NULL,
@@ -1497,20 +1959,49 @@ INSERT INTO `user_sessions` (`id`, `user_id`, `session_hash`, `ip_address`, `use
 (63, 9, 'b6a01eeadc4f2557cbc59919d8d6fe995fbc5c7dfc88a660d672d4d7b1aa6c13', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 11:42:37', '2026-08-19 11:42:37', '2026-08-19 12:03:16', 0),
 (64, 5, '114233ed070e354777af19c9a2207790de8de7e6a858de995324a49470bc3070', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 12:04:51', '2026-08-19 12:04:51', '2026-08-19 12:05:10', 0),
 (65, 1, '6de633dc0a44cee013538d19c9c7cbf37c78a1f236df2f4dd6a0daaa3f7b922b', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 12:05:47', '2026-08-19 12:05:47', '2026-08-19 12:16:48', 0),
-(66, 9, '37141758687919c17b7deb19d7fc544ba594aa6cd41fe4b31067738ce9dfcbea', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 12:31:31', '2026-08-19 12:31:31', NULL, 1),
-(67, 9, '3be307da852c570f0a162b58bb39907a815100509f0d1f236f3d2c5370c3375f', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 13:37:55', '2026-08-19 13:37:55', '2026-08-19 13:44:48', 0),
-(68, 10, 'a43082e97b5b03e9a0f2bec6fd8e2b8cfa2435e8dd764b4481e2b6454c53e2f5', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 13:45:09', '2026-08-19 13:45:09', '2026-08-19 13:45:52', 0),
-(69, 9, '83d57dc0d6e65412a35962275da3c61d85e1db421c6ffe53d4264433bb0a1388', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 13:46:13', '2026-08-19 13:46:13', NULL, 1),
-(70, 9, '07eb3e49aa9096f9a67b4132bb96a6ddeafbef646c0b81fbf6c338bdfc13722b', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 15:08:45', '2026-08-19 15:08:45', NULL, 1),
-(71, 9, '9eb2edb39a770e85b75627fb25becda77fefdee6019893ee78e59c4939fc7e63', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 16:17:59', '2026-08-19 16:17:59', NULL, 1),
-(72, 9, 'eca776b8f0d05eadfc6dbed19bf973d4be57e4d2efb9efa54f57837d9d0fdd83', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 16:39:09', '2026-08-19 16:39:09', '2026-08-19 16:40:11', 0),
-(73, 9, 'ef39f6248c98791834a55107a0bb92e556bc2bf8930ebb75331250211034f0fe', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 22:24:44', '2026-08-19 22:24:44', '2026-08-19 22:24:52', 0),
-(74, 1, 'd76b7ec9f7327d591879184edd6b17543c877b12034aaed33b81554c698db3d3', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 22:25:46', '2026-08-19 22:25:46', NULL, 1),
-(75, 1, '38321df5bc6590132e71419bfdc00f8318da10819ccf000d1bb4a88bd87d249e', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-19 23:09:41', '2026-08-19 23:09:41', NULL, 1),
-(76, 9, 'd49655cfacec13ced600c2b6f1f252a749c69b57db3af3de24a1f7cdb0343de6', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-20 00:59:44', '2026-08-20 00:59:44', NULL, 1),
-(77, 9, '77bfec1b4fb81bb28c2f27fb0359d215d1f25190c641a33f3dd59d7698e9f519', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-20 10:54:36', '2026-08-20 10:54:36', NULL, 1),
-(78, 9, 'd3cfd646360480ac6e23734e47e8185b31045c4cf0128afaec5733c254354a87', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-21 02:42:57', '2026-08-21 02:42:57', NULL, 1),
-(79, 9, 'f19a74a06b96b6adb1f05936d98fc1b330a191de877ad3998eb3dd361aba376e', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-21 02:51:25', '2026-08-21 02:51:25', NULL, 1);
+(66, 2, '157207c1a4f1e66147f1506ab30c237555db78bc9b6ca23905de88b9b87e3b95', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-24 10:50:57', '2026-08-24 10:50:57', '2026-08-24 10:53:28', 0),
+(67, 5, '5c1bcbda7b816e00c5dcdb40a5809b3b3d260c7fa50872519143300d814220c2', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-24 10:59:16', '2026-08-24 10:59:16', NULL, 1),
+(68, 5, '179b40fae015f9a8a58d92fbde86bf6aa5a7c2cc69f9c3e27cdd1a477459869d', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-24 10:59:28', '2026-08-24 10:59:28', '2026-08-24 11:00:03', 0),
+(69, 3, '8c324053735800353f882c141f2f6b4c8f75be1d24524faa03995c6e4b074e16', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-24 11:02:05', '2026-08-24 11:02:05', '2026-08-24 11:05:07', 0),
+(70, 2, 'cf04afda0828e423e4fa63ad89a45576f85561f87b97e039d8b6e47c6e266127', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-24 11:05:32', '2026-08-24 11:05:32', '2026-08-24 11:10:19', 0),
+(71, 1, '196163b8bc9e2117c81873df927b9627b4c9559a8f4d3cf26cbe0aabd1b57459', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-24 11:14:33', '2026-08-24 11:14:33', '2026-08-24 11:21:12', 0),
+(72, 2, '91c5252b9afabdd29af9c44ca073f97b64f220a1113ec59fd949a8e60b3b0d18', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-24 12:17:32', '2026-08-24 12:17:32', NULL, 1),
+(73, 2, '051b7a97ebe50d6da56434004a2787fa822d328bf3c55229e17175abd8a82e6f', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-24 13:40:12', '2026-08-24 13:40:12', NULL, 1),
+(74, 2, '48e56fa31ef19bf2c881e0ca9106f5b5733ff15f0669e07a9474fb7a111215f1', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-24 22:41:34', '2026-08-24 22:41:34', NULL, 1),
+(75, 2, 'ca3ea84147623685a957f89687df8d0e9efe7db9d945d033348c11f9a3df5172', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-25 09:55:53', '2026-08-25 09:55:53', '2026-08-25 10:43:35', 0),
+(76, 3, '9cffc99e18b1b3e88e2b4e9afffdf130813567d148d6b30f5dca7bf7b269ee34', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-25 10:44:42', '2026-08-25 10:44:42', '2026-08-25 10:46:08', 0),
+(77, 5, 'de2c6dd26c27655d9dea50afb391ce33e9ac6a2eef12f8f7f2a81f3d549ca896', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-25 10:47:00', '2026-08-25 10:47:00', NULL, 1),
+(78, 2, 'cfad961854b7f9b130f762b81bdbb9af20c38f17435f65a83361ca67bc379be6', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-25 11:38:54', '2026-08-25 11:38:54', NULL, 1),
+(79, 2, '7d60b81fe992cdc39d8df605973e584406ca292e8b0a3b47544485344209bf77', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-25 12:13:48', '2026-08-25 12:13:48', NULL, 1),
+(80, 2, 'da234e61fddd813be84911d81eaf16e66b3937d6978fc5dda3e5929169f13bf3', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-25 14:29:48', '2026-08-25 14:29:48', '2026-08-25 16:03:11', 0),
+(81, 5, '98ba9d01e48ce40b56bec4e36cec2212b5fa258ffb393c9a0280dc0e0df28b6d', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-25 16:03:51', '2026-08-25 16:03:51', NULL, 1),
+(82, 2, '84c09bdada59b7ac325712f38c661c8d678e4ce5f0409d4bfed1772d4274ab20', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-26 08:20:31', '2026-08-26 08:20:31', '2026-08-26 09:21:23', 0),
+(83, 2, 'f9093dcc106f1fbafc5b0ac484417ca396c58d55eb09d72a81c9c2227f4378a1', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-26 09:21:52', '2026-08-26 09:21:52', '2026-08-26 09:34:04', 0),
+(84, 2, 'a4991fa13a4fdd7ecc69bc50662de75a7a1fcd07ba39f8bf513c66faeb8407a3', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-26 09:36:57', '2026-08-26 09:36:57', '2026-08-26 10:14:09', 0),
+(85, 3, '44ae68fdfc5e6b2d78c5dcea20be5fbc0d1204ac4e37f34b592e43ca19e5a7db', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-30 21:19:22', '2026-08-30 21:19:22', '2026-08-30 21:20:49', 0),
+(86, 5, 'fcef533d4ec186b697e1e142e8aff291da119767969572efee568b8f75812af1', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-30 21:25:59', '2026-08-30 21:25:59', NULL, 1),
+(87, 5, '71dc34c193b66ce30d2a0a00ae266cd904f69707a83525a1903a61b46b3ec3e2', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-31 08:41:57', '2026-08-31 08:41:57', NULL, 1),
+(88, 5, '448df78dfd43294dd4623110b7c43bba422e4be8a5dcb657499a4bf651dae60f', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-31 10:12:32', '2026-08-31 10:12:32', NULL, 1),
+(89, 5, 'a6cb13a5aef85d96288d05e274d7067d8c3b2ca5f5df3a8d143b797d8692cc7d', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-31 10:12:55', '2026-08-31 10:12:55', '2026-08-31 10:30:04', 0),
+(90, 3, 'f7788f6aa4c968d85e69708712c1452206d9392b246457b7cb4a833e5280051b', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-31 10:30:50', '2026-08-31 10:30:50', NULL, 1),
+(91, 3, '64677ddc5e1ee496c66cd2d38b826a8f17cab52cc9d1e64a3a2d266bd7b1fcf2', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-31 10:31:00', '2026-08-31 10:31:00', NULL, 1),
+(92, 3, '6874d23c2583935016e949b137bb9cbf5304c17a48dbbc14036d5634c1c07c3d', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-31 10:31:12', '2026-08-31 10:31:12', NULL, 1),
+(93, 5, 'ffdec1ce7f5b90bccc3b5444cd4cfcb1cb7fe6f5301ae8421040e18dc5091b6b', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-31 11:17:31', '2026-08-31 11:17:31', NULL, 1),
+(94, 5, 'b38366b8fed07bb278b8aea6cfb624337a659005ed28c3eeea332d838e6ab3b3', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-31 13:21:31', '2026-08-31 13:21:31', NULL, 1),
+(95, 5, 'f599e5d1c366df70e2448c33d4876883e9a4d679fb19ebfeb5e955ee992dc305', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36', '2026-08-31 16:47:06', '2026-08-31 16:47:06', NULL, 1),
+(96, 5, 'd09ff428d3cf95b28f169ece3fcefb0f9b5144d7db6a99b06107d9bd17a843ce', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36', '2026-09-08 10:59:54', '2026-09-08 10:59:54', '2026-09-08 11:01:59', 0),
+(97, 3, '703786bab389987a41ca9bee6f5782851ee017882e5df02d26915b67c934245f', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36', '2026-09-08 11:02:27', '2026-09-08 11:02:27', NULL, 1),
+(98, 3, '31c01ac26026e4adf95a0e20c6f0622a314103a2f915845d09900708a8ce923c', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36', '2026-09-08 11:02:28', '2026-09-08 11:02:28', '2026-09-08 11:03:04', 0),
+(99, 3, 'b86f9465088dea550c4bef57498dce105df0dac31fe04e88f299dadb03d467bd', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36', '2026-09-08 11:03:34', '2026-09-08 11:03:34', '2026-09-08 11:04:14', 0),
+(100, 2, 'e4cb89af5303a7ba24c4b5dc882c9e3431b61f188897a6c500d26904de75e6f1', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36', '2026-09-08 11:04:36', '2026-09-08 11:04:36', NULL, 1),
+(101, 2, '9ae6d2a7502fae80c65343af9fee03bd017710d574b95583123e62ecb1ef1a2e', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36', '2026-09-08 11:04:37', '2026-09-08 11:04:37', '2026-09-08 11:11:08', 0),
+(102, 5, '75789f2d6ff6d98d52bc202729e68deb9a095363d0c9b83b741535db34b59a6e', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36', '2026-09-08 11:44:30', '2026-09-08 11:44:30', '2026-09-08 11:47:20', 0),
+(103, 3, 'a73a514c588cc064cc4d060dc3884e2e6d0061f87a396a7c0b6c2e28315c56b9', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36', '2026-09-08 11:54:27', '2026-09-08 11:54:27', '2026-09-08 11:56:11', 0),
+(104, 3, '10094817115b1bb4f6e1f31beb408b9c84bfec7783e1dae8b138766db8c5d230', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36', '2026-09-08 11:58:17', '2026-09-08 11:58:17', NULL, 1),
+(105, 3, 'bf6ea83bd0891508135f2a8e5b4200375722bd1294a36fb33eab269162b5f76e', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36', '2026-09-08 13:44:11', '2026-09-08 13:44:11', '2026-09-08 13:56:55', 0),
+(106, 4, '2167422cafb9776e68811e1cc866d3647b7ec0205c51ae5854e2e34a8b0230dd', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36', '2026-09-08 13:57:36', '2026-09-08 13:57:36', '2026-09-08 13:59:09', 0),
+(107, 6, '8326d0c17ae183dd457f1faad366c7c23409522e74545971628753392209cb58', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36', '2026-09-08 14:00:02', '2026-09-08 14:00:02', '2026-09-08 14:00:41', 0),
+(108, 7, 'e36e8adc78f9602802659cbbbe0e0d2728a2473dcc820a5b7b1b047e6174b789', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36', '2026-09-08 14:02:01', '2026-09-08 14:02:01', NULL, 1);
 
 -- --------------------------------------------------------
 
@@ -1521,8 +2012,8 @@ INSERT INTO `user_sessions` (`id`, `user_id`, `session_hash`, `ip_address`, `use
 CREATE TABLE `user_settings` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `setting_key` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `setting_value` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `setting_key` varchar(60) NOT NULL,
+  `setting_value` varchar(255) NOT NULL DEFAULT '',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1536,12 +2027,12 @@ CREATE TABLE `user_settings` (
 CREATE TABLE `work_experience` (
   `id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED NOT NULL,
-  `job_title` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `company` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `job_title` varchar(150) NOT NULL,
+  `company` varchar(150) NOT NULL,
   `start_date` date NOT NULL,
   `end_date` date DEFAULT NULL,
   `is_current` tinyint(1) NOT NULL DEFAULT 0,
-  `description` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `description` text DEFAULT NULL,
   `sort_order` int(11) NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -1570,22 +2061,55 @@ ALTER TABLE `applications`
   ADD KEY `idx_applications_created` (`created_at`);
 
 --
--- Indexes for table `application_documents`
+-- Indexes for table `assessment_attempts`
 --
-ALTER TABLE `application_documents`
+ALTER TABLE `assessment_attempts`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_app_docs_application_type` (`application_id`,`document_type`),
-  ADD KEY `idx_app_docs_application` (`application_id`),
-  ADD KEY `idx_app_docs_type` (`document_type`);
+  ADD UNIQUE KEY `uq_as_attempt` (`participant_id`,`outcome_id`,`attempt_number`),
+  ADD KEY `assessor_id` (`assessor_id`),
+  ADD KEY `moderator_id` (`moderator_id`),
+  ADD KEY `status` (`status`),
+  ADD KEY `fk_as_attempt_outcome` (`outcome_id`);
 
 --
--- Indexes for table `application_responses`
+-- Indexes for table `assessment_criteria`
 --
-ALTER TABLE `application_responses`
+ALTER TABLE `assessment_criteria`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_app_responses_application_question` (`application_id`,`question_id`),
-  ADD KEY `idx_app_responses_application` (`application_id`),
-  ADD KEY `idx_app_responses_question` (`question_id`);
+  ADD KEY `outcome_id` (`outcome_id`);
+
+--
+-- Indexes for table `assessment_decisions`
+--
+ALTER TABLE `assessment_decisions`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_as_decision` (`attempt_id`,`criterion_id`),
+  ADD KEY `assessor_id` (`assessor_id`),
+  ADD KEY `evidence_id` (`evidence_id`),
+  ADD KEY `fk_as_decision_criterion` (`criterion_id`);
+
+--
+-- Indexes for table `assessment_evidence`
+--
+ALTER TABLE `assessment_evidence`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `attempt_id` (`attempt_id`);
+
+--
+-- Indexes for table `assessment_outcomes`
+--
+ALTER TABLE `assessment_outcomes`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `code` (`code`);
+
+--
+-- Indexes for table `assessor_activity_log`
+--
+ALTER TABLE `assessor_activity_log`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `assessor_id` (`assessor_id`),
+  ADD KEY `action` (`action`),
+  ADD KEY `created_at` (`created_at`);
 
 --
 -- Indexes for table `audit_logs`
@@ -1604,6 +2128,14 @@ ALTER TABLE `availability_statuses`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `uq_availability_statuses_slug` (`slug`),
   ADD KEY `idx_availability_statuses_active` (`is_active`);
+
+--
+-- Indexes for table `candidate_consents`
+--
+ALTER TABLE `candidate_consents`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_candidate_consent` (`candidate_id`,`consent_type`,`status`),
+  ADD KEY `idx_candidate_consent_expiry` (`expires_at`);
 
 --
 -- Indexes for table `candidate_profiles`
@@ -1651,7 +2183,8 @@ ALTER TABLE `cohorts`
   ADD KEY `idx_cohorts_close` (`application_close_date`),
   ADD KEY `idx_cohorts_province` (`province`),
   ADD KEY `idx_cohorts_delivery` (`delivery_mode`),
-  ADD KEY `fk_cohorts_created_by` (`created_by`);
+  ADD KEY `fk_cohorts_created_by` (`created_by`),
+  ADD KEY `idx_cohorts_supervisor_id` (`supervisor_id`);
 
 --
 -- Indexes for table `cohort_documents`
@@ -1695,6 +2228,48 @@ ALTER TABLE `cohort_workflow`
   ADD KEY `idx_cohort_workflow_cohort` (`cohort_id`);
 
 --
+-- Indexes for table `commercial_capability_packs`
+--
+ALTER TABLE `commercial_capability_packs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_cm_pack_owner` (`commercial_manager_id`),
+  ADD KEY `idx_cm_pack_search` (`saved_search_id`);
+
+--
+-- Indexes for table `commercial_capability_pack_breakdowns`
+--
+ALTER TABLE `commercial_capability_pack_breakdowns`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_cm_pack_breakdown` (`capability_pack_id`);
+
+--
+-- Indexes for table `commercial_manager_activity_log`
+--
+ALTER TABLE `commercial_manager_activity_log`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_cm_activity_owner` (`commercial_manager_id`);
+
+--
+-- Indexes for table `commercial_privacy_rules`
+--
+ALTER TABLE `commercial_privacy_rules`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `commercial_saved_searches`
+--
+ALTER TABLE `commercial_saved_searches`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_cm_saved_search_owner` (`commercial_manager_id`);
+
+--
+-- Indexes for table `commercial_saved_search_breakdowns`
+--
+ALTER TABLE `commercial_saved_search_breakdowns`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_cm_breakdown_search` (`saved_search_id`);
+
+--
 -- Indexes for table `consents`
 --
 ALTER TABLE `consents`
@@ -1728,6 +2303,27 @@ ALTER TABLE `email_verifications`
   ADD UNIQUE KEY `uq_email_verifications_token` (`token_hash`),
   ADD KEY `idx_email_verifications_user` (`user_id`),
   ADD KEY `idx_email_verifications_expiry` (`expires_at`);
+
+--
+-- Indexes for table `finance_activity_log`
+--
+ALTER TABLE `finance_activity_log`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_fo_act_user` (`user_id`);
+
+--
+-- Indexes for table `finance_attendance_approved`
+--
+ALTER TABLE `finance_attendance_approved`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_fo_att_source` (`source_attendance_id`),
+  ADD KEY `idx_fo_att_status` (`approval_status`,`attendance_date`);
+
+--
+-- Indexes for table `finance_stipend_settings`
+--
+ALTER TABLE `finance_stipend_settings`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `login_attempts`
@@ -1785,14 +2381,6 @@ ALTER TABLE `opportunity_eligibility`
   ADD UNIQUE KEY `uq_opp_elig_opportunity` (`opportunity_id`);
 
 --
--- Indexes for table `opportunity_questions`
---
-ALTER TABLE `opportunity_questions`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_opp_questions_opportunity` (`opportunity_id`),
-  ADD KEY `idx_opp_questions_section` (`section`);
-
---
 -- Indexes for table `opportunity_responsibilities`
 --
 ALTER TABLE `opportunity_responsibilities`
@@ -1808,6 +2396,15 @@ ALTER TABLE `opportunity_skills`
   ADD UNIQUE KEY `uq_opp_skills_opp_name_cat` (`opportunity_id`,`skill_name`,`skill_category`),
   ADD KEY `idx_opp_skills_opportunity` (`opportunity_id`),
   ADD KEY `idx_opp_skills_category` (`skill_category`);
+
+--
+-- Indexes for table `participant_outcome_progress`
+--
+ALTER TABLE `participant_outcome_progress`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_as_progress` (`participant_id`,`outcome_id`),
+  ADD KEY `fk_as_progress_outcome` (`outcome_id`),
+  ADD KEY `fk_as_progress_attempt` (`final_attempt_id`);
 
 --
 -- Indexes for table `password_resets`
@@ -1827,7 +2424,9 @@ ALTER TABLE `programmes`
   ADD KEY `idx_programmes_status` (`status`),
   ADD KEY `idx_programmes_start` (`start_date`),
   ADD KEY `idx_programmes_end` (`end_date`),
-  ADD KEY `idx_programmes_created_by` (`created_by`);
+  ADD KEY `idx_programmes_created_by` (`created_by`),
+  ADD KEY `idx_programme_manager_id` (`programme_manager_id`),
+  ADD KEY `idx_programmes_programme_officer` (`programme_officer_id`);
 
 --
 -- Indexes for table `programme_eligibility`
@@ -1835,6 +2434,16 @@ ALTER TABLE `programmes`
 ALTER TABLE `programme_eligibility`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_prog_elig_programme` (`programme_id`);
+
+--
+-- Indexes for table `programme_officer_activity_log`
+--
+ALTER TABLE `programme_officer_activity_log`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_po_activity_officer` (`programme_officer_id`),
+  ADD KEY `idx_po_activity_action` (`action`),
+  ADD KEY `idx_po_activity_entity` (`entity_type`,`entity_id`),
+  ADD KEY `idx_po_activity_created` (`created_at`);
 
 --
 -- Indexes for table `programme_skills`
@@ -1852,6 +2461,28 @@ ALTER TABLE `qualifications`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_qualifications_user` (`user_id`),
   ADD KEY `idx_qualifications_verification` (`verification_status`);
+
+--
+-- Indexes for table `recruiter_activity_log`
+--
+ALTER TABLE `recruiter_activity_log`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_recruiter_activity_user` (`recruiter_id`),
+  ADD KEY `idx_recruiter_activity_created` (`created_at`);
+
+--
+-- Indexes for table `recruiter_shortlists`
+--
+ALTER TABLE `recruiter_shortlists`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_recruiter_shortlist_owner` (`recruiter_id`);
+
+--
+-- Indexes for table `recruiter_shortlist_candidates`
+--
+ALTER TABLE `recruiter_shortlist_candidates`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_shortlist_candidate` (`shortlist_id`,`candidate_id`);
 
 --
 -- Indexes for table `remember_me_tokens`
@@ -1878,6 +2509,56 @@ ALTER TABLE `skills`
   ADD UNIQUE KEY `uq_skills_name` (`name`),
   ADD KEY `idx_skills_category` (`category`),
   ADD KEY `idx_skills_active` (`is_active`);
+
+--
+-- Indexes for table `skill_taxonomy_versions`
+--
+ALTER TABLE `skill_taxonomy_versions`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `version_label` (`version_label`);
+
+--
+-- Indexes for table `stipend_schedules`
+--
+ALTER TABLE `stipend_schedules`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `schedule_reference` (`schedule_reference`),
+  ADD KEY `idx_fo_sched_creator` (`created_by`),
+  ADD KEY `idx_fo_sched_status` (`status`),
+  ADD KEY `fk_fo_sched_supersedes` (`supersedes_schedule_id`);
+
+--
+-- Indexes for table `stipend_schedule_approval_history`
+--
+ALTER TABLE `stipend_schedule_approval_history`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_fo_hist_sched` (`schedule_id`);
+
+--
+-- Indexes for table `stipend_schedule_lines`
+--
+ALTER TABLE `stipend_schedule_lines`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_fo_line_sched` (`schedule_id`);
+
+--
+-- Indexes for table `supervisor_activity_log`
+--
+ALTER TABLE `supervisor_activity_log`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_supervisor_activity_user` (`supervisor_id`),
+  ADD KEY `idx_supervisor_activity_action` (`action`),
+  ADD KEY `idx_supervisor_activity_entity` (`entity_type`,`entity_id`),
+  ADD KEY `idx_supervisor_activity_created` (`created_at`);
+
+--
+-- Indexes for table `supervisor_notifications`
+--
+ALTER TABLE `supervisor_notifications`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_supervisor_notifications_user` (`supervisor_id`),
+  ADD KEY `idx_supervisor_notifications_unread` (`supervisor_id`,`is_read`),
+  ADD KEY `idx_supervisor_notifications_created` (`supervisor_id`,`created_at`);
 
 --
 -- Indexes for table `users`
@@ -1922,31 +2603,61 @@ ALTER TABLE `work_experience`
 -- AUTO_INCREMENT for table `applications`
 --
 ALTER TABLE `applications`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- AUTO_INCREMENT for table `application_documents`
---
-ALTER TABLE `application_documents`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `application_responses`
+-- AUTO_INCREMENT for table `assessment_attempts`
 --
-ALTER TABLE `application_responses`
+ALTER TABLE `assessment_attempts`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `assessment_criteria`
+--
+ALTER TABLE `assessment_criteria`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `assessment_decisions`
+--
+ALTER TABLE `assessment_decisions`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `assessment_evidence`
+--
+ALTER TABLE `assessment_evidence`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `assessment_outcomes`
+--
+ALTER TABLE `assessment_outcomes`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `assessor_activity_log`
+--
+ALTER TABLE `assessor_activity_log`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `audit_logs`
 --
 ALTER TABLE `audit_logs`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=204;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=202;
 
 --
 -- AUTO_INCREMENT for table `availability_statuses`
 --
 ALTER TABLE `availability_statuses`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT for table `candidate_consents`
+--
+ALTER TABLE `candidate_consents`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `candidate_profiles`
@@ -1994,7 +2705,7 @@ ALTER TABLE `cohort_eligibility`
 -- AUTO_INCREMENT for table `cohort_participants`
 --
 ALTER TABLE `cohort_participants`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `cohort_skills`
@@ -2007,6 +2718,42 @@ ALTER TABLE `cohort_skills`
 --
 ALTER TABLE `cohort_workflow`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=137;
+
+--
+-- AUTO_INCREMENT for table `commercial_capability_packs`
+--
+ALTER TABLE `commercial_capability_packs`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `commercial_capability_pack_breakdowns`
+--
+ALTER TABLE `commercial_capability_pack_breakdowns`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `commercial_manager_activity_log`
+--
+ALTER TABLE `commercial_manager_activity_log`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `commercial_privacy_rules`
+--
+ALTER TABLE `commercial_privacy_rules`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `commercial_saved_searches`
+--
+ALTER TABLE `commercial_saved_searches`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `commercial_saved_search_breakdowns`
+--
+ALTER TABLE `commercial_saved_search_breakdowns`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `consents`
@@ -2030,13 +2777,31 @@ ALTER TABLE `documents`
 -- AUTO_INCREMENT for table `email_verifications`
 --
 ALTER TABLE `email_verifications`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT for table `finance_activity_log`
+--
+ALTER TABLE `finance_activity_log`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `finance_attendance_approved`
+--
+ALTER TABLE `finance_attendance_approved`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `finance_stipend_settings`
+--
+ALTER TABLE `finance_stipend_settings`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `login_attempts`
 --
 ALTER TABLE `login_attempts`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=45;
 
 --
 -- AUTO_INCREMENT for table `notification_preferences`
@@ -2069,12 +2834,6 @@ ALTER TABLE `opportunity_eligibility`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
--- AUTO_INCREMENT for table `opportunity_questions`
---
-ALTER TABLE `opportunity_questions`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
-
---
 -- AUTO_INCREMENT for table `opportunity_responsibilities`
 --
 ALTER TABLE `opportunity_responsibilities`
@@ -2085,6 +2844,12 @@ ALTER TABLE `opportunity_responsibilities`
 --
 ALTER TABLE `opportunity_skills`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=163;
+
+--
+-- AUTO_INCREMENT for table `participant_outcome_progress`
+--
+ALTER TABLE `participant_outcome_progress`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `password_resets`
@@ -2105,6 +2870,12 @@ ALTER TABLE `programme_eligibility`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
+-- AUTO_INCREMENT for table `programme_officer_activity_log`
+--
+ALTER TABLE `programme_officer_activity_log`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `programme_skills`
 --
 ALTER TABLE `programme_skills`
@@ -2115,6 +2886,24 @@ ALTER TABLE `programme_skills`
 --
 ALTER TABLE `qualifications`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT for table `recruiter_activity_log`
+--
+ALTER TABLE `recruiter_activity_log`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `recruiter_shortlists`
+--
+ALTER TABLE `recruiter_shortlists`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `recruiter_shortlist_candidates`
+--
+ALTER TABLE `recruiter_shortlist_candidates`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `remember_me_tokens`
@@ -2135,16 +2924,52 @@ ALTER TABLE `skills`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=54;
 
 --
+-- AUTO_INCREMENT for table `skill_taxonomy_versions`
+--
+ALTER TABLE `skill_taxonomy_versions`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `stipend_schedules`
+--
+ALTER TABLE `stipend_schedules`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `stipend_schedule_approval_history`
+--
+ALTER TABLE `stipend_schedule_approval_history`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `stipend_schedule_lines`
+--
+ALTER TABLE `stipend_schedule_lines`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `supervisor_activity_log`
+--
+ALTER TABLE `supervisor_activity_log`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `supervisor_notifications`
+--
+ALTER TABLE `supervisor_notifications`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `user_sessions`
 --
 ALTER TABLE `user_sessions`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=80;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=109;
 
 --
 -- AUTO_INCREMENT for table `user_settings`
@@ -2170,17 +2995,30 @@ ALTER TABLE `applications`
   ADD CONSTRAINT `fk_applications_opportunity` FOREIGN KEY (`opportunity_id`) REFERENCES `opportunities` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `application_documents`
+-- Constraints for table `assessment_attempts`
 --
-ALTER TABLE `application_documents`
-  ADD CONSTRAINT `fk_app_docs_application` FOREIGN KEY (`application_id`) REFERENCES `applications` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `assessment_attempts`
+  ADD CONSTRAINT `fk_as_attempt_outcome` FOREIGN KEY (`outcome_id`) REFERENCES `assessment_outcomes` (`id`);
 
 --
--- Constraints for table `application_responses`
+-- Constraints for table `assessment_criteria`
 --
-ALTER TABLE `application_responses`
-  ADD CONSTRAINT `fk_app_responses_application` FOREIGN KEY (`application_id`) REFERENCES `applications` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_app_responses_question` FOREIGN KEY (`question_id`) REFERENCES `opportunity_questions` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `assessment_criteria`
+  ADD CONSTRAINT `fk_as_criteria_outcome` FOREIGN KEY (`outcome_id`) REFERENCES `assessment_outcomes` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `assessment_decisions`
+--
+ALTER TABLE `assessment_decisions`
+  ADD CONSTRAINT `fk_as_decision_attempt` FOREIGN KEY (`attempt_id`) REFERENCES `assessment_attempts` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_as_decision_criterion` FOREIGN KEY (`criterion_id`) REFERENCES `assessment_criteria` (`id`),
+  ADD CONSTRAINT `fk_as_decision_evidence` FOREIGN KEY (`evidence_id`) REFERENCES `assessment_evidence` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `assessment_evidence`
+--
+ALTER TABLE `assessment_evidence`
+  ADD CONSTRAINT `fk_as_evidence_attempt` FOREIGN KEY (`attempt_id`) REFERENCES `assessment_attempts` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `audit_logs`
@@ -2254,6 +3092,24 @@ ALTER TABLE `cohort_workflow`
   ADD CONSTRAINT `fk_cohort_workflow_cohort` FOREIGN KEY (`cohort_id`) REFERENCES `cohorts` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
+-- Constraints for table `commercial_capability_packs`
+--
+ALTER TABLE `commercial_capability_packs`
+  ADD CONSTRAINT `fk_cm_pack_search` FOREIGN KEY (`saved_search_id`) REFERENCES `commercial_saved_searches` (`id`);
+
+--
+-- Constraints for table `commercial_capability_pack_breakdowns`
+--
+ALTER TABLE `commercial_capability_pack_breakdowns`
+  ADD CONSTRAINT `fk_cm_pack_breakdown` FOREIGN KEY (`capability_pack_id`) REFERENCES `commercial_capability_packs` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `commercial_saved_search_breakdowns`
+--
+ALTER TABLE `commercial_saved_search_breakdowns`
+  ADD CONSTRAINT `fk_cm_breakdown_search` FOREIGN KEY (`saved_search_id`) REFERENCES `commercial_saved_searches` (`id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `consents`
 --
 ALTER TABLE `consents`
@@ -2318,12 +3174,6 @@ ALTER TABLE `opportunity_eligibility`
   ADD CONSTRAINT `fk_opp_elig_opportunity` FOREIGN KEY (`opportunity_id`) REFERENCES `opportunities` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
--- Constraints for table `opportunity_questions`
---
-ALTER TABLE `opportunity_questions`
-  ADD CONSTRAINT `fk_opp_questions_opportunity` FOREIGN KEY (`opportunity_id`) REFERENCES `opportunities` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
---
 -- Constraints for table `opportunity_responsibilities`
 --
 ALTER TABLE `opportunity_responsibilities`
@@ -2336,6 +3186,13 @@ ALTER TABLE `opportunity_skills`
   ADD CONSTRAINT `fk_opp_skills_opportunity` FOREIGN KEY (`opportunity_id`) REFERENCES `opportunities` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
+-- Constraints for table `participant_outcome_progress`
+--
+ALTER TABLE `participant_outcome_progress`
+  ADD CONSTRAINT `fk_as_progress_attempt` FOREIGN KEY (`final_attempt_id`) REFERENCES `assessment_attempts` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_as_progress_outcome` FOREIGN KEY (`outcome_id`) REFERENCES `assessment_outcomes` (`id`);
+
+--
 -- Constraints for table `password_resets`
 --
 ALTER TABLE `password_resets`
@@ -2345,7 +3202,8 @@ ALTER TABLE `password_resets`
 -- Constraints for table `programmes`
 --
 ALTER TABLE `programmes`
-  ADD CONSTRAINT `fk_programmes_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_programmes_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_programmes_programme_manager` FOREIGN KEY (`programme_manager_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Constraints for table `programme_eligibility`
@@ -2366,10 +3224,34 @@ ALTER TABLE `qualifications`
   ADD CONSTRAINT `fk_qualifications_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
+-- Constraints for table `recruiter_shortlist_candidates`
+--
+ALTER TABLE `recruiter_shortlist_candidates`
+  ADD CONSTRAINT `fk_shortlist_candidate_shortlist` FOREIGN KEY (`shortlist_id`) REFERENCES `recruiter_shortlists` (`id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `remember_me_tokens`
 --
 ALTER TABLE `remember_me_tokens`
   ADD CONSTRAINT `fk_remember_me_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `stipend_schedules`
+--
+ALTER TABLE `stipend_schedules`
+  ADD CONSTRAINT `fk_fo_sched_supersedes` FOREIGN KEY (`supersedes_schedule_id`) REFERENCES `stipend_schedules` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `stipend_schedule_approval_history`
+--
+ALTER TABLE `stipend_schedule_approval_history`
+  ADD CONSTRAINT `fk_fo_hist_sched` FOREIGN KEY (`schedule_id`) REFERENCES `stipend_schedules` (`id`);
+
+--
+-- Constraints for table `stipend_schedule_lines`
+--
+ALTER TABLE `stipend_schedule_lines`
+  ADD CONSTRAINT `fk_fo_line_sched` FOREIGN KEY (`schedule_id`) REFERENCES `stipend_schedules` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `users`
