@@ -1,80 +1,10 @@
 <?php
-/**
- * ================================================
- * INVESTHOOD IT - Recruiter Dashboard
- * ================================================
- * Role: Recruiter
- */
-
-require_once __DIR__ . '/../includes/bootstrap.php';
-
-require_role('recruiter');
-
-$user = current_user();
-$flashes = render_flashes();
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Recruiter Dashboard | Investhood IT</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
-  <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
-</head>
-<body class="dashboard-page">
-  <div class="dashboard">
-    <aside class="sidebar">
-      <div class="sidebar__header">
-        <a href="<?= url('index.php') ?>" class="logo">
-          <span class="logo__icon"><i class="fas fa-code"></i></span>
-          <span class="logo__text">Investhood <span class="logo__accent">IT</span></span>
-        </a>
-      </div>
-      <nav class="sidebar__nav">
-        <div class="sidebar__section-label">Recruiter</div>
-        <ul class="sidebar__menu">
-          <li><a href="#" class="sidebar__link active"><i class="fas fa-th-large"></i> Dashboard</a></li>
-          <li><a href="#" class="sidebar__link"><i class="fas fa-briefcase"></i> Opportunities</a></li>
-          <li><a href="#" class="sidebar__link"><i class="fas fa-users"></i> Talent Pool</a></li>
-          <li><a href="#" class="sidebar__link"><i class="fas fa-handshake"></i> Placements</a></li>
-        </ul>
-      </nav>
-      <div class="sidebar__footer">
-        <div class="sidebar__user">
-          <div class="sidebar__user-avatar"><img src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Recruiter') ?>&background=1a56db&color=fff&size=80" alt=""></div>
-          <div class="sidebar__user-info">
-            <span class="sidebar__user-name"><?= e($user['fullname'] ?? 'Recruiter') ?></span>
-            <span class="sidebar__user-role">Recruiter</span>
-          </div>
-        </div>
-        <a href="<?= url('auth/logout.php') ?>" class="sidebar__logout"><i class="fas fa-sign-out-alt"></i> Sign Out</a>
-      </div>
-    </aside>
-    <main class="dashboard__main">
-      <header class="dash-header">
-        <div class="dash-header__left">
-          <h1>Recruiter Dashboard</h1>
-        </div>
-        <div class="dash-header__right">
-          <div class="dash-header__user">
-            <img src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Recruiter') ?>&background=1a56db&color=fff&size=80" alt="" class="dash-header__avatar">
-          </div>
-        </div>
-      </header>
-      <div class="dash-content">
-        <div class="welcome-card">
-          <div class="welcome-card__bg"></div>
-          <div class="welcome-card__content">
-            <h1 class="welcome-card__greeting">Welcome, <span class="text-gradient"><?= e($user['fullname'] ?? 'Recruiter') ?></span></h1>
-            <p>Manage opportunities, review candidate profiles, and facilitate placements.</p>
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
-</body>
-</html>
+require_once __DIR__.'/../includes/bootstrap.php'; require_role('recruiter'); $user=current_user();$flashes=render_flashes();$currentPage='dashboard';$pageTitle='Recruiter Dashboard';require_once __DIR__.'/_helpers.php';$conn=Database::getConnection();$recruiterId=(int)($user['id']??$user['user_id']??0);if($recruiterId<=0){http_response_code(403);exit('Invalid Recruiter account.');}
+$stats=['verified'=>0,'consented'=>0,'scarce'=>0,'gauteng'=>0,'shortlists'=>0];
+if(rc_has_table($conn,'candidate_profiles')&&rc_has_table($conn,'candidate_consents')){$r=$conn->query("SELECT COUNT(DISTINCT CASE WHEN cp.verification_status='verified' THEN cp.user_id END) verified,COUNT(DISTINCT CASE WHEN cc.status='consented' AND (cc.expires_at IS NULL OR cc.expires_at>NOW()) THEN cp.user_id END) consented,COUNT(DISTINCT CASE WHEN cp.province='Gauteng' THEN cp.user_id END) gauteng FROM candidate_profiles cp LEFT JOIN candidate_consents cc ON cc.candidate_id=cp.user_id AND cc.consent_type='recruiter_discovery'");if($r)$stats=array_merge($stats,$r->fetch_assoc()?:[]);} if(rc_has_table($conn,'candidate_skills')&&rc_has_table($conn,'skills')){$r=$conn->query("SELECT COUNT(DISTINCT cs.candidate_id) scarce FROM candidate_skills cs JOIN skills s ON s.id=cs.skill_id WHERE s.is_scarce=1 AND cs.verification_status='verified'");if($r)$stats['scarce']=(int)($r->fetch_assoc()['scarce']??0);} if(rc_has_table($conn,'recruiter_shortlists')){$s=$conn->prepare("SELECT COUNT(*) total FROM recruiter_shortlists WHERE recruiter_id=?");$s->bind_param('i',$recruiterId);$s->execute();$stats['shortlists']=(int)($s->get_result()->fetch_assoc()['total']??0);$s->close();}
+$f=trim((string)($user['first_name']??'Recruiter'));$taxonomy=rc_taxonomy_version($conn);require __DIR__.'/_layout_start.php';?>
+<section class="rc-hero"><div><span class="rc-eyebrow"><i class="fas fa-bolt"></i> Scarce Skills Discovery</span><h2>Find verified talent faster, <?=e($f?:'Recruiter')?>.</h2><p>Search consented candidates using structured skill, location, verification and recency filters, then preserve your criteria and taxonomy version with every shortlist.</p><div class="rc-hero__actions"><a class="rc-btn rc-btn--light" href="<?=url('recruiter/search.php')?>"><i class="fas fa-magnifying-glass"></i> Find Candidates</a><a class="rc-btn rc-btn--glass" href="<?=url('recruiter/shortlists.php')?>"><i class="fas fa-list-check"></i> Open Shortlists</a></div></div><div class="rc-taxonomy"><span>Active Taxonomy</span><strong><?=e($taxonomy)?></strong><small>Matching decisions remain reproducible.</small></div></section>
+<section class="rc-stats"><article><i class="fas fa-badge-check"></i><strong><?=number_format((int)$stats['verified'])?></strong><span>Verified Candidates</span></article><article><i class="fas fa-user-shield"></i><strong><?=number_format((int)$stats['consented'])?></strong><span>Consent Eligible</span></article><article><i class="fas fa-gem"></i><strong><?=number_format((int)$stats['scarce'])?></strong><span>Scarce Skill Profiles</span></article><article><i class="fas fa-location-dot"></i><strong><?=number_format((int)$stats['gauteng'])?></strong><span>Gauteng Candidates</span></article><article><i class="fas fa-list-check"></i><strong><?=number_format((int)$stats['shortlists'])?></strong><span>My Shortlists</span></article></section>
+<div class="rc-grid"><a class="rc-action" href="<?=url('recruiter/search.php?skill=Java&province=Gauteng&verification=verified&scarce_only=1')?>"><i class="fab fa-java"></i><div><strong>Java in Gauteng</strong><span>Verified + scarce skill filter</span></div></a><a class="rc-action" href="<?=url('recruiter/search.php?skill=AWS&province=Gauteng&verification=verified&scarce_only=1')?>"><i class="fas fa-cloud"></i><div><strong>Cloud Talent</strong><span>Find verified cloud candidates</span></div></a><a class="rc-action" href="<?=url('recruiter/shortlists.php')?>"><i class="fas fa-list-check"></i><div><strong>Client Shortlists</strong><span>Open stored search contexts</span></div></a></div>
+<div class="rc-card"><div class="rc-card__body rc-info"><i class="fas fa-shield-halved"></i><div><strong>Scope and consent are enforced before discovery.</strong><p>Candidate search is designed to return only recruiter-discovery consented candidates that satisfy the selected filters.</p></div></div></div>
+<?php require __DIR__.'/_layout_end.php';?>

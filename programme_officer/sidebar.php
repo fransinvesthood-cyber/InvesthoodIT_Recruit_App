@@ -1,102 +1,13 @@
 <?php
-/**
- * ================================================
- * INVESTHOOD IT - Programme Officer Sidebar
- * ================================================
- * Reusable sidebar navigation for Programme Officer
- */
+$currentPage=$currentPage??''; if(!isset($user)||!is_array($user))$user=current_user();
+$fn=trim((string)($user['first_name']??'')); $ln=trim((string)($user['last_name']??''));
+$name=trim((string)($user['full_name']??$user['fullname']??($fn.' '.$ln))); if($name==='')$name='Programme Officer'; $initials=po_initials($fn,$ln);
+if(!function_exists('po_nav_active')){function po_nav_active(string $current,$pages):string{$pages=is_array($pages)?$pages:[$pages];return in_array($current,$pages,true)?'po-nav__item--active':'';}}
 ?>
-<aside class="sidebar">
-    <!-- =====================================================
-         SIDEBAR HEADER
-    ====================================================== -->
-    <div class="sidebar__header">
-        <a href="<?= url('index.php') ?>" class="logo">
-            <span class="logo__icon">
-                <i class="fas fa-code"></i>
-            </span>
-            <span class="logo__text">
-                Investhood <span class="logo__accent">IT</span>
-            </span>
-        </a>
-    </div>
-    <!-- =====================================================
-         SIDEBAR NAVIGATION
-    ====================================================== -->
-    <nav class="sidebar__nav">
-        <div class="sidebar__section-label">
-            Programme Officer
-        </div>
-        <ul class="sidebar__menu">
-            <!-- Dashboard -->
-            <li>
-                <a
-                    href="<?= url('programme_officer/dashboard.php') ?>"
-                    class="sidebar__link <?= basename($_SERVER['PHP_SELF']) === 'dashboard.php' ? 'active' : '' ?>"
-                >
-                    <i class="fas fa-th-large"></i>
-                    Dashboard
-                </a>
-            </li>
-            <!-- Programmes -->
-            <li>
-                <a
-                    href="<?= url('programme_officer/programmes.php') ?>"
-                    class="sidebar__link <?= basename($_SERVER['PHP_SELF']) === 'programmes.php' ? 'active' : '' ?>"
-                >
-                    <i class="fas fa-graduation-cap"></i>
-                    Programmes
-                </a>
-            </li>
-            <!-- Candidates -->
-            <li>
-                <a
-                    href="<?= url('programme_officer/candidates.php') ?>"
-                    class="sidebar__link <?= basename($_SERVER['PHP_SELF']) === 'candidates.php' ? 'active' : '' ?>"
-                >
-                    <i class="fas fa-users"></i>
-                    Candidates
-                </a>
-            </li>
-            <!-- Reports -->
-            <li>
-                <a
-                    href="<?= url('programme_officer/reports.php') ?>"
-                    class="sidebar__link <?= basename($_SERVER['PHP_SELF']) === 'reports.php' ? 'active' : '' ?>"
-                >
-                    <i class="fas fa-chart-line"></i>
-                    Reports
-                </a>
-            </li>
-        </ul>
-    </nav>
-    <!-- =====================================================
-         SIDEBAR FOOTER
-    ====================================================== -->
-    <div class="sidebar__footer">
-        <div class="sidebar__user">
-            <div class="sidebar__user-avatar">
-                <img
-                    src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Programme+Officer') ?>&background=1a56db&color=fff&size=80"
-                    alt=""
-                >
-            </div>
-            <div class="sidebar__user-info">
-                <span class="sidebar__user-name">
-                    <?= e($user['fullname'] ?? 'Programme Officer') ?>
-                </span>
-                <span class="sidebar__user-role">
-                    Programme Officer
-                </span>
-            </div>
-        </div>
-        <!-- Sign Out -->
-        <a
-            href="<?= url('auth/logout.php') ?>"
-            class="sidebar__logout"
-        >
-            <i class="fas fa-sign-out-alt"></i>
-            Sign Out
-        </a>
-    </div>
-</aside>
+<aside class="po-sidebar" id="poSidebar"><div class="po-sidebar__brand"><div class="po-sidebar__logo"><i class="fas fa-cubes-stacked"></i></div><div class="po-sidebar__brand-copy"><strong>Investhood IT</strong><span>Programme Platform</span></div><button class="po-sidebar__close" id="poSidebarClose" type="button"><i class="fas fa-xmark"></i></button></div>
+<div class="po-profile"><div class="po-profile__avatar"><?= e($initials) ?><span class="po-profile__online"></span></div><div class="po-profile__copy"><strong><?= e($name) ?></strong><span>Programme Officer</span></div></div>
+<nav class="po-nav"><div class="po-nav__group"><div class="po-nav__label">Main</div><a href="<?= url('programme_officer/dashboard.php') ?>" class="po-nav__item <?= po_nav_active($currentPage,'dashboard') ?>"><span class="po-nav__icon"><i class="fas fa-grid-2"></i></span><span>Dashboard</span></a></div>
+<div class="po-nav__group"><div class="po-nav__label">Programme Management</div><a href="<?= url('programme_officer/programmes.php') ?>" class="po-nav__item <?= po_nav_active($currentPage,['programmes','programme_view']) ?>"><span class="po-nav__icon"><i class="fas fa-diagram-project"></i></span><span>My Programmes</span></a><a href="<?= url('programme_officer/cohorts.php') ?>" class="po-nav__item <?= po_nav_active($currentPage,['cohorts','cohort_view']) ?>"><span class="po-nav__icon"><i class="fas fa-layer-group"></i></span><span>Cohorts</span></a><a href="<?= url('programme_officer/candidates.php') ?>" class="po-nav__item <?= po_nav_active($currentPage,['candidates','candidate_view']) ?>"><span class="po-nav__icon"><i class="fas fa-users"></i></span><span>Candidates</span></a></div>
+<div class="po-nav__group"><div class="po-nav__label">Insights</div><a href="<?= url('programme_officer/reports.php') ?>" class="po-nav__item <?= po_nav_active($currentPage,'reports') ?>"><span class="po-nav__icon"><i class="fas fa-chart-column"></i></span><span>Reports</span></a><a href="<?= url('programme_officer/activity_log.php') ?>" class="po-nav__item <?= po_nav_active($currentPage,'activity_log') ?>"><span class="po-nav__icon"><i class="fas fa-clock-rotate-left"></i></span><span>Activity Log</span></a></div>
+<div class="po-nav__group"><div class="po-nav__label">Appearance</div><button type="button" class="po-theme-control" data-po-theme-toggle><span class="po-nav__icon"><i class="fas fa-moon" data-po-theme-icon></i></span><span>Dark Mode</span><span class="po-theme-switch"></span></button></div></nav>
+<div class="po-sidebar__footer"><div class="po-secure-card"><i class="fas fa-shield-halved"></i><div><strong>Secure Workspace</strong><span>Access is restricted to Programme Officer records.</span></div></div><a href="<?= url('auth/logout.php') ?>" class="po-logout"><i class="fas fa-arrow-right-from-bracket"></i><span>Sign Out</span></a></div></aside><div class="po-overlay" id="poOverlay"></div>

@@ -1,0 +1,1 @@
+</div></main></div><script src="<?= url('js/commercial_manager.js') ?>"></script></body></html>

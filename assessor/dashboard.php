@@ -1,80 +1,10 @@
 <?php
-/**
- * ================================================
- * INVESTHOOD IT - Assessor Dashboard
- * ================================================
- * Role: Assessor
- */
-
-require_once __DIR__ . '/../includes/bootstrap.php';
-
-require_role('assessor');
-
-$user = current_user();
-$flashes = render_flashes();
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Assessor Dashboard | Investhood IT</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
-  <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
-</head>
-<body class="dashboard-page">
-  <div class="dashboard">
-    <aside class="sidebar">
-      <div class="sidebar__header">
-        <a href="<?= url('index.php') ?>" class="logo">
-          <span class="logo__icon"><i class="fas fa-code"></i></span>
-          <span class="logo__text">Investhood <span class="logo__accent">IT</span></span>
-        </a>
-      </div>
-      <nav class="sidebar__nav">
-        <div class="sidebar__section-label">Assessor</div>
-        <ul class="sidebar__menu">
-          <li><a href="#" class="sidebar__link active"><i class="fas fa-th-large"></i> Dashboard</a></li>
-          <li><a href="#" class="sidebar__link"><i class="fas fa-clipboard-check"></i> Assessments</a></li>
-          <li><a href="#" class="sidebar__link"><i class="fas fa-certificate"></i> Skills Verification</a></li>
-          <li><a href="#" class="sidebar__link"><i class="fas fa-star"></i> Ratings</a></li>
-        </ul>
-      </nav>
-      <div class="sidebar__footer">
-        <div class="sidebar__user">
-          <div class="sidebar__user-avatar"><img src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Assessor') ?>&background=1a56db&color=fff&size=80" alt=""></div>
-          <div class="sidebar__user-info">
-            <span class="sidebar__user-name"><?= e($user['fullname'] ?? 'Assessor') ?></span>
-            <span class="sidebar__user-role">Assessor</span>
-          </div>
-        </div>
-        <a href="<?= url('auth/logout.php') ?>" class="sidebar__logout"><i class="fas fa-sign-out-alt"></i> Sign Out</a>
-      </div>
-    </aside>
-    <main class="dashboard__main">
-      <header class="dash-header">
-        <div class="dash-header__left">
-          <h1>Assessor Dashboard</h1>
-        </div>
-        <div class="dash-header__right">
-          <div class="dash-header__user">
-            <img src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Assessor') ?>&background=1a56db&color=fff&size=80" alt="" class="dash-header__avatar">
-          </div>
-        </div>
-      </header>
-      <div class="dash-content">
-        <div class="welcome-card">
-          <div class="welcome-card__bg"></div>
-          <div class="welcome-card__content">
-            <h1 class="welcome-card__greeting">Welcome, <span class="text-gradient"><?= e($user['fullname'] ?? 'Assessor') ?></span></h1>
-            <p>Conduct assessments, verify skills, and manage candidate evaluations.</p>
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
-</body>
-</html>
+require_once __DIR__.'/../includes/bootstrap.php';require_role('assessor');$user=current_user();$flashes=render_flashes();$currentPage='dashboard';$pageTitle='Assessor Dashboard';require_once __DIR__.'/_helpers.php';$conn=Database::getConnection();$assessorId=(int)($user['id']??$user['user_id']??0);if($assessorId<=0){http_response_code(403);exit('Invalid Assessor account.');}
+$stats=['assigned'=>0,'pending'=>0,'competent'=>0,'nyc'=>0,'moderation'=>0];$queue=[];
+if(as_has_table($conn,'assessment_attempts')){$s=$conn->prepare("SELECT COUNT(*) assigned,SUM(status IN ('submitted','in_review')) pending,SUM(assessor_result='competent') competent,SUM(assessor_result='not_yet_competent') nyc,SUM(moderation_status='pending' AND status='awaiting_moderation') moderation FROM assessment_attempts WHERE assessor_id=?");if($s){$s->bind_param('i',$assessorId);$s->execute();$stats=array_merge($stats,$s->get_result()->fetch_assoc()?:[]);$s->close();}$s=$conn->prepare("SELECT aa.id attempt_id,aa.attempt_number,aa.status,aa.submitted_at,u.first_name,u.last_name,u.email,ao.code outcome_code,ao.title outcome_title FROM assessment_attempts aa JOIN users u ON u.id=aa.participant_id JOIN assessment_outcomes ao ON ao.id=aa.outcome_id WHERE aa.assessor_id=? AND aa.status IN ('submitted','in_review') ORDER BY CASE WHEN aa.status='submitted' THEN 0 ELSE 1 END,aa.submitted_at ASC LIMIT 6");if($s){$s->bind_param('i',$assessorId);$s->execute();$r=$s->get_result();while($x=$r->fetch_assoc())$queue[]=$x;$s->close();}}
+$first=trim((string)($user['first_name']??'Assessor'));require __DIR__.'/_layout_start.php';?>
+<section class="as-hero"><div class="as-hero__content"><span class="as-hero__eyebrow"><i class="fas fa-award"></i> Quality Assessment Workspace</span><h2>Welcome back, <?= e($first?:'Assessor') ?>.</h2><p>Review evidence against outcomes, record criterion-level decisions, provide clear feedback and maintain a complete audit trail for every assessment.</p><div class="as-hero__actions"><a class="as-btn as-btn--light" href="<?= url('assessor/assessments.php') ?>"><i class="fas fa-clipboard-check"></i> Open Assessment Queue</a><a class="as-btn as-btn--glass" href="<?= url('assessor/decisions.php') ?>"><i class="fas fa-gavel"></i> View My Decisions</a></div></div><div class="as-hero__visual"><div class="as-quality-orb"><div class="as-quality-orb__icon"><i class="fas fa-scale-balanced"></i></div><strong>Consistent</strong><span>Evidence-led assessment</span></div></div></section>
+<section class="as-stats as-stats--5"><article class="as-stat"><span class="as-stat__icon as-stat__icon--blue"><i class="fas fa-list-check"></i></span><strong><?= number_format((int)$stats['assigned']) ?></strong><span>Assigned Attempts</span></article><article class="as-stat"><span class="as-stat__icon as-stat__icon--orange"><i class="fas fa-hourglass-half"></i></span><strong><?= number_format((int)$stats['pending']) ?></strong><span>Awaiting Review</span></article><article class="as-stat"><span class="as-stat__icon as-stat__icon--green"><i class="fas fa-circle-check"></i></span><strong><?= number_format((int)$stats['competent']) ?></strong><span>Competent</span></article><article class="as-stat"><span class="as-stat__icon as-stat__icon--red"><i class="fas fa-rotate-right"></i></span><strong><?= number_format((int)$stats['nyc']) ?></strong><span>Not Yet Competent</span></article><article class="as-stat"><span class="as-stat__icon as-stat__icon--purple"><i class="fas fa-shield-halved"></i></span><strong><?= number_format((int)$stats['moderation']) ?></strong><span>Awaiting Moderation</span></article></section>
+<div class="as-grid as-grid--main"><section class="as-card"><div class="as-card__header"><div><h3>Assessment Queue</h3><p>Submissions requiring your assessment.</p></div><a class="as-link" href="<?= url('assessor/assessments.php') ?>">View all <i class="fas fa-arrow-right"></i></a></div><?php if(!$queue):?><div class="as-empty"><div class="as-empty__icon"><i class="fas fa-clipboard-check"></i></div><strong>No assessments waiting</strong><span>New assigned submissions will appear here.</span></div><?php else:?><div class="as-queue"><?php foreach($queue as $x):$f=trim((string)$x['first_name']);$l=trim((string)$x['last_name']);?><a class="as-queue-item" href="<?= url('assessor/review_assessment.php?id='.(int)$x['attempt_id']) ?>"><div class="as-avatar"><?= e(as_initials($f,$l)) ?></div><div class="as-queue-item__body"><div class="as-queue-item__top"><strong><?= e(trim($f.' '.$l)?:'Participant') ?></strong><span class="as-status as-status--<?= e(as_class($x['status'])) ?>"><?= e(as_label($x['status'])) ?></span></div><span class="as-queue-item__outcome"><?= e($x['outcome_code']) ?> · <?= e($x['outcome_title']) ?></span><div class="as-queue-item__meta"><span><i class="fas fa-rotate"></i> Attempt <?= (int)$x['attempt_number'] ?></span><span><i class="fas fa-clock"></i> <?= e(as_datetime($x['submitted_at'])) ?></span></div></div><i class="fas fa-chevron-right as-queue-item__arrow"></i></a><?php endforeach;?></div><?php endif;?></section><section class="as-card"><div class="as-card__header"><div><h3>Assessment Principles</h3><p>Your audit and quality safeguards.</p></div></div><div class="as-principles"><div class="as-principle"><span class="as-principle__icon as-principle__icon--blue"><i class="fas fa-list-check"></i></span><div><strong>Criterion-level decisions</strong><span>Record result and feedback against every criterion.</span></div></div><div class="as-principle"><span class="as-principle__icon as-principle__icon--purple"><i class="fas fa-shield-halved"></i></span><div><strong>Moderation segregation</strong><span>An assessor cannot moderate their own assessment.</span></div></div><div class="as-principle"><span class="as-principle__icon as-principle__icon--green"><i class="fas fa-chart-line"></i></span><div><strong>Approved progress only</strong><span>Participant progress changes only after final approval.</span></div></div></div></section></div>
+<div class="as-security"><i class="fas fa-fingerprint"></i><div><strong>Audit-ready assessment environment</strong><span>Every decision is designed to retain criterion, result, feedback, supporting evidence, attempt and assessor details.</span></div></div>
+<?php require __DIR__.'/_layout_end.php';?>

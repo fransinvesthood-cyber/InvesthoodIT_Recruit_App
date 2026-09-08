@@ -1,0 +1,5 @@
+<?php
+$titles=['dashboard'=>'Dashboard','saved_searches'=>'Saved Searches','saved_search_view'=>'Saved Search Details','capability_packs'=>'Capability Packs','generate_pack'=>'Generate Pack','pack_view'=>'Capability Pack','privacy_rules'=>'Privacy Rules','reports'=>'Reports','activity_log'=>'Activity Log'];
+$title=$titles[$currentPage]??'Commercial Manager Portal';
+?>
+<header class="cm-navbar"><div class="cm-navbar__left"><button id="cmMenuButton"><i class="fas fa-bars"></i></button><div><span>Commercial Manager Workspace</span><h1><?= e($title) ?></h1></div></div><div class="cm-navbar__right"><button data-cm-theme-toggle><i class="fas fa-moon" data-cm-theme-icon></i></button><div class="cm-navbar__user"><div class="cm-avatar"><?= e($i??'CM') ?></div><span>Commercial Manager</span></div></div></header>

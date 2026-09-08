@@ -1,0 +1,14 @@
+<?php
+function rc_label(?string $v): string { $v=trim((string)$v); return $v===''?'Unknown':ucwords(str_replace('_',' ',$v)); }
+function rc_class(?string $v): string { return match(strtolower(trim((string)$v))){'verified','active','consented','available'=>'success','expired','revoked','unverified','inactive'=>'danger','pending','partial'=>'warning','scarce'=>'purple',default=>'info'}; }
+function rc_date(?string $v,string $fallback='Not set'): string { if(!$v)return $fallback; $t=strtotime($v); return $t?date('d M Y',$t):$fallback; }
+function rc_datetime(?string $v,string $fallback='Not available'): string { if(!$v)return $fallback; $t=strtotime($v); return $t?date('d M Y, H:i',$t):$fallback; }
+function rc_initials(string $f,string $l): string { $x=''; if($f!=='')$x.=strtoupper(substr($f,0,1)); if($l!=='')$x.=strtoupper(substr($l,0,1)); return $x?:'RC'; }
+function rc_has_table(mysqli $c,string $t): bool { static $m=[]; if(isset($m[$t]))return $m[$t]; $s=$c->real_escape_string($t); $r=$c->query("SHOW TABLES LIKE '{$s}'"); return $m[$t]=(bool)($r&&$r->num_rows); }
+function rc_csrf(): string { if(session_status()!==PHP_SESSION_ACTIVE)session_start(); if(empty($_SESSION['rc_csrf']))$_SESSION['rc_csrf']=bin2hex(random_bytes(32)); return $_SESSION['rc_csrf']; }
+function rc_verify_csrf(): void { $a=(string)($_SESSION['rc_csrf']??''); $b=(string)($_POST['csrf_token']??''); if($a===''||$b===''||!hash_equals($a,$b)){http_response_code(419);exit('Invalid or expired security token.');} }
+function rc_flash(string $type,string $message): void { if(session_status()!==PHP_SESSION_ACTIVE)session_start(); $_SESSION['rc_flash']=['type'=>$type,'message'=>$message]; }
+function rc_render_flash(): string { if(session_status()!==PHP_SESSION_ACTIVE)session_start(); $f=$_SESSION['rc_flash']??null; unset($_SESSION['rc_flash']); if(!$f)return ''; return '<div class="rc-alert rc-alert--'.htmlspecialchars($f['type']).'"><i class="fas fa-circle-info"></i><div>'.htmlspecialchars($f['message']).'</div></div>'; }
+function rc_taxonomy_version(mysqli $c): string { if(!rc_has_table($c,'skill_taxonomy_versions'))return 'unconfigured'; $r=$c->query("SELECT version_label FROM skill_taxonomy_versions WHERE is_current=1 ORDER BY id DESC LIMIT 1"); $x=$r?$r->fetch_assoc():null; return trim((string)($x['version_label']??'unconfigured')); }
+function rc_activity(mysqli $c,int $uid,string $action,string $description,?string $entityType=null,?int $entityId=null): void { if($uid<=0||!rc_has_table($c,'recruiter_activity_log'))return; $ip=$_SERVER['REMOTE_ADDR']??null; $ua=substr((string)($_SERVER['HTTP_USER_AGENT']??''),0,255); $s=$c->prepare("INSERT INTO recruiter_activity_log(recruiter_id,action,description,entity_type,entity_id,ip_address,user_agent) VALUES(?,?,?,?,?,?,?)"); if(!$s)return; $s->bind_param('isssiss',$uid,$action,$description,$entityType,$entityId,$ip,$ua); $s->execute(); $s->close(); }
+?>

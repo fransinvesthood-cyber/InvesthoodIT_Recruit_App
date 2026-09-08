@@ -1,0 +1,14 @@
+(function(){'use strict';
+const KEY='investhood-supervisor-theme';
+function currentTheme(){return document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light'}
+function savedTheme(){try{return localStorage.getItem(KEY)==='dark'?'dark':'light'}catch(e){return'light'}}
+function syncIcons(){const dark=currentTheme()==='dark';document.querySelectorAll('[data-supervisor-theme-icon]').forEach(i=>i.className=dark?'fas fa-sun':'fas fa-moon');document.querySelectorAll('[data-supervisor-theme-toggle]').forEach(b=>{b.title=dark?'Switch to light mode':'Switch to dark mode';b.setAttribute('aria-label',b.title)})}
+function setTheme(theme){const t=theme==='dark'?'dark':'light';document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem(KEY,t)}catch(e){}syncIcons()}
+function toggleTheme(){setTheme(currentTheme()==='dark'?'light':'dark')}
+window.setSupervisorTheme=setTheme;window.toggleSupervisorTheme=toggleTheme;
+function openMenu(){document.getElementById('supervisorSidebar')?.classList.add('supervisor-sidebar--open');document.getElementById('supervisorOverlay')?.classList.add('supervisor-overlay--visible');document.body.classList.add('supervisor-menu-open')}
+function closeMenu(){document.getElementById('supervisorSidebar')?.classList.remove('supervisor-sidebar--open');document.getElementById('supervisorOverlay')?.classList.remove('supervisor-overlay--visible');document.body.classList.remove('supervisor-menu-open')}
+function closeDropdowns(except=null){document.querySelectorAll('.sv-dropdown').forEach(d=>{if(d!==except)d.classList.remove('sv-dropdown--open')})}
+function init(){setTheme(savedTheme());document.querySelectorAll('[data-supervisor-theme-toggle]').forEach(b=>b.addEventListener('click',toggleTheme));document.getElementById('supervisorMenuButton')?.addEventListener('click',openMenu);document.getElementById('supervisorSidebarClose')?.addEventListener('click',closeMenu);document.getElementById('supervisorOverlay')?.addEventListener('click',closeMenu);document.querySelectorAll('.sv-nav__item').forEach(a=>a.addEventListener('click',()=>{if(innerWidth<=900)closeMenu()}));const nb=document.getElementById('supervisorNotificationButton'),nd=document.getElementById('supervisorNotificationDropdown');if(nb&&nd)nb.addEventListener('click',e=>{e.stopPropagation();const open=!nd.classList.contains('sv-dropdown--open');closeDropdowns(nd);if(open)nd.classList.add('sv-dropdown--open')});document.addEventListener('click',e=>{if(!e.target.closest('.sv-dropdown-wrap'))closeDropdowns()});document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();closeDropdowns()}});addEventListener('resize',()=>{if(innerWidth>900)closeMenu()})}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();

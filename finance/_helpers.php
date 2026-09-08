@@ -1,0 +1,17 @@
+<?php
+function fo_label(?string $v): string { $v=trim((string)$v); return $v===''?'Unknown':ucwords(str_replace('_',' ',$v)); }
+function fo_status_class(?string $v): string { return match(strtolower(trim((string)$v))){'approved','processed','paid','ready'=>'success','draft','pending','submitted','awaiting_approval'=>'warning','exception','rejected','failed'=>'danger','revised','superseded'=>'purple',default=>'info'}; }
+function fo_date(?string $v,string $f='Not set'): string { if(!$v)return $f; $t=strtotime($v); return $t?date('d M Y',$t):$f; }
+function fo_datetime(?string $v,string $f='Not available'): string { if(!$v)return $f; $t=strtotime($v); return $t?date('d M Y, H:i',$t):$f; }
+function fo_money($v): string { return 'R '.number_format((float)$v,2); }
+function fo_initials(string $f,string $l): string { $i=($f!==''?strtoupper(substr($f,0,1)):'').($l!==''?strtoupper(substr($l,0,1)):''); return $i?:'FO'; }
+function fo_has_table(mysqli $c,string $t): bool { static $cache=[]; if(isset($cache[$t]))return $cache[$t]; $s=$c->real_escape_string($t); $r=$c->query("SHOW TABLES LIKE '{$s}'"); return $cache[$t]=(bool)($r&&$r->num_rows); }
+function fo_csrf_token(): string { if(session_status()!==PHP_SESSION_ACTIVE)session_start(); if(empty($_SESSION['fo_csrf']))$_SESSION['fo_csrf']=bin2hex(random_bytes(32)); return $_SESSION['fo_csrf']; }
+function fo_verify_csrf(): void { $a=(string)($_SESSION['fo_csrf']??'');$b=(string)($_POST['csrf_token']??'');if($a===''||$b===''||!hash_equals($a,$b)){http_response_code(419);exit('Invalid security token.');} }
+function fo_flash(string $t,string $m): void { if(session_status()!==PHP_SESSION_ACTIVE)session_start(); $_SESSION['fo_flash']=['type'=>$t,'message'=>$m]; }
+function fo_local_flash(): string { if(session_status()!==PHP_SESSION_ACTIVE)session_start();$f=$_SESSION['fo_flash']??null;unset($_SESSION['fo_flash']);if(!$f)return'';$t=htmlspecialchars($f['type']??'info',ENT_QUOTES,'UTF-8');$m=htmlspecialchars($f['message']??'',ENT_QUOTES,'UTF-8');return '<div class="fo-alert fo-alert--'.$t.'"><i class="fas fa-circle-info"></i><div>'.$m.'</div></div>'; }
+function fo_config(mysqli $c): array { $d=['maker_checker_enabled'=>1,'default_daily_rate'=>150.00,'minimum_attendance_minutes'=>240]; if(!fo_has_table($c,'finance_stipend_settings'))return$d;$r=$c->query("SELECT * FROM finance_stipend_settings WHERE is_active=1 ORDER BY id DESC LIMIT 1");return array_merge($d,$r?$r->fetch_assoc()?:[]:[]); }
+function fo_can_approve(array $cfg,int $maker,int $user): bool { return (int)($cfg['maker_checker_enabled']??1)!==1 || $maker!==$user; }
+function fo_calc(int $minutes,float $rate,int $min): array { if($minutes<=0)return['days'=>0,'gross'=>0,'exception'=>'No approved attendance'];$days=$minutes/480;$gross=round($days*$rate,2);return['days'=>round($days,4),'gross'=>$gross,'exception'=>$minutes<$min?'Attendance below configured minimum':null]; }
+function fo_activity(mysqli $c,int $uid,string $a,string $d,?string $t=null,?int $eid=null): void { if(!fo_has_table($c,'finance_activity_log'))return;$ip=$_SERVER['REMOTE_ADDR']??null;$ua=substr((string)($_SERVER['HTTP_USER_AGENT']??''),0,255);$s=$c->prepare("INSERT INTO finance_activity_log(user_id,action,description,entity_type,entity_id,ip_address,user_agent) VALUES(?,?,?,?,?,?,?)");if(!$s)return;$s->bind_param('isssiss',$uid,$a,$d,$t,$eid,$ip,$ua);$s->execute();$s->close(); }
+?>
