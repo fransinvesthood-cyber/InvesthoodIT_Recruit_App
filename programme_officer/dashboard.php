@@ -1,20 +1,79 @@
 <?php
+/**
+ * ================================================
+ * INVESTHOOD IT - Programme Officer Dashboard
+ * ================================================
+ * Role: Programme Officer
+ */
+
 require_once __DIR__ . '/../includes/bootstrap.php';
+
 require_role('programme_officer');
-$user=current_user();$flashes=render_flashes();$currentPage='dashboard';$pageTitle='Programme Officer Dashboard';
-require_once __DIR__.'/_helpers.php';$conn=Database::getConnection();$officerId=(int)($user['id']??$user['user_id']??0);if($officerId<=0){http_response_code(403);exit('Invalid Programme Officer account.');}
-$scope=po_scope($conn,'p','c');$condition=$scope['condition'];$stats=['programmes'=>0,'cohorts'=>0,'candidates'=>0,'active'=>0,'completed'=>0];
-if($scope['mode']!=='none'){$sql="SELECT COUNT(DISTINCT p.id) programmes,COUNT(DISTINCT c.id) cohorts,COUNT(DISTINCT CASE WHEN cp.status<>'withdrawn' THEN cp.user_id END) candidates,COUNT(DISTINCT CASE WHEN cp.status='active' THEN cp.user_id END) active,COUNT(DISTINCT CASE WHEN cp.status='completed' THEN cp.user_id END) completed FROM programmes p LEFT JOIN cohorts c ON c.programme_id=p.id LEFT JOIN cohort_participants cp ON cp.cohort_id=c.id WHERE $condition";$stmt=$conn->prepare($sql);$stmt->bind_param('i',$officerId);$stmt->execute();$stats=array_merge($stats,$stmt->get_result()->fetch_assoc()?:[]);$stmt->close();}
-$rate=po_completion_rate((int)$stats['candidates'],(int)$stats['completed']);$programmes=[];
-if($scope['mode']!=='none'){$sql="SELECT p.id,p.name,p.type,p.status,p.start_date,p.end_date,COUNT(DISTINCT c.id) cohort_count,COUNT(DISTINCT CASE WHEN cp.status<>'withdrawn' THEN cp.user_id END) candidate_count,COUNT(DISTINCT CASE WHEN cp.status='completed' THEN cp.user_id END) completed_count FROM programmes p LEFT JOIN cohorts c ON c.programme_id=p.id LEFT JOIN cohort_participants cp ON cp.cohort_id=c.id WHERE $condition GROUP BY p.id,p.name,p.type,p.status,p.start_date,p.end_date ORDER BY CASE WHEN p.status='active' THEN 0 ELSE 1 END,p.start_date DESC,p.id DESC LIMIT 5";$stmt=$conn->prepare($sql);$stmt->bind_param('i',$officerId);$stmt->execute();$r=$stmt->get_result();while($row=$r->fetch_assoc())$programmes[]=$row;$stmt->close();}
-$recent=[];if($scope['mode']!=='none'){$sql="SELECT u.id candidate_id,u.first_name,u.last_name,u.email,cp.status participant_status,c.id cohort_id,c.name cohort_name,p.name programme_name FROM cohort_participants cp INNER JOIN cohorts c ON c.id=cp.cohort_id INNER JOIN programmes p ON p.id=c.programme_id INNER JOIN users u ON u.id=cp.user_id WHERE $condition ORDER BY COALESCE(cp.completed_at,cp.onboarded_at,cp.selected_at) DESC,cp.id DESC LIMIT 6";$stmt=$conn->prepare($sql);$stmt->bind_param('i',$officerId);$stmt->execute();$r=$stmt->get_result();while($row=$r->fetch_assoc())$recent[]=$row;$stmt->close();}
-$first=trim((string)($user['first_name']??'Programme Officer'));require __DIR__.'/_layout_start.php';
+
+$user = current_user();
+$flashes = render_flashes();
 ?>
-<?php if($scope['mode']==='none'): ?><div class="po-alert"><i class="fas fa-triangle-exclamation"></i><div><strong>Programme Officer assignment column not detected.</strong><span>The portal supports programmes.programme_officer_id or cohorts.programme_officer_id. Add one of these relationships or adjust po_scope() in _helpers.php.</span></div></div><?php endif; ?>
-<section class="po-hero"><div class="po-hero__content"><span class="po-hero__eyebrow"><i class="fas fa-sparkles"></i> Programme Operations</span><h2>Welcome back, <?= e($first?:'Programme Officer') ?>.</h2><p>Manage programmes, monitor cohort delivery, review candidate movement and keep programme operations on track from one workspace.</p><div class="po-hero__actions"><a href="<?= url('programme_officer/programmes.php') ?>" class="po-btn po-btn--light"><i class="fas fa-diagram-project"></i> My Programmes</a><a href="<?= url('programme_officer/candidates.php') ?>" class="po-btn po-btn--glass"><i class="fas fa-users"></i> Review Candidates</a></div></div><div class="po-hero__metric"><div class="po-ring" style="--progress:<?= $rate ?>"><strong><?= $rate ?>%</strong></div><span>Candidate completion</span></div></section>
-<section class="po-stats po-stats--5"><?php foreach([['blue','fa-diagram-project',$stats['programmes'],'My Programmes'],['purple','fa-layer-group',$stats['cohorts'],'Cohorts'],['orange','fa-users',$stats['candidates'],'Current Candidates'],['cyan','fa-person-running',$stats['active'],'Active'],['green','fa-circle-check',$stats['completed'],'Completed']] as $s): ?><article class="po-stat"><span class="po-stat__icon po-stat__icon--<?= $s[0] ?>"><i class="fas <?= $s[1] ?>"></i></span><strong><?= number_format((int)$s[2]) ?></strong><span><?= e($s[3]) ?></span></article><?php endforeach; ?></section>
-<div class="po-grid po-grid--main"><section class="po-card"><div class="po-card__header"><div><h3>Programme Portfolio</h3><p>Performance of programmes assigned to your workspace.</p></div><a class="po-link" href="<?= url('programme_officer/programmes.php') ?>">View all <i class="fas fa-arrow-right"></i></a></div><?php if(!$programmes): ?><div class="po-empty"><div class="po-empty__icon"><i class="fas fa-diagram-project"></i></div><strong>No programmes available</strong><span>Assigned programmes will appear here.</span></div><?php else: ?><div class="po-list"><?php foreach($programmes as $p): $total=(int)$p['candidate_count'];$done=(int)$p['completed_count'];$pr=po_completion_rate($total,$done); ?><a href="<?= url('programme_officer/cohorts.php?programme_id='.(int)$p['id']) ?>" class="po-list-item"><div class="po-list-item__icon"><i class="fas fa-diagram-project"></i></div><div class="po-list-item__main"><div class="po-list-item__title"><strong><?= e($p['name']) ?></strong><span class="po-status po-status--<?= e(po_status_class($p['status'])) ?>"><?= e(po_status_label($p['status'])) ?></span></div><span><?= e((string)($p['type']??'Programme')) ?> · <?= number_format((int)$p['cohort_count']) ?> cohorts · <?= number_format($total) ?> candidates</span><div class="po-progress"><div class="po-progress__track"><span style="width:<?= $pr ?>%"></span></div><small><?= $pr ?>% completed</small></div></div><i class="fas fa-chevron-right po-list-item__arrow"></i></a><?php endforeach; ?></div><?php endif; ?></section>
-<section class="po-card"><div class="po-card__header"><div><h3>Quick Actions</h3><p>Frequently used programme operations.</p></div></div><div class="po-quick-actions"><a href="<?= url('programme_officer/cohorts.php') ?>" class="po-quick-action"><span class="po-quick-action__icon"><i class="fas fa-layer-group"></i></span><div><strong>Review Cohorts</strong><span>Monitor cohort delivery and timelines.</span></div></a><a href="<?= url('programme_officer/candidates.php') ?>" class="po-quick-action"><span class="po-quick-action__icon"><i class="fas fa-users"></i></span><div><strong>Candidate Overview</strong><span>View participants across your programmes.</span></div></a><a href="<?= url('programme_officer/reports.php') ?>" class="po-quick-action"><span class="po-quick-action__icon"><i class="fas fa-chart-line"></i></span><div><strong>Programme Reports</strong><span>Review progress and completion metrics.</span></div></a></div></section></div>
-<section class="po-card"><div class="po-card__header"><div><h3>Recent Candidate Activity</h3><p>Latest candidate movement in your programme portfolio.</p></div><a class="po-link" href="<?= url('programme_officer/candidates.php') ?>">View candidates <i class="fas fa-arrow-right"></i></a></div><?php if(!$recent): ?><div class="po-empty"><div class="po-empty__icon"><i class="fas fa-users"></i></div><strong>No candidate activity yet</strong><span>Recent participant activity will appear here.</span></div><?php else: ?><div class="po-candidate-grid"><?php foreach($recent as $c):$fn=trim((string)($c['first_name']??''));$ln=trim((string)($c['last_name']??''));$name=trim($fn.' '.$ln)?:'Candidate'; ?><article class="po-person-card"><div class="po-person-card__top"><div class="po-avatar"><?= e(po_initials($fn,$ln)) ?></div><div class="po-person-card__identity"><strong><?= e($name) ?></strong><span><?= e($c['programme_name']) ?></span></div><span class="po-status po-status--<?= e(po_status_class($c['participant_status'])) ?>"><?= e(po_status_label($c['participant_status'])) ?></span></div><div class="po-person-card__footer"><span><i class="fas fa-layer-group"></i> <?= e($c['cohort_name']) ?></span><a href="<?= url('programme_officer/candidate_view.php?id='.(int)$c['candidate_id'].'&cohort_id='.(int)$c['cohort_id']) ?>">View <i class="fas fa-arrow-right"></i></a></div></article><?php endforeach; ?></div><?php endif; ?></section>
-<div class="po-security"><i class="fas fa-shield-halved"></i><div><strong>Programme Officer scoped access</strong><span>Information displayed here is limited to programmes or cohorts assigned to your Programme Officer account.</span></div></div>
-<?php require __DIR__.'/_layout_end.php'; ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Programme Officer Dashboard | Investhood IT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+</head>
+<body class="dashboard-page">
+  <div class="dashboard">
+    <aside class="sidebar">
+      <div class="sidebar__header">
+        <a href="<?= url('index.php') ?>" class="logo">
+          <span class="logo__icon"><i class="fas fa-code"></i></span>
+          <span class="logo__text">Investhood <span class="logo__accent">IT</span></span>
+        </a>
+      </div>
+      <nav class="sidebar__nav">
+        <div class="sidebar__section-label">Programme Officer</div>
+        <ul class="sidebar__menu">
+          <li><a href="#" class="sidebar__link active"><i class="fas fa-th-large"></i> Dashboard</a></li>
+          <li><a href="#" class="sidebar__link"><i class="fas fa-tasks"></i> Tasks</a></li>
+          <li><a href="#" class="sidebar__link"><i class="fas fa-users"></i> Candidate Support</a></li>
+        </ul>
+      </nav>
+      <div class="sidebar__footer">
+        <div class="sidebar__user">
+          <div class="sidebar__user-avatar"><img src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'PO+User') ?>&background=1a56db&color=fff&size=80" alt=""></div>
+          <div class="sidebar__user-info">
+            <span class="sidebar__user-name"><?= e($user['fullname'] ?? 'Programme Officer') ?></span>
+            <span class="sidebar__user-role">Programme Officer</span>
+          </div>
+        </div>
+        <a href="<?= url('auth/logout.php') ?>" class="sidebar__logout"><i class="fas fa-sign-out-alt"></i> Sign Out</a>
+      </div>
+    </aside>
+    <main class="dashboard__main">
+      <header class="dash-header">
+        <div class="dash-header__left">
+          <h1>Programme Officer Dashboard</h1>
+        </div>
+        <div class="dash-header__right">
+          <div class="dash-header__user">
+            <img src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'PO+User') ?>&background=1a56db&color=fff&size=80" alt="" class="dash-header__avatar">
+          </div>
+        </div>
+      </header>
+      <div class="dash-content">
+        <div class="welcome-card">
+          <div class="welcome-card__bg"></div>
+          <div class="welcome-card__content">
+            <h1 class="welcome-card__greeting">Welcome, <span class="text-gradient"><?= e($user['fullname'] ?? 'Programme Officer') ?></span></h1>
+            <p>Track programme activities, support candidates, and manage operational tasks.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

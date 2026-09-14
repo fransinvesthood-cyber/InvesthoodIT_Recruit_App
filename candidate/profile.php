@@ -120,18 +120,11 @@ $careerInterests = array_filter(array_map('trim', explode(',', (string)($profile
           <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar">
             <i class="fas fa-bars"></i>
           </button>
-          <div class="dash-header__search" id="dashSearch">
-            <i class="fas fa-search"></i>
-            <input type="text" class="dash-header__search-input" placeholder="Search my profile..." aria-label="Search profile">
-          </div>
         </div>
         <div class="dash-header__right">
           <button class="dash-header__icon-btn" id="themeToggle" aria-label="Toggle dark mode">
             <i class="fas fa-moon"></i>
           </button>
-          <a href="<?= url('candidate/dashboard.php') ?>" class="dash-header__icon-btn" aria-label="Back to dashboard" title="Back to dashboard">
-            <i class="fas fa-th-large"></i>
-          </a>
           <div class="dash-header__user">
             <img src="<?= url('candidate/avatar.php') ?>" alt="Profile" class="dash-header__avatar">
           </div>

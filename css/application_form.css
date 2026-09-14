@@ -747,7 +747,149 @@
 }
 
 /* ================================================
-   RESPONSIVE
+   DARK MODE SUPPORT
+body.dark-mode .app-form__card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .app-form__step-title {
+  color: #f1f5f9;
+}
+
+body.dark-mode .app-form__step-desc {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-form__label {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-form__input,
+body.dark-mode .app-form__textarea,
+body.dark-mode .app-form__select {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+body.dark-mode .app-form__input:focus,
+body.dark-mode .app-form__textarea:focus,
+body.dark-mode .app-form__select:focus {
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2);
+}
+
+body.dark-mode .app-form__input::placeholder,
+body.dark-mode .app-form__textarea::placeholder {
+  color: #64748b;
+}
+
+body.dark-mode .app-form__help {
+  color: #64748b;
+}
+
+body.dark-mode .app-form__info-grid {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .app-form__info-item {
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .app-form__info-label {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-form__info-value {
+  color: #e2e8f0;
+}
+
+body.dark-mode .app-form__doc-item {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .app-form__doc-item:hover {
+  border-color: #475569;
+}
+
+body.dark-mode .app-form__doc-name {
+  color: #e2e8f0;
+}
+
+body.dark-mode .app-form__doc-hint {
+  color: #64748b;
+}
+
+body.dark-mode .app-form__doc-file-hint {
+  color: #64748b;
+}
+
+body.dark-mode .app-form__doc-status {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-form__doc-status--uploaded {
+  color: #34d399;
+}
+
+body.dark-mode .app-form__doc-status--error {
+  color: #f87171;
+}
+
+body.dark-mode .app-form__save-status {
+  background: #0f172a;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+body.dark-mode .app-form__save-status--success {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+body.dark-mode .app-form__save-status--error {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+body.dark-mode .app-form__save-status--saving {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: rgba(6, 182, 212, 0.3);
+  color: #22d3ee;
+}
+
+body.dark-mode .app-form__upload-area {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .app-form__upload-area:hover {
+  border-color: var(--primary-light);
+}
+
+body.dark-mode .app-form__upload-icon {
+  color: #64748b;
+}
+
+body.dark-mode .app-form__upload-text {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-form__progress {
+  background: #334155;
+}
+
+body.dark-mode .app-form__progress-bar {
+  background: var(--primary);
+}
+
+/* ================================================
+    RESPONSIVE
    ================================================ */
 @media (max-width: 768px) {
   .app-form__card {

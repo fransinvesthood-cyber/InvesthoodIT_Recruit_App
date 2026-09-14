@@ -23,6 +23,7 @@ class Opportunity
 
     /**
      * All opportunities joined with their programme and cohort.
+     * Includes real application count from opportunity_applications table.
      *
      * @return array
      */
@@ -33,16 +34,23 @@ class Opportunity
                     p.name AS programme_name, p.type AS programme_type, p.status AS programme_status,
                     p.start_date AS programme_start, p.end_date AS programme_end,
                     c.name AS cohort_name, c.status AS cohort_status,
-                    c.start_date AS cohort_start, c.end_date AS cohort_end
+                    c.start_date AS cohort_start, c.end_date AS cohort_end,
+                    COALESCE(app_counts.real_applications, 0) AS applications_count
              FROM opportunities o
              LEFT JOIN programmes p ON p.id = o.programme_id
              LEFT JOIN cohorts c ON c.id = o.cohort_id
+             LEFT JOIN (
+                 SELECT opportunity_id, COUNT(*) AS real_applications
+                 FROM opportunity_applications
+                 GROUP BY opportunity_id
+             ) app_counts ON app_counts.opportunity_id = o.id
              ORDER BY o.created_at DESC"
         );
     }
 
     /**
      * Find a single opportunity with programme/cohort context.
+     * Includes real application count from opportunity_applications table.
      *
      * @param int $id
      * @return array|null
@@ -54,10 +62,16 @@ class Opportunity
                     p.name AS programme_name, p.type AS programme_type, p.status AS programme_status,
                     p.start_date AS programme_start, p.end_date AS programme_end,
                     c.name AS cohort_name, c.status AS cohort_status,
-                    c.start_date AS cohort_start, c.end_date AS cohort_end
+                    c.start_date AS cohort_start, c.end_date AS cohort_end,
+                    COALESCE(app_counts.real_applications, 0) AS applications_count
              FROM opportunities o
              LEFT JOIN programmes p ON p.id = o.programme_id
              LEFT JOIN cohorts c ON c.id = o.cohort_id
+             LEFT JOIN (
+                 SELECT opportunity_id, COUNT(*) AS real_applications
+                 FROM opportunity_applications
+                 GROUP BY opportunity_id
+             ) app_counts ON app_counts.opportunity_id = o.id
              WHERE o.id = ?
              LIMIT 1",
             'i',
@@ -84,16 +98,22 @@ class Opportunity
 
     /**
      * Aggregate positions / applications statistics.
+     * Uses real application count from opportunity_applications table.
      *
      * @return array ['total_positions'=>int, 'total_applications'=>int, 'avg_applications'=>float]
      */
     public static function aggregateStats(): array
     {
         $row = Database::fetchOne(
-            "SELECT COALESCE(SUM(available_positions),0) AS total_positions,
-                    COALESCE(SUM(applications_count),0) AS total_applications,
-                    COUNT(*) AS total_opps
-             FROM opportunities"
+            "SELECT COALESCE(SUM(o.available_positions),0) AS total_positions,
+                    COALESCE(SUM(app_counts.real_applications),0) AS total_applications,
+                    COUNT(DISTINCT o.id) AS total_opps
+             FROM opportunities o
+             LEFT JOIN (
+                 SELECT opportunity_id, COUNT(*) AS real_applications
+                 FROM opportunity_applications
+                 GROUP BY opportunity_id
+             ) app_counts ON app_counts.opportunity_id = o.id"
         );
         $totalPositions = (int) ($row['total_positions'] ?? 0);
         $totalApplications = (int) ($row['total_applications'] ?? 0);

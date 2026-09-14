@@ -237,5 +237,231 @@ class User
             [$id]
         );
     }
+
+    /**
+     * Get all users with their roles, with optional search and filters.
+     *
+     * @param string $search Search term for name or email
+     * @param string $roleSlug Filter by role slug
+     * @param string $status Filter by account status
+     * @param int $page Page number (1-based)
+     * @param int $perPage Items per page
+     * @return array ['users' => array, 'total' => int, 'pages' => int]
+     */
+    public static function adminList(string $search = '', string $roleSlug = '', string $status = '', int $page = 1, int $perPage = 15): array
+    {
+        $where = [];
+        $types = '';
+        $params = [];
+
+        if ($search !== '') {
+            $where[] = "(u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR u.username LIKE ?)";
+            $searchTerm = '%' . $search . '%';
+            $types .= 'ssss';
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+        }
+
+        if ($roleSlug !== '') {
+            $where[] = "r.slug = ?";
+            $types .= 's';
+            $params[] = $roleSlug;
+        }
+
+        if ($status !== '') {
+            $where[] = "u.status = ?";
+            $types .= 's';
+            $params[] = $status;
+        }
+
+        $whereSql = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
+
+        // Get total count
+        $countRow = Database::fetchOne(
+            "SELECT COUNT(*) AS cnt FROM users u INNER JOIN roles r ON r.id = u.role_id {$whereSql}",
+            $types,
+            $params
+        );
+        $total = (int) ($countRow['cnt'] ?? 0);
+        $pages = (int) ceil($total / $perPage);
+        $page = max(1, min($page, $pages ?: 1));
+        $offset = ($page - 1) * $perPage;
+
+        $users = Database::fetchAll(
+            "SELECT u.id, u.first_name, u.last_name, u.username, u.email, u.status,
+                    u.last_login, u.created_at, u.updated_at,
+                    r.name AS role_name, r.slug AS role_slug
+             FROM users u
+             INNER JOIN roles r ON r.id = u.role_id
+             {$whereSql}
+             ORDER BY u.created_at DESC
+             LIMIT ? OFFSET ?",
+            $types . 'ii',
+            array_merge($params, [$perPage, $offset])
+        );
+
+        return [
+            'users' => $users,
+            'total' => $total,
+            'pages' => $pages,
+            'page' => $page,
+        ];
+    }
+
+    /**
+     * Count users by role slug.
+     *
+     * @param string $roleSlug
+     * @return int
+     */
+    public static function countByRole(string $roleSlug): int
+    {
+        $row = Database::fetchOne(
+            "SELECT COUNT(*) AS cnt FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE r.slug = ?",
+            's',
+            [$roleSlug]
+        );
+        return (int) ($row['cnt'] ?? 0);
+    }
+
+    /**
+     * Count users by status.
+     *
+     * @param string $status
+     * @return int
+     */
+    public static function countByStatus(string $status): int
+    {
+        $row = Database::fetchOne(
+            "SELECT COUNT(*) AS cnt FROM users WHERE status = ?",
+            's',
+            [$status]
+        );
+        return (int) ($row['cnt'] ?? 0);
+    }
+
+    /**
+     * Count total users.
+     *
+     * @return int
+     */
+    public static function countAll(): int
+    {
+        $row = Database::fetchOne("SELECT COUNT(*) AS cnt FROM users");
+        return (int) ($row['cnt'] ?? 0);
+    }
+
+    /**
+     * Check if a user has related records that would prevent deletion.
+     *
+     * @param int $userId
+     * @return array ['can_delete' => bool, 'reasons' => array]
+     */
+    public static function canDelete(int $userId): array
+    {
+        $reasons = [];
+
+        // Check for applications
+        $row = Database::fetchOne("SELECT COUNT(*) AS cnt FROM applications WHERE candidate_id = ?", 'i', [$userId]);
+        if ($row && (int) $row['cnt'] > 0) {
+            $reasons[] = 'Has ' . $row['cnt'] . ' application(s)';
+        }
+
+        // Check for candidate profile
+        $row = Database::fetchOne("SELECT COUNT(*) AS cnt FROM candidate_profiles WHERE user_id = ?", 'i', [$userId]);
+        if ($row && (int) $row['cnt'] > 0) {
+            $reasons[] = 'Has candidate profile data';
+        }
+
+        // Check for cohort participations
+        $row = Database::fetchOne("SELECT COUNT(*) AS cnt FROM cohort_participants WHERE user_id = ?", 'i', [$userId]);
+        if ($row && (int) $row['cnt'] > 0) {
+            $reasons[] = 'Has cohort participation records';
+        }
+
+        // Check for documents
+        $row = Database::fetchOne("SELECT COUNT(*) AS cnt FROM documents WHERE user_id = ?", 'i', [$userId]);
+        if ($row && (int) $row['cnt'] > 0) {
+            $reasons[] = 'Has uploaded documents';
+        }
+
+        // Check for qualifications
+        $row = Database::fetchOne("SELECT COUNT(*) AS cnt FROM qualifications WHERE user_id = ?", 'i', [$userId]);
+        if ($row && (int) $row['cnt'] > 0) {
+            $reasons[] = 'Has qualification records';
+        }
+
+        // Check for work experience
+        $row = Database::fetchOne("SELECT COUNT(*) AS cnt FROM work_experience WHERE user_id = ?", 'i', [$userId]);
+        if ($row && (int) $row['cnt'] > 0) {
+            $reasons[] = 'Has work experience records';
+        }
+
+        return [
+            'can_delete' => empty($reasons),
+            'reasons' => $reasons,
+        ];
+    }
+
+    /**
+     * Permanently delete a user and their related records.
+     * Only call after checking canDelete().
+     *
+     * @param int $userId
+     * @return bool
+     */
+    public static function delete(int $userId): bool
+    {
+        // Deactivate all sessions first
+        UserSession::deactivateAllForUser($userId);
+
+        // Delete remember me tokens
+        RememberMeToken::deleteAllForUser($userId);
+
+        // Delete the user (cascades will handle related records with ON DELETE CASCADE)
+        Database::execute("DELETE FROM users WHERE id = ?", 'i', [$userId]);
+        return true;
+    }
+
+    /**
+     * Update user role.
+     *
+     * @param int $userId
+     * @param int $roleId
+     * @return bool
+     */
+    public static function updateRole(int $userId, int $roleId): bool
+    {
+        return Database::execute(
+            "UPDATE users SET role_id = ?, updated_at = NOW() WHERE id = ?",
+            'ii',
+            [$roleId, $userId]
+        ) >= 0;
+    }
+
+    /**
+     * Update user status.
+     *
+     * @param int $userId
+     * @param string $status
+     * @return bool
+     */
+    public static function updateStatus(int $userId, string $status): bool
+    {
+        $result = Database::execute(
+            "UPDATE users SET status = ?, updated_at = NOW() WHERE id = ?",
+            'si',
+            [$status, $userId]
+        );
+
+        // If deactivating, also deactivate all sessions
+        if (in_array($status, [STATUS_SUSPENDED, STATUS_DISABLED], true)) {
+            UserSession::deactivateAllForUser($userId);
+        }
+
+        return $result >= 0;
+    }
 }
 

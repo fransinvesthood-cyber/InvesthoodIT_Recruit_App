@@ -21,12 +21,13 @@ CREATE TABLE `applications` (
   `application_reference` VARCHAR(20)  NOT NULL,
   `candidate_id`         INT UNSIGNED NOT NULL,
   `opportunity_id`         INT UNSIGNED NOT NULL,
-  `status`              ENUM('draft','submitted','eligibility_review','screened','assessment','interview','waitlisted','selected','rejected','withdrawn','expired')
+  `status`              ENUM('draft','submitted','under_review','shortlisted','assessment','interview_scheduled','interview_completed','selected','offer_sent','offer_accepted','offer_declined','rejected','withdrawn','on_hold')
                                   NOT NULL DEFAULT 'draft',
   `created_at`          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `submitted_at`        DATETIME      NULL,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_applications_reference` (`application_reference`),
   UNIQUE KEY `uq_applications_candidate_opportunity` (`candidate_id`,`opportunity_id`),
   KEY `idx_applications_candidate` (`candidate_id`, `status`),
   KEY `idx_applications_opportunity` (`opportunity_id`),

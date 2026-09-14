@@ -6,6 +6,33 @@
 
 document.addEventListener('DOMContentLoaded', function () {
 
+  // ============================================
+  // 0. DARK MODE — Restore saved theme on ALL dashboard pages
+  //    (must run before early return so all pages get the theme)
+  // ============================================
+  var savedThemeDash = localStorage.getItem('theme');
+  if (savedThemeDash === 'dark') {
+    document.body.classList.add('dark-mode');
+  }
+  var themeToggleDash = document.getElementById('themeToggle');
+  if (themeToggleDash) {
+    var iconDash = themeToggleDash.querySelector('i');
+    if (iconDash) {
+      iconDash.className = document.body.classList.contains('dark-mode') ? 'fas fa-sun' : 'fas fa-moon';
+    }
+    themeToggleDash.addEventListener('click', function () {
+      document.body.classList.toggle('dark-mode');
+      var icon = this.querySelector('i');
+      if (document.body.classList.contains('dark-mode')) {
+        icon.className = 'fas fa-sun';
+        localStorage.setItem('theme', 'dark');
+      } else {
+        icon.className = 'fas fa-moon';
+        localStorage.setItem('theme', 'light');
+      }
+    });
+  }
+
   var dashContent = document.getElementById('dashContent');
   if (!dashContent) return; // Not a dashboard page
 
@@ -85,23 +112,7 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   // ============================================
-  // 2. DARK MODE TOGGLE
-  // ============================================
-  var themeToggle = document.getElementById('themeToggle');
-  if (themeToggle) {
-    themeToggle.addEventListener('click', function () {
-      document.body.classList.toggle('dark-mode');
-      var icon = this.querySelector('i');
-      if (document.body.classList.contains('dark-mode')) {
-        icon.className = 'fas fa-sun';
-      } else {
-        icon.className = 'fas fa-moon';
-      }
-    });
-  }
-
-  // ============================================
-  // 3. OVERVIEW COUNTER ANIMATION
+  // 2. OVERVIEW COUNTER ANIMATION
   // ============================================
   function animateNumber(el) {
     var target = parseInt(el.getAttribute('data-count'), 10);
@@ -131,144 +142,105 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   // ============================================
-  // 4. DASHBOARD OPPORTUNITIES
+  // 4. DASHBOARD OPPORTUNITIES (Server-rendered)
   // ============================================
-  var dashOpps = [
-    { id: 1, title: 'Junior Software Developer', type: 'graduate', typeLabel: 'Graduate Programme', location: 'Johannesburg, Gauteng', province: 'gauteng', closingDate: '30 Jun 2025', employmentType: 'Full-time', qualification: "Bachelor's Degree in CS or related", match: 95 },
-    { id: 2, title: 'IT Support Learnership', type: 'learnership', typeLabel: 'Learnership', location: 'Cape Town, Western Cape', province: 'western-cape', closingDate: '15 Jul 2025', employmentType: 'Fixed-term', qualification: 'Grade 12 + NQF Level 4', match: 88 },
-    { id: 3, title: 'Cloud Engineering Intern', type: 'internship', typeLabel: 'Internship', location: 'Durban, KZN', province: 'kwazulu-natal', closingDate: '31 Aug 2025', employmentType: 'Internship', qualification: "Bachelor's in IT or Engineering", match: 92 },
-    { id: 4, title: 'Data Analytics Graduate', type: 'graduate', typeLabel: 'Graduate Programme', location: 'Johannesburg, Gauteng', province: 'gauteng', closingDate: '30 Jun 2025', employmentType: 'Full-time', qualification: 'Honours in Data Science', match: 78 },
-    { id: 5, title: 'Cyber Security Learnership', type: 'learnership', typeLabel: 'Learnership', location: 'Pretoria, Gauteng', province: 'gauteng', closingDate: '15 Sep 2025', employmentType: 'Fixed-term', qualification: 'NQF Level 5 Cyber Security', match: 85 },
-    { id: 6, title: 'WIL - IT Placement', type: 'wil', typeLabel: 'Work Integrated Learning', location: 'Port Elizabeth, EC', province: 'eastern-cape', closingDate: '30 Jul 2025', employmentType: 'Contract', qualification: '3rd Year IT Degree', match: 90 }
-  ];
-
-  var dashRecOpps = [
-    { id: 7, title: 'Full-Stack Developer Graduate', type: 'graduate', typeLabel: 'Graduate', location: 'Johannesburg', closingDate: '15 Aug 2025', match: 97 },
-    { id: 8, title: 'DevOps Engineering Intern', type: 'internship', typeLabel: 'Internship', location: 'Cape Town', closingDate: '30 Sep 2025', match: 93 },
-    { id: 9, title: 'AI/ML Learnership', type: 'learnership', typeLabel: 'Learnership', location: 'Durban', closingDate: '31 Oct 2025', match: 89 }
-  ];
 
   var oppGrid = document.getElementById('oppGrid');
-  var oppRecGrid = document.getElementById('oppRecommendedGrid');
 
-  function renderOpps(data) {
+  // Initialize save buttons on server-rendered opportunity cards
+  function initOppSaveButtons() {
     if (!oppGrid) return;
-    if (!data.length) {
-      oppGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-light);">No opportunities match your criteria.</div>';
-      return;
-    }
-    oppGrid.innerHTML = data.map(function (o) {
-      return '<div class="opp-card">' +
-        '<div class="opp-card__header">' +
-          '<h3 class="opp-card__title">' + o.title + '</h3>' +
-          '<div><span class="opp-card__type">' + o.typeLabel + '</span><span class="opp-card__match"><i class="fas fa-star"></i> ' + o.match + '%</span></div>' +
-        '</div>' +
-        '<div class="opp-card__details">' +
-          '<div class="opp-card__detail"><i class="fas fa-map-marker-alt"></i> ' + o.location + '</div>' +
-          '<div class="opp-card__detail"><i class="fas fa-calendar-alt"></i> Closes: ' + o.closingDate + '</div>' +
-          '<div class="opp-card__detail"><i class="fas fa-briefcase"></i> ' + o.employmentType + '</div>' +
-          '<div class="opp-card__detail"><i class="fas fa-check-circle"></i> ' + o.typeLabel + '</div>' +
-        '</div>' +
-        '<div class="opp-card__qual"><i class="fas fa-graduation-cap"></i> ' + o.qualification + '</div>' +
-        '<div class="opp-card__actions">' +
-          '<a href="#" class="btn btn--primary btn--sm">Apply Now</a>' +
-          '<button class="opp-card__save" data-id="' + o.id + '" aria-label="Save"><i class="far fa-bookmark"></i></button>' +
-        '</div>';
-    }).join('');
-    oppGrid.querySelectorAll('.opp-card__save').forEach(function (btn) {
+    oppGrid.querySelectorAll('.opp-card__save-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        this.classList.toggle('saved');
-        this.querySelector('i').className = this.classList.contains('saved') ? 'fas fa-bookmark' : 'far fa-bookmark';
-        if (this.classList.contains('saved') && window.InvesthoodNotifications) {
+        var oppId = this.getAttribute('data-opp-id');
+        var isSaved = this.getAttribute('data-saved') === '1';
+        var btnEl = this;
+        btnEl.classList.toggle('is-saved');
+        btnEl.setAttribute('data-saved', isSaved ? '0' : '1');
+        var icon = btnEl.querySelector('i');
+        if (icon) icon.className = isSaved ? 'far fa-bookmark' : 'fas fa-bookmark';
+        btnEl.setAttribute('aria-label', isSaved ? 'Save opportunity' : 'Remove from saved');
+        if (!isSaved && window.InvesthoodNotifications) {
           window.InvesthoodNotifications.show('success', 'Saved!', 'Opportunity added to your saved list.');
         }
       });
     });
   }
 
-  function renderRecOpps() {
-    if (!oppRecGrid) return;
-    oppRecGrid.innerHTML = dashRecOpps.map(function (o) {
-      return '<div class="opp-card">' +
-        '<div class="opp-card__header">' +
-          '<h3 class="opp-card__title">' + o.title + '</h3>' +
-          '<span class="opp-card__match"><i class="fas fa-star"></i> ' + o.match + '%</span>' +
-        '</div>' +
-        '<div class="opp-card__details">' +
-          '<div class="opp-card__detail"><i class="fas fa-map-marker-alt"></i> ' + o.location + '</div>' +
-          '<div class="opp-card__detail"><i class="fas fa-calendar-alt"></i> Closes: ' + o.closingDate + '</div>' +
-        '</div>' +
-        '<div class="opp-card__actions">' +
-          '<a href="#" class="btn btn--primary btn--sm">Apply</a>' +
-          '<button class="opp-card__save" data-id="r' + o.id + '" aria-label="Save"><i class="far fa-bookmark"></i></button>' +
-        '</div>';
-    }).join('');
-    oppRecGrid.querySelectorAll('.opp-card__save').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        this.classList.toggle('saved');
-        this.querySelector('i').className = this.classList.contains('saved') ? 'fas fa-bookmark' : 'far fa-bookmark';
-      });
-    });
-  }
-
-  renderOpps(dashOpps);
-  renderRecOpps();
-
-  // Filtering
+  // Filtering for server-rendered cards
   var oppSearch = document.getElementById('oppSearchInput');
   var oppFilterType = document.getElementById('oppFilterType');
   var oppFilterLoc = document.getElementById('oppFilterLocation');
-  var oppFilterEmp = document.getElementById('oppFilterEmployment');
+  var oppFilterArr = document.getElementById('oppFilterEmployment');
 
   function filterDashOpps() {
+    if (!oppGrid) return;
     var q = oppSearch ? oppSearch.value.toLowerCase().trim() : '';
     var t = oppFilterType ? oppFilterType.value : 'all';
     var l = oppFilterLoc ? oppFilterLoc.value : 'all';
-    var e = oppFilterEmp ? oppFilterEmp.value : 'all';
-    var filtered = dashOpps.filter(function (o) {
-      var mq = !q || o.title.toLowerCase().indexOf(q) !== -1 || o.location.toLowerCase().indexOf(q) !== -1;
-      var mt = t === 'all' || o.type === t;
-      var ml = l === 'all' || o.province === l;
-      var me = e === 'all' || o.employmentType.toLowerCase().indexOf(e.replace('-', ' ')) !== -1;
-      return mq && mt && ml && me;
+    var a = oppFilterArr ? oppFilterArr.value : 'all';
+    var cards = oppGrid.querySelectorAll('.opp-card');
+    var visibleCount = 0;
+    cards.forEach(function (card) {
+      var title = (card.querySelector('.opp-card__title') || {}).textContent || '';
+      title = title.toLowerCase();
+      var type = card.getAttribute('data-type') || '';
+      var province = card.getAttribute('data-province') || '';
+      var arrangement = card.getAttribute('data-arrangement') || '';
+      var desc = (card.querySelector('.opp-card__description') || {}).textContent || '';
+      desc = desc.toLowerCase();
+      var mq = !q || title.indexOf(q) !== -1 || desc.indexOf(q) !== -1;
+      var mt = t === 'all' || type === t;
+      var ml = l === 'all' || province === l;
+      var ma = a === 'all' || arrangement === a;
+      if (mq && mt && ml && ma) {
+        card.style.display = '';
+        visibleCount++;
+      } else {
+        card.style.display = 'none';
+      }
     });
-    renderOpps(filtered);
+    var noResultsMsg = oppGrid.querySelector('.opp-filter-no-results');
+    if (visibleCount === 0 && cards.length > 0) {
+      if (!noResultsMsg) {
+        noResultsMsg = document.createElement('div');
+        noResultsMsg.className = 'opp-filter-no-results';
+        noResultsMsg.style.cssText = 'grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-light);';
+        noResultsMsg.innerHTML = '<i class="fas fa-search" style="font-size:2rem;margin-bottom:1rem;display:block;"></i>No opportunities match your search criteria.';
+        oppGrid.appendChild(noResultsMsg);
+      }
+    } else if (noResultsMsg) {
+      noResultsMsg.remove();
+    }
   }
 
   if (oppSearch) oppSearch.addEventListener('input', filterDashOpps);
   if (oppFilterType) oppFilterType.addEventListener('change', filterDashOpps);
   if (oppFilterLoc) oppFilterLoc.addEventListener('change', filterDashOpps);
-  if (oppFilterEmp) oppFilterEmp.addEventListener('change', filterDashOpps);
+  if (oppFilterArr) oppFilterArr.addEventListener('change', filterDashOpps);
+
+  // Initialize save buttons on page load
+  initOppSaveButtons();
 
   // ============================================
-  // 5. APPLICATION TRACKER
+  // 5. APPLICATION TRACKER (Server-rendered)
   // ============================================
+  // The Application Tracker is now rendered server-side in dashboard.php
+  // No JavaScript initialization needed for the tracker cards
+  
+  // Optional: Add interaction for View Opportunity buttons if needed
   var appTracker = document.getElementById('appTracker');
-  var appStatuses = ['Draft', 'Submitted', 'Eligibility Review', 'Screening', 'Assessment', 'Interview', 'Selected'];
-  var appsData = [
-    { title: 'Junior Software Developer', date: '15 May 2025', idx: 5, status: 'Interview' },
-    { title: 'Cloud Engineering Intern', date: '10 Apr 2025', idx: 3, status: 'Screening' },
-    { title: 'Data Analytics Graduate', date: '20 Mar 2025', idx: 6, status: 'Selected' }
-  ];
-
-  function renderApps() {
-    if (!appTracker) return;
-    appTracker.innerHTML = appsData.map(function (a) {
-      var tl = appStatuses.map(function (s, i) {
-        var cls = i < a.idx ? 'timeline-step--done' : i === a.idx ? 'timeline-step--current' : 'timeline-step--waiting';
-        var icon = i < a.idx ? '<i class="fas fa-check"></i>' : i === a.idx ? '<i class="fas fa-circle"></i>' : '';
-        var line = i < appStatuses.length - 1 ? '<div class="timeline-step__line"></div>' : '';
-        return '<div class="timeline-step ' + cls + '"><div class="timeline-step__dot">' + icon + '</div>' + line + '<span class="timeline-step__label">' + s + '</span></div>';
-      }).join('');
-      var pct = Math.round((a.idx + 1) / appStatuses.length * 100);
-      return '<div class="app-card">' +
-        '<div class="app-card__header"><h3 class="app-card__title">' + a.title + '</h3><span class="app-card__date"><i class="fas fa-calendar-alt"></i> ' + a.date + '</span></div>' +
-        '<div class="app-card__timeline">' + tl + '</div>' +
-        '<div class="app-card__progress"><div class="app-card__progress-bar"><div class="app-card__progress-fill" style="width:' + pct + '%"></div><span class="app-card__progress-label">Current: <strong>' + a.status + '</strong> &middot; ' + pct + '% complete</span></div>' +
-        '<div class="app-card__footer"><a href="#" class="btn btn--primary btn--sm">View Details</a><a href="#" class="btn btn--ghost btn--sm">Withdraw</a></div>';
-    }).join('');
+  if (appTracker) {
+    // Animate progress bars on page load
+    var progressFills = appTracker.querySelectorAll('.app-card__progress-fill');
+    progressFills.forEach(function(fill) {
+      var targetWidth = fill.style.width;
+      fill.style.width = '0%';
+      setTimeout(function() {
+        fill.style.width = targetWidth;
+      }, 100);
+    });
   }
-  renderApps();
 
   // ============================================
   // 6. PROGRAMME MANAGEMENT

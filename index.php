@@ -3,10 +3,71 @@
  * ================================================
  * INVESTHOOD IT - Landing Page
  * ================================================
- * Public landing page with flash notification support.
+ * Public landing page with dynamic database content.
  */
 
 require_once __DIR__ . '/includes/bootstrap.php';
+
+// =========================================================
+// FETCH DYNAMIC DATA FROM DATABASE
+// =========================================================
+
+// Initialize data arrays
+$featuredProgrammes = [];
+$openOpportunities = [];
+$activeOpportunitiesCount = 0;
+$activeProgrammesCount = 0;
+$totalCandidatesCount = 0;
+$placedCandidatesCount = 0;
+
+try {
+    $programmesResult = Database::fetchAll("SELECT p.id, p.name, p.type, p.description, p.duration, p.start_date, p.end_date, COUNT(DISTINCT c.id) AS cohort_count, COUNT(DISTINCT o.id) AS opportunity_count FROM programmes p LEFT JOIN cohorts c ON c.programme_id = p.id LEFT JOIN opportunities o ON o.programme_id = p.id AND o.status = 'published' WHERE p.status = 'active' GROUP BY p.id ORDER BY p.created_at DESC LIMIT 6");
+    $featuredProgrammes = $programmesResult ?? [];
+} catch (Exception $e) {
+    error_log('[Landing Page] Error fetching programmes: ' . $e->getMessage());
+    $featuredProgrammes = [];
+}
+
+try {
+    $opportunitiesResult = Database::fetchAll("SELECT o.id, o.title, o.type, o.organisation, o.short_description, o.province, o.city, o.work_arrangement, o.application_close_date, o.available_positions, o.applications_count, p.id AS programme_id, p.name AS programme_name, p.type AS programme_type, c.id AS cohort_id, c.name AS cohort_name FROM opportunities o INNER JOIN programmes p ON p.id = o.programme_id LEFT JOIN cohorts c ON c.id = o.cohort_id WHERE o.status = 'published' AND p.status = 'active' ORDER BY o.created_at DESC LIMIT 6");
+    $openOpportunities = $opportunitiesResult ?? [];
+} catch (Exception $e) {
+    error_log('[Landing Page] Error fetching opportunities: ' . $e->getMessage());
+    $openOpportunities = [];
+}
+
+try {
+    $result = Database::fetchOne("SELECT COUNT(*) AS cnt FROM opportunities WHERE status = 'published' AND programme_id IN (SELECT id FROM programmes WHERE status = 'active')");
+    $activeOpportunitiesCount = (int) ($result['cnt'] ?? 0);
+} catch (Exception $e) {
+    error_log('[Landing Page] Error counting opportunities: ' . $e->getMessage());
+    $activeOpportunitiesCount = 0;
+}
+
+try {
+    $result = Database::fetchOne("SELECT COUNT(*) AS cnt FROM programmes WHERE status = 'active'");
+    $activeProgrammesCount = (int) ($result['cnt'] ?? 0);
+} catch (Exception $e) {
+    error_log('[Landing Page] Error counting programmes: ' . $e->getMessage());
+    $activeProgrammesCount = 0;
+}
+
+try {
+    $result = Database::fetchOne("SELECT COUNT(*) AS cnt FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE r.slug = 'candidate'");
+    $totalCandidatesCount = (int) ($result['cnt'] ?? 0);
+} catch (Exception $e) {
+    error_log('[Landing Page] Error counting candidates: ' . $e->getMessage());
+    $totalCandidatesCount = 0;
+}
+
+try {
+    $result = Database::fetchOne("SELECT COUNT(DISTINCT candidate_id) AS cnt FROM applications WHERE status = 'submitted'");
+    $placedCandidatesCount = (int) ($result['cnt'] ?? 0);
+} catch (Exception $e) {
+    error_log('[Landing Page] Error counting placements: ' . $e->getMessage());
+    $placedCandidatesCount = 0;
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -35,13 +96,13 @@ require_once __DIR__ . '/includes/bootstrap.php';
           <li><a href="#home" class="nav__link active">Home</a></li>
           <li><a href="#about" class="nav__link">About Us</a></li>
           <li><a href="#programmes" class="nav__link">Programmes</a></li>
-          <li><a href="#opportunities" class="nav__link">Opportunities</a></li>
+          <!-- <li><a href="#opportunities" class="nav__link">Opportunities</a></li> -->
           <li><a href="#talent" class="nav__link">Talent Community</a></li>
           <li><a href="#skills" class="nav__link">Scarce Skills</a></li>
           <li><a href="#contact" class="nav__link">Contact Us</a></li>
         </ul>
         <div class="nav__actions">
-<a href="login.php" class="btn btn--outline btn--sm">Login</a>
+          <a href="login.php" class="btn btn--outline btn--sm">Login</a>
           <a href="register.php" class="btn btn--primary btn--sm">Register</a>
         </div>
       </nav>
@@ -55,6 +116,8 @@ require_once __DIR__ . '/includes/bootstrap.php';
 
   <!-- ===== HERO ===== -->
   <section class="hero" id="home">
+    <!-- ===== GRADUATION CAP ANIMATION ===== -->
+    <div class="graduation-caps-container" id="graduationCaps" aria-hidden="true"></div>
     <div class="hero__bg"></div>
     <div class="container hero__container">
       <div class="hero__content">
@@ -71,20 +134,20 @@ require_once __DIR__ . '/includes/bootstrap.php';
         </div>
       </div>
       <div class="hero__stats">
-        <div class="stat-card" data-count="24">
-          <span class="stat-card__number"><span class="counter" data-target="24">0</span>+</span>
+        <div class="stat-card" data-count="<?= e($activeProgrammesCount) ?>">
+          <span class="stat-card__number"><span class="counter" data-target="<?= e($activeProgrammesCount) ?>">0</span>+</span>
           <span class="stat-card__label">Active Programmes</span>
         </div>
-        <div class="stat-card" data-count="156">
-          <span class="stat-card__number"><span class="counter" data-target="156">0</span>+</span>
+        <div class="stat-card" data-count="<?= e($activeOpportunitiesCount) ?>">
+          <span class="stat-card__number"><span class="counter" data-target="<?= e($activeOpportunitiesCount) ?>">0</span>+</span>
           <span class="stat-card__label">Available Opportunities</span>
         </div>
-        <div class="stat-card" data-count="3420">
-          <span class="stat-card__number"><span class="counter" data-target="3420">0</span>+</span>
+        <div class="stat-card" data-count="<?= e($totalCandidatesCount) ?>">
+          <span class="stat-card__number"><span class="counter" data-target="<?= e($totalCandidatesCount) ?>">0</span>+</span>
           <span class="stat-card__label">Registered Candidates</span>
         </div>
-        <div class="stat-card" data-count="1280">
-          <span class="stat-card__number"><span class="counter" data-target="1280">0</span>+</span>
+        <div class="stat-card" data-count="<?= e($placedCandidatesCount) ?>">
+          <span class="stat-card__number"><span class="counter" data-target="<?= e($placedCandidatesCount) ?>">0</span>+</span>
           <span class="stat-card__label">Successful Placements</span>
         </div>
       </div>
@@ -150,75 +213,45 @@ require_once __DIR__ . '/includes/bootstrap.php';
         <p class="section__text">Discover our range of structured development programmes designed to accelerate your career.</p>
       </div>
       <div class="programmes__grid">
-        <div class="programme-card">
-          <div class="programme-card__header">
-            <span class="programme-card__tag">Graduate</span>
-            <h3 class="programme-card__title">Software Engineering Graduate</h3>
+        <?php if (!empty($featuredProgrammes)): ?>
+          <?php foreach ($featuredProgrammes as $prog): 
+            $typeLabel = [
+              'graduate_programme' => 'Graduate',
+              'learnership' => 'Learnership',
+              'internship' => 'Internship',
+              'wil' => 'WIL',
+              'skills_development' => 'Skills',
+              'other' => 'Programme'
+            ][$prog['type']] ?? 'Programme';
+            
+            $durationMonths = preg_match('/(\d+)/', $prog['duration'] ?? '', $m) ? (int)$m[1] : 12;
+          ?>
+            <div class="programme-card">
+              <div class="programme-card__header">
+                <span class="programme-card__tag"><?= e($typeLabel) ?></span>
+                <h3 class="programme-card__title"><?= e($prog['name']) ?></h3>
+              </div>
+              <p class="programme-card__desc"><?= e(substr($prog['description'] ?? '', 0, 150)) . '...' ?></p>
+              <div class="programme-card__details">
+                <div class="programme-card__detail"><i class="fas fa-clock"></i> <?= e($prog['duration'] ?? 'TBD') ?></div>
+                <div class="programme-card__detail"><i class="fas fa-briefcase"></i> <?= e($prog['opportunity_count'] ?? 0) ?> Opportunities</div>
+              </div>
+              <div class="programme-card__actions">
+                <a href="<?= url('candidate/opportunities.php') ?>" class="btn btn--primary btn--sm">Apply Now</a>
+                <a href="<?= url('programme/detail.php?id=' . (int)$prog['id']) ?>" class="btn btn--ghost btn--sm">View Details</a>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        <?php else: ?>
+          <div style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
+            <p style="color: var(--text-light); font-size: 1rem;">Featured programmes will appear here soon.</p>
           </div>
-          <p class="programme-card__desc">A 12-month immersive programme for recent graduates to master modern software engineering practices.</p>
-          <div class="programme-card__details">
-            <div class="programme-card__detail"><i class="fas fa-clock"></i> 12 Months</div>
-            <div class="programme-card__detail"><i class="fas fa-map-marker-alt"></i> Johannesburg</div>
-            <div class="programme-card__detail"><i class="fas fa-users"></i> 15 Positions</div>
-          </div>
-          <div class="programme-card__actions">
-            <a href="#" class="btn btn--primary btn--sm">Apply Now</a>
-            <a href="#" class="btn btn--ghost btn--sm">View Details</a>
-          </div>
-        </div>
-        <div class="programme-card">
-          <div class="programme-card__header">
-            <span class="programme-card__tag programme-card__tag--cyan">Learnership</span>
-            <h3 class="programme-card__title">IT Systems Development</h3>
-          </div>
-          <p class="programme-card__desc">NQF Level 5 learnership combining theoretical training with hands-on development experience.</p>
-          <div class="programme-card__details">
-            <div class="programme-card__detail"><i class="fas fa-clock"></i> 18 Months</div>
-            <div class="programme-card__detail"><i class="fas fa-map-marker-alt"></i> Cape Town</div>
-            <div class="programme-card__detail"><i class="fas fa-users"></i> 20 Positions</div>
-          </div>
-          <div class="programme-card__actions">
-            <a href="#" class="btn btn--primary btn--sm">Apply Now</a>
-            <a href="#" class="btn btn--ghost btn--sm">View Details</a>
-          </div>
-        </div>
-        <div class="programme-card">
-          <div class="programme-card__header">
-            <span class="programme-card__tag programme-card__tag--amber">Internship</span>
-            <h3 class="programme-card__title">Cloud & DevOps Internship</h3>
-          </div>
-          <p class="programme-card__desc">Hands-on internship working with cloud infrastructure, CI/CD pipelines, and modern DevOps tools.</p>
-          <div class="programme-card__details">
-            <div class="programme-card__detail"><i class="fas fa-clock"></i> 6 Months</div>
-            <div class="programme-card__detail"><i class="fas fa-map-marker-alt"></i> Durban</div>
-            <div class="programme-card__detail"><i class="fas fa-users"></i> 10 Positions</div>
-          </div>
-          <div class="programme-card__actions">
-            <a href="#" class="btn btn--primary btn--sm">Apply Now</a>
-            <a href="#" class="btn btn--ghost btn--sm">View Details</a>
-          </div>
-        </div>
-        <div class="programme-card">
-          <div class="programme-card__header">
-            <span class="programme-card__tag programme-card__tag--green">WIL</span>
-            <h3 class="programme-card__title">Work Integrated Learning</h3>
-          </div>
-          <p class="programme-card__desc">Placement programme for students requiring work experience as part of their tertiary qualification.</p>
-          <div class="programme-card__details">
-            <div class="programme-card__detail"><i class="fas fa-clock"></i> 12 Months</div>
-            <div class="programme-card__detail"><i class="fas fa-map-marker-alt"></i> Multiple Locations</div>
-            <div class="programme-card__detail"><i class="fas fa-users"></i> 25 Positions</div>
-          </div>
-          <div class="programme-card__actions">
-            <a href="#" class="btn btn--primary btn--sm">Apply Now</a>
-            <a href="#" class="btn btn--ghost btn--sm">View Details</a>
-          </div>
-        </div>
+        <?php endif; ?>
       </div>
     </div>
   </section>
 
-  <!-- ===== OPPORTUNITIES ===== -->
+  <!-- ===== OPPORTUNITIES =====
   <section class="section opportunities" id="opportunities">
     <div class="container">
       <div class="section__header">
@@ -226,53 +259,80 @@ require_once __DIR__ . '/includes/bootstrap.php';
         <h2 class="section__title">Latest <span class="text-gradient">Opportunities</span></h2>
         <p class="section__text">Browse and filter through available positions matched to your skills and preferences.</p>
       </div>
-      <div class="opportunities__filters">
-        <div class="filter-group">
-          <label for="filter-type" class="filter-label">Programme Type</label>
-          <select id="filter-type" class="filter-select">
-            <option value="all">All Types</option>
-            <option value="graduate">Graduate Programme</option>
-            <option value="learnership">Learnership</option>
-            <option value="internship">Internship</option>
-            <option value="wil">Work Integrated Learning</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label for="filter-province" class="filter-label">Province</label>
-          <select id="filter-province" class="filter-select">
-            <option value="all">All Provinces</option>
-            <option value="gauteng">Gauteng</option>
-            <option value="western-cape">Western Cape</option>
-            <option value="kwazulu-natal">KwaZulu-Natal</option>
-            <option value="eastern-cape">Eastern Cape</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label for="filter-qualification" class="filter-label">Qualification</label>
-          <select id="filter-qualification" class="filter-select">
-            <option value="all">All Levels</option>
-            <option value="diploma">Diploma</option>
-            <option value="degree">Bachelor's Degree</option>
-            <option value="honours">Honours Degree</option>
-            <option value="masters">Master's Degree</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label for="filter-skill" class="filter-label">Skills Category</label>
-          <select id="filter-skill" class="filter-select">
-            <option value="all">All Skills</option>
-            <option value="software">Software Development</option>
-            <option value="cloud">Cloud Computing</option>
-            <option value="cyber">Cyber Security</option>
-            <option value="data">Data Analytics</option>
-          </select>
-        </div>
-      </div>
       <div class="opportunities__grid" id="opportunities-grid">
-        <!-- Cards populated by JS -->
+        <?php if (!empty($openOpportunities)): ?>
+          <?php foreach ($openOpportunities as $opp):
+            $typeLabel = [
+              'graduate_programme' => 'Graduate Programme',
+              'learnership' => 'Learnership',
+              'internship' => 'Internship',
+              'wil' => 'Work Integrated Learning',
+              'skills_development' => 'Skills Development',
+              'mentorship' => 'Mentorship',
+              'other' => 'Opportunity'
+            ][$opp['type']] ?? 'Opportunity';
+            
+            $daysLeft = 0;
+            if (!empty($opp['application_close_date'])) {
+              $closeDate = new DateTime($opp['application_close_date']);
+              $today = new DateTime();
+              $diff = $closeDate->diff($today);
+              $daysLeft = $diff->invert ? $diff->days : -1;
+            }
+            
+            $closingStatus = '';
+            if ($daysLeft < 0) {
+              $closingStatus = 'Applications Closed';
+            } elseif ($daysLeft === 0) {
+              $closingStatus = 'Closing Today';
+            } elseif ($daysLeft === 1) {
+              $closingStatus = 'Closing Tomorrow';
+            } elseif ($daysLeft <= 7) {
+              $closingStatus = "Closing in {$daysLeft} days";
+            } else {
+              $closingStatus = "Closing in {$daysLeft} days";
+            }
+          ?>
+            <article class="opportunity-card" style="background: var(--bg-white); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; transition: var(--transition); text-decoration: none; color: inherit;">
+              <div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                  <h3 style="font-size: 1.125rem; font-weight: 700; color: var(--dark); margin: 0;"><?= e($opp['title']) ?></h3>
+                  <span style="background: var(--primary-bg); color: var(--primary); padding: 0.375rem 0.75rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600; white-space: nowrap;"><?= e($typeLabel) ?></span>
+                </div>
+                <p style="font-size: 0.875rem; color: var(--text-light); margin: 0; margin-bottom: 0.5rem;"><?= e($opp['programme_name']) ?><?= !empty($opp['cohort_name']) ? ' • ' . e($opp['cohort_name']) : '' ?></p>
+                <p style="font-size: 0.8125rem; color: var(--text-light); margin: 0;"><i class="fas fa-building" style="margin-right: 0.375rem;"></i><?= e($opp['organisation'] ?? 'TBD') ?></p>
+              </div>
+              
+              <p style="font-size: 0.875rem; color: var(--text); margin: 0; line-height: 1.5;"><?= e(substr($opp['short_description'] ?? '', 0, 120)) . '...' ?></p>
+              
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.8125rem; color: var(--text-light);">
+                <div><i class="fas fa-map-pin" style="margin-right: 0.375rem; color: var(--primary);"></i><?= e($opp['city'] ?? $opp['province'] ?? 'TBD') ?></div>
+                <div><i class="fas fa-briefcase" style="margin-right: 0.375rem; color: var(--primary);"></i><?= e(ucfirst(str_replace('_', ' ', $opp['work_arrangement']))) ?></div>
+              </div>
+              
+              <div style="border-top: 1px solid var(--border); padding-top: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8125rem; color: var(--accent); font-weight: 500;"><?= e($closingStatus) ?></span>
+                <div style="display: flex; gap: 0.5rem;">
+                  <?php if (is_logged_in()): ?>
+                    <a href="<?= url('candidate/opportunity_detail.php?id=' . (int)$opp['id']) ?>" class="btn btn--primary btn--sm" style="padding: 0.5rem 1rem; font-size: 0.8125rem;">Apply</a>
+                  <?php else: ?>
+                    <a href="<?= url('register.php') ?>" class="btn btn--primary btn--sm" style="padding: 0.5rem 1rem; font-size: 0.8125rem;">Apply</a>
+                  <?php endif; ?>
+                  <a href="<?= url('candidate/opportunity_detail.php?id=' . (int)$opp['id']) ?>" class="btn btn--ghost btn--sm" style="padding: 0.5rem 1rem; font-size: 0.8125rem;">View</a>
+                </div>
+              </div>
+            </article>
+          <?php endforeach; ?>
+        <?php else: ?>
+          <div style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
+            <div style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"><i class="fas fa-search"></i></div>
+            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--dark); margin: 0 0 0.5rem;">No Opportunities Available</h3>
+            <p style="color: var(--text-light); margin: 0;">No opportunities are currently available. Please check back soon for new positions.</p>
+          </div>
+        <?php endif; ?>
       </div>
     </div>
-  </section>
+  </section> -->
 
   <!-- ===== TALENT COMMUNITY ===== -->
   <section class="section talent" id="talent">

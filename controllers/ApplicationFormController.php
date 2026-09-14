@@ -275,13 +275,18 @@ class ApplicationFormController
         $existing = ApplicationDocument::findForApplication($applicationId, $documentType);
 
         if ($existing) {
-            // Update metadata first; keep the old file until we are sure the new one is stored
+            $wasReused = !empty($existing['is_reused']);
+
+            // Update metadata first; keep the old file until we are sure the new one is stored.
+            // A fresh upload is no longer a reference to a profile document.
             $updated = ApplicationDocument::update((int) $existing['id'], $applicationId, [
-                'original_filename' => $originalName,
-                'stored_filename'   => $storedFilename,
-                'mime_type'         => $mime,
-                'file_size'         => $size,
-                'file_checksum'     => $checksum,
+                'original_filename'   => $originalName,
+                'stored_filename'     => $storedFilename,
+                'mime_type'           => $mime,
+                'file_size'           => $size,
+                'file_checksum'       => $checksum,
+                'is_reused'           => 0,
+                'source_document_id'  => null,
             ]);
 
             if (!$updated) {
@@ -291,8 +296,12 @@ class ApplicationFormController
                 return null;
             }
 
-            // Delete the old physical file only after the new record is saved
-            FileUploader::delete('documents', $existing['stored_filename']);
+            // Delete the old physical file only after the new record is saved,
+            // and only if it was an upload owned solely by this application
+            // (never delete a profile document the candidate reused).
+            if (!$wasReused) {
+                FileUploader::delete('documents', $existing['stored_filename']);
+            }
 
             return (int) $existing['id'];
         }
@@ -375,13 +384,18 @@ class ApplicationFormController
             return false;
         }
 
-        // Update the metadata record (keeps the same application_documents row)
+        // Update the metadata record (keeps the same application_documents row).
+        // A fresh replacement is no longer a reference to a profile document.
+        $wasReused = !empty($appDoc['is_reused']);
+
         $updated = ApplicationDocument::update($appDocId, $applicationId, [
-            'original_filename' => $result['original_filename'],
-            'stored_filename'   => $result['stored_filename'],
-            'mime_type'         => $result['mime'],
-            'file_size'         => (int) $result['size'],
-            'file_checksum'     => $result['checksum'],
+            'original_filename'   => $result['original_filename'],
+            'stored_filename'     => $result['stored_filename'],
+            'mime_type'           => $result['mime'],
+            'file_size'           => (int) $result['size'],
+            'file_checksum'       => $result['checksum'],
+            'is_reused'           => 0,
+            'source_document_id'  => null,
         ]);
 
         if (!$updated) {
@@ -391,8 +405,11 @@ class ApplicationFormController
             return false;
         }
 
-        // Delete the old physical file only after the new one is persisted
-        FileUploader::delete('documents', $appDoc['stored_filename']);
+        // Delete the old physical file only after the new one is persisted,
+        // and only if it was not a reused profile document.
+        if (!$wasReused) {
+            FileUploader::delete('documents', $appDoc['stored_filename']);
+        }
 
         Database::execute(
             "UPDATE applications SET updated_at = NOW() WHERE id = ? AND candidate_id = ?",
@@ -433,8 +450,11 @@ class ApplicationFormController
             return false;
         }
 
-        // Delete physical file
-        FileUploader::delete('documents', $appDoc['stored_filename']);
+        // Delete the physical file only if it was an upload owned solely by this
+        // application. Reused profile documents must remain intact for the candidate.
+        if (empty($appDoc['is_reused'])) {
+            FileUploader::delete('documents', $appDoc['stored_filename']);
+        }
 
         Database::execute(
             "UPDATE applications SET updated_at = NOW() WHERE id = ? AND candidate_id = ?",
@@ -492,14 +512,18 @@ class ApplicationFormController
             return ['success' => false, 'message' => 'A document for this type is already attached.', 'id' => (int) $existing['id']];
         }
 
-        // Create the application document record pointing to the same stored file
+        // Create the application document record pointing to the same stored file.
+        // is_reused + source_document_id ensure the profile's physical file is
+        // never removed when the application document is deleted or replaced.
         $id = ApplicationDocument::create($applicationId, [
-            'document_type'     => $docType,
-            'original_filename' => $profileDoc['original_filename'],
-            'stored_filename'   => $profileDoc['stored_filename'],
-            'mime_type'         => $profileDoc['mime_type'],
-            'file_size'         => (int) $profileDoc['file_size'],
-            'file_checksum'     => $profileDoc['file_checksum'],
+            'document_type'      => $docType,
+            'original_filename'  => $profileDoc['original_filename'],
+            'stored_filename'    => $profileDoc['stored_filename'],
+            'mime_type'          => $profileDoc['mime_type'],
+            'file_size'          => (int) $profileDoc['file_size'],
+            'file_checksum'      => $profileDoc['file_checksum'],
+            'is_reused'          => 1,
+            'source_document_id' => (int) $profileDoc['id'],
         ]);
 
         if (!$id) {
@@ -978,5 +1002,380 @@ class ApplicationFormController
         }
 
         return false;
+    }
+
+    /* ============================================================
+     * STAGE 5 - REVIEW & DECLARATION
+     * ============================================================ */
+
+    /**
+     * Whether an opportunity is still accepting applications.
+     *
+     * @param array       $opportunity
+     * @param string|null $reason       (by reference) friendly closed reason
+     * @return bool  True when the opportunity is still open
+     */
+    public static function isOpportunityOpen(array $opportunity, ?string &$reason = null): bool
+    {
+        $today = date('Y-m-d');
+
+        if (!empty($opportunity['application_close_date']) && $opportunity['application_close_date'] < $today) {
+            $reason = 'Applications for this opportunity are now closed.';
+            return false;
+        }
+
+        $status = (string) ($opportunity['status'] ?? '');
+        if (in_array($status, ['closed', 'archived'], true)) {
+            $reason = 'Applications for this opportunity are now closed.';
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Stage 5: Load all data needed to render the Review & Declaration step.
+     *
+     * Performs the same ownership/status/closing checks as loadForm() and
+     * enriches the payload with a server-side completeness checklist and
+     * the candidate's current consent state (display only – the permanent
+     * consent record is created at submission in Stage 6).
+     *
+     * @param int $candidateId
+     * @param int $applicationId
+     * @return array|null
+     */
+    public static function loadReviewData(int $candidateId, int $applicationId): ?array
+    {
+        $form = self::loadForm($candidateId, $applicationId);
+
+        if ($form === null || !empty($form['readonly'])) {
+            return $form;
+        }
+
+        $application = $form['application'] ?? [];
+        $opportunity = $form['opportunity'] ?? [];
+
+        // Consolidated review payload
+        $form['review'] = [
+            'completeness'    => self::reviewCompleteness($form),
+            'documents'       => self::validateRequiredDocuments($candidateId, $applicationId),
+            'consent_state'   => ConsentController::stateForUser($candidateId),
+            'confirmation'    => self::getReviewConfirmation($candidateId, $applicationId),
+            'closing_status'  => self::isOpportunityOpen($opportunity, $closedReason),
+            'closing_reason'  => $closedReason ?? null,
+        ];
+
+        return $form;
+    }
+
+    /**
+     * Build a server-side application completeness checklist.
+     *
+     * Never relies on browser validation – every requirement is re-checked
+     * from the database on each request.
+     *
+     * @param array $form  Payload from loadForm()
+     * @return array  ['items' => [...], 'all_complete' => bool, 'missing_fields' => array]
+     */
+    public static function reviewCompleteness(array $form): array
+    {
+        $items = [];
+        $missingFields = [];
+
+        $user       = $form['user'] ?? [];
+        $profile    = $form['profile'] ?? null;
+        $questions  = $form['questions'] ?? ['eligibility' => [], 'application' => []];
+        $responses  = $form['responses'] ?? [];
+
+        // ---- Personal Information ----
+        $personal = self::validatePersonalInfo($user, $profile);
+        $items['personal_information'] = [
+            'label'    => 'Personal Information',
+            'complete' => $personal['valid'],
+            'missing'  => $personal['missing'],
+        ];
+        if (!$personal['valid']) {
+            $missingFields = array_merge($missingFields, $personal['missing']);
+        }
+
+        // ---- Eligibility ----
+        $eligibilityQuestions = $questions['eligibility'] ?? [];
+        $eligMissing = [];
+
+        foreach ($eligibilityQuestions as $q) {
+            if (!empty($q['is_required'])) {
+                $value = trim((string) ($responses[$q['id']] ?? ''));
+                if ($value === '') {
+                    $eligMissing[] = $q['question_text'];
+                }
+            }
+        }
+
+        $eligibility = $form['eligibility'] ?? [];
+        $eligCheck   = self::checkEligibility(
+            [
+                'user'           => $user,
+                'profile'        => $profile ?? [],
+                'qualifications' => $form['qualifications'] ?? [],
+                'skills'         => $form['skills'] ?? [],
+                'experiences'    => $form['experiences'] ?? [],
+            ],
+            $eligibility
+        );
+
+        $eligComplete = empty($eligMissing) && (empty($eligibility) || ($eligibilityCheck['all_met'] ?? true));
+        $items['eligibility'] = [
+            'label'        => 'Eligibility',
+            'complete'     => $eligComplete,
+            'missing'      => $eligMissing,
+            'requirements' => $eligibilityCheck['requirements'] ?? [],
+        ];
+        if (!$eligComplete) {
+            $missingFields = array_merge($missingFields, $eligMissing);
+        }
+
+        // ---- Application Questions ----
+        $appQuestions = $questions['application'] ?? [];
+        $appMissing = [];
+        foreach ($appQuestions as $q) {
+            if (!empty($q['is_required'])) {
+                $value = trim((string) ($responses[$q['id']] ?? ''));
+                if ($value === '') {
+                    $appMissing[] = $q['question_text'];
+                }
+            }
+        }
+        $items['application_questions'] = [
+            'label'    => 'Application Questions',
+            'complete' => empty($appMissing),
+            'missing'  => $appMissing,
+        ];
+        if (!empty($appMissing)) {
+            $missingFields = array_merge($missingFields, $appMissing);
+        }
+
+        // ---- Required Documents ----
+        $application = $form['application'] ?? [];
+        $docCheck    = self::validateRequiredDocuments(
+            (int) ($application['candidate_id'] ?? 0),
+            (int) ($application['id'] ?? 0)
+        );
+        $items['documents'] = [
+            'label'    => 'Required Documents',
+            'complete' => $docCheck['valid'],
+            'missing'  => $docCheck['missing'],
+        ];
+        if (!$docCheck['valid']) {
+            $missingFields = array_merge($missingFields, $docCheck['missing']);
+        }
+
+        $allComplete = true;
+        foreach ($items as $item) {
+            if (!$item['complete']) {
+                $allComplete = false;
+                break;
+            }
+        }
+
+        return [
+            'items'          => $items,
+            'all_complete'   => $allComplete,
+            'missing_fields' => array_values(array_unique($missingFields)),
+        ];
+    }
+
+    /**
+     * Validate all necessary server-side conditions for continuing to the
+     * submission step. Used when the candidate presses [Continue to Submission].
+     *
+     * @param int $candidateId
+     * @param int $applicationId
+     * @return array  ['valid' => bool, 'errors' => array]
+     */
+    public static function validateSubmissionReadiness(int $candidateId, int $applicationId): array
+    {
+        $errors = [];
+
+        $application = Application::findForCandidate($candidateId, $applicationId);
+        if (!$application) {
+            return ['valid' => false, 'errors' => ['Application not found.']];
+        }
+
+        if (($application['status'] ?? '') !== 'draft') {
+            return ['valid' => false, 'errors' => ['This application has already been submitted.']];
+        }
+
+        $opportunity = Opportunity::find((int) ($application['opportunity_id'] ?? 0));
+        if (!$opportunity) {
+            return ['valid' => false, 'errors' => ['The opportunity for this application could not be found.']];
+        }
+
+        $open = self::isOpportunityOpen($opportunity, $closedReason);
+        if (!$open) {
+            return ['valid' => false, 'errors' => [$closedReason ?? 'Applications for this opportunity are now closed.']];
+        }
+
+        // Re-check completeness server-side (never trust frontend)
+        $form = self::loadForm($candidateId, $applicationId);
+        $completeness = self::reviewCompleteness($form ?? []);
+        if (!$completeness['all_complete']) {
+            foreach ($completeness['items'] as $item) {
+                if (!$item['complete']) {
+                    $errors[] = ucfirst(strtolower($item['label'])) . ' is incomplete.';
+                }
+            }
+        }
+
+        // Required declaration must be confirmed in this session/workflow
+        $confirmation = self::getReviewConfirmation($candidateId, $applicationId);
+        if (empty($confirmation['declaration_confirmed'])) {
+            $errors[] = 'Please confirm the declaration before submitting your application.';
+        }
+
+        $consentPurposes = array_values(array_unique(array_map('strval', $confirmation['consent_purposes'] ?? [])));
+        if (!in_array(CONSENT_PROGRAMME, $consentPurposes, true)) {
+            $errors[] = 'Please provide the required consent before submitting your application.';
+        }
+
+        if (empty($errors)) {
+            return ['valid' => true, 'errors' => []];
+        }
+
+        return ['valid' => false, 'errors' => array_values(array_unique($errors))];
+    }
+
+    /**
+     * Final server-side validation before submitting a draft application.
+     *
+     * @param int $candidateId
+     * @param int $applicationId
+     * @return array ['valid' => bool, 'errors' => array]
+     */
+    public static function validateFinalSubmission(int $candidateId, int $applicationId): array
+    {
+        $validation = self::validateSubmissionReadiness($candidateId, $applicationId);
+        if (!$validation['valid']) {
+            return $validation;
+        }
+
+        $application = Application::findForCandidate($candidateId, $applicationId);
+        if (!$application) {
+            return ['valid' => false, 'errors' => ['Application not found.']];
+        }
+
+        $confirmation = self::getReviewConfirmation($candidateId, $applicationId);
+        if (empty($confirmation['declaration_confirmed'])) {
+            return ['valid' => false, 'errors' => ['Please confirm the declaration before submitting your application.']];
+        }
+
+        $consentPurposes = array_values(array_unique(array_map('strval', $confirmation['consent_purposes'] ?? [])));
+        if (!in_array(CONSENT_PROGRAMME, $consentPurposes, true)) {
+            return ['valid' => false, 'errors' => ['Please provide the required consent before submitting your application.']];
+        }
+
+        return ['valid' => true, 'errors' => []];
+    }
+
+    /**
+     * Stage 5: Store the candidate's temporary confirmation for the
+     * current Draft workflow.
+     *
+     * The state lives only in the session until the application is
+     * successfully submitted in Stage 6, at which point the real
+     * application consent records (consents table) and declaration
+     * record are persisted. Nothing is written to the DB here.
+     *
+     * @param int    $candidateId
+     * @param int    $applicationId
+     * @param bool   $declaration      Whether the declaration checkbox was ticked
+     * @param array  $consentPurposes  Purposes the candidate explicitly confirmed
+     * @return array ['success' => bool, 'message' => string, 'confirmation' => array]
+     */
+    public static function saveReviewConfirmation(int $candidateId, int $applicationId, bool $declaration, array $consentPurposes = []): array
+    {
+        $application = Application::findForCandidate($candidateId, $applicationId);
+        if (!$application) {
+            return ['success' => false, 'message' => 'Application not found.', 'confirmation' => []];
+        }
+
+        if (($application['status'] ?? '') !== 'draft') {
+            return ['success' => false, 'message' => 'This application can no longer be edited.', 'confirmation' => []];
+        }
+
+        $opportunity = Opportunity::find((int) ($application['opportunity_id'] ?? 0));
+        if (!$opportunity) {
+            return ['success' => false, 'message' => 'The opportunity for this application could not be found.', 'confirmation' => []];
+        }
+
+        $open = self::isOpportunityOpen($opportunity, $closedReason);
+        if (!$open) {
+            return ['success' => false, 'message' => $closedReason ?? 'Applications for this opportunity are now closed.', 'confirmation' => []];
+        }
+
+        // Restrict to the canonical consent purposes supported by the platform
+        $validPurposes = array_values(array_intersect($consentPurposes, ALLOWED_CONSENT_PURPOSES));
+
+        if (!isset($_SESSION['application_review']) || !is_array($_SESSION['application_review'])) {
+            $_SESSION['application_review'] = [];
+        }
+
+        $_SESSION['application_review'][$applicationId] = [
+            'candidate_id'          => $candidateId,
+            'application_id'        => $applicationId,
+            'declaration_confirmed' => (bool) $declaration,
+            'consent_purposes'      => $validPurposes,
+            'confirmed_at'          => date('Y-m-d H:i:s'),
+        ];
+
+        return [
+            'success'      => true,
+            'message'      => 'Your declaration has been saved. You will complete submission in the next step.',
+            'confirmation' => $_SESSION['application_review'][$applicationId],
+        ];
+    }
+
+    /**
+     * Retrieve the temporary confirmation state for an application (draft only).
+     *
+     * @param int $candidateId
+     * @param int $applicationId
+     * @return array
+     */
+    public static function getReviewConfirmation(int $candidateId, int $applicationId): array
+    {
+        $state = $_SESSION['application_review'][$applicationId] ?? null;
+
+        if ($state === null) {
+            return [
+                'declaration_confirmed' => false,
+                'consent_purposes'      => [],
+                'confirmed_at'          => null,
+                'present'               => false,
+            ];
+        }
+
+        // Never trust a session written by another session/user ID
+        if ((int) ($state['candidate_id'] ?? 0) !== $candidateId) {
+            return [
+                'declaration_confirmed' => false,
+                'consent_purposes'      => [],
+                'confirmed_at'          => null,
+                'present'               => false,
+            ];
+        }
+
+        return array_merge($state, ['present' => true]);
+    }
+
+    /**
+     * Readable label for a document type (used on the review screen).
+     *
+     * @param string $type
+     * @return string
+     */
+    public static function documentTypeLabel(string $type): string
+    {
+        return ucwords(strtolower(str_replace('_', ' ', $type)));
     }
 }
