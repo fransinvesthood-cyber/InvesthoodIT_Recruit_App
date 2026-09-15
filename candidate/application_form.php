@@ -339,9 +339,14 @@ function render_question_input(array $question, string $value = ''): string
               <span class="app-form__step-num">4</span>
               <span class="app-form__step-label">Documents</span>
             </div>
+            <div class="app-form__step-line"></div>
+            <div class="app-form__step" data-step-indicator="5">
+              <span class="app-form__step-num">5</span>
+              <span class="app-form__step-label">Review & Declaration</span>
+            </div>
           </div>
           <div class="app-form__progress-text">
-            <span id="stepCount">Step 1 of 4</span>
+            <span id="stepCount">Step 1 of 5</span>
             <span id="stepName">Personal Information</span>
           </div>
         </section>
@@ -706,9 +711,14 @@ function render_question_input(array $question, string $value = ''): string
 
               <div class="app-form__actions">
                 <button type="button" class="btn btn--ghost" data-prev-step="3"><i class="fas fa-arrow-left"></i> Back</button>
-                <button type="submit" class="btn btn--primary" id="saveApplicationBtn">
-                  <i class="fas fa-save"></i> Save Application
-                </button>
+                <div class="app-form__actions-right">
+                  <button type="submit" class="btn btn--outline" id="saveApplicationBtn">
+                    <i class="fas fa-save"></i> Save Application
+                  </button>
+                  <a href="<?= url('candidate/application_review.php?id=' . (int) $application['id']) ?>" class="btn btn--primary" id="reviewApplicationBtn">
+                    Continue to Review <i class="fas fa-arrow-right"></i>
+                  </a>
+                </div>
               </div>
             </div>
           </div>

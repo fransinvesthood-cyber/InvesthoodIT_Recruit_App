@@ -79,6 +79,30 @@
       if (type) status.classList.add('app-form__save-status--' + type);
     }
 
+    /**
+     * Parse a fetch response as JSON.
+     *
+     * If the server did not return valid JSON (e.g. an HTML error
+     * page, a redirect, or PHP warnings emitted before the JSON),
+     * fall back to a user-friendly message instead of surfacing the
+     * raw HTML to the candidate.
+     *
+     * @param {Response} res
+     * @returns {Promise<Object>}
+     */
+    function parseResponse(res) {
+      return res.text().then(function (text) {
+        if (!text) {
+          return { success: false, message: 'The server returned an empty response. Please try again.' };
+        }
+        try {
+          return JSON.parse(text);
+        } catch (e) {
+          return { success: false, message: 'The server returned an unexpected response. Please refresh the page and try again.' };
+        }
+      });
+    }
+
     /* ---------------- Document Helpers ---------------- */
     function docItemByType(type) {
       return document.querySelector('.app-form__doc-item[data-doc-type="' + type + '"]');
@@ -155,17 +179,14 @@
         body: fd
       })
         .then(function (res) {
-          return res.json().catch(function () {
-            return { success: false, message: 'Invalid server response.' };
-          });
+          return parseResponse(res);
         })
         .then(function (json) {
           if (json.success) {
             showDocMessage(type, json.message || 'Your document was uploaded successfully.', false);
-            // Reload page so server-rendered document state refreshes
-            setTimeout(function () {
-              window.location.reload();
-            }, 800);
+            // Update UI without reloading page to stay on current step
+            updateDocItemAfterUpload(type, json.id || null);
+            input.value = '';
           } else {
             showDocMessage(type, json.message || 'We couldn\'t upload your document. Please try again.', true);
             input.value = '';
@@ -175,6 +196,76 @@
           showDocMessage(type, 'We couldn\'t upload your document. Please try again.', true);
           input.value = '';
         });
+    }
+
+    /**
+     * Update the document item UI after a successful upload/replace.
+     * Shows the document as uploaded with Replace/Remove buttons.
+     */
+    function updateDocItemAfterUpload(type, docId) {
+      var item = docItemByType(type);
+      if (!item) return;
+
+      // Update data attribute to indicate document is uploaded
+      item.setAttribute('data-has-doc', '1');
+      if (docId) {
+        item.setAttribute('data-doc-id', String(docId));
+      }
+
+      // Hide upload area
+      var area = item.querySelector('[data-upload-area="' + type + '"]');
+      if (area) area.hidden = true;
+
+      // Show uploaded status
+      var statusEl = item.querySelector('.app-form__doc-status');
+      if (statusEl) {
+        statusEl.innerHTML = '<span class="app-form__doc-status--uploaded"><i class="fas fa-check-circle"></i> Document uploaded</span>';
+        statusEl.hidden = false;
+      }
+
+      // Update actions to show Replace/Remove buttons
+      var actionsEl = item.querySelector('.app-form__doc-actions');
+      if (actionsEl) {
+        actionsEl.innerHTML = `
+          <button type="button" class="btn btn--outline btn--sm doc-upload" data-doc-type="${type}">
+            <i class="fas fa-sync-alt"></i> Replace
+          </button>
+          <button type="button" class="btn btn--ghost btn--sm btn--danger doc-remove" data-doc-id="${docId || 0}" data-doc-type="${type}">
+            <i class="fas fa-trash"></i> Remove
+          </button>
+        `;
+
+        // Re-attach event listeners to new buttons
+        attachDocButtonListeners(type);
+      }
+    }
+
+    function attachDocButtonListeners(type) {
+      var item = docItemByType(type);
+      if (!item) return;
+
+      // Replace button
+      var replaceBtn = item.querySelector('.doc-upload');
+      if (replaceBtn) {
+        replaceBtn.addEventListener('click', function () {
+          var area = item.querySelector('[data-upload-area="' + type + '"]');
+          var input = item.querySelector('[data-doc-input="' + type + '"]');
+          var existingDocId = item.getAttribute('data-doc-id') || 0;
+          if (area) area.hidden = false;
+          if (input) input.value = '';
+          clearDocMessage(type);
+          setPendingUpload(type, existingDocId);
+        });
+      }
+
+      // Remove button
+      var removeBtn = item.querySelector('.doc-remove');
+      if (removeBtn) {
+        removeBtn.addEventListener('click', function () {
+          var appDocId = removeBtn.getAttribute('data-doc-id');
+          handleRemove(type, appDocId);
+        });
+      }
     }
 
     /**
@@ -194,9 +285,8 @@
       postJson(data, function (json, success) {
         if (success) {
           showDocMessage(type, json.message || 'Document attached successfully.', false);
-          setTimeout(function () {
-            window.location.reload();
-          }, 600);
+          // Update UI without reloading page to stay on current step
+          updateDocItemAfterUpload(type, json.id || null);
         } else {
           showDocMessage(type, json.message || 'Could not reuse the document.', true);
         }
@@ -220,13 +310,55 @@
       postJson(data, function (json, success) {
         if (success) {
           showDocMessage(type, 'Document removed.', false);
-          setTimeout(function () {
-            window.location.reload();
-          }, 600);
+          // Update UI without reloading page to stay on current step
+          updateDocItemAfterRemove(type);
         } else {
           showDocMessage(type, json.message || 'Could not remove the document.', true);
         }
       });
+    }
+
+    /**
+     * Update the document item UI after a successful removal.
+     * Shows the document as not uploaded with Upload button.
+     */
+    function updateDocItemAfterRemove(type) {
+      var item = docItemByType(type);
+      if (!item) return;
+
+      // Update data attributes to indicate document is not uploaded
+      item.setAttribute('data-has-doc', '0');
+      item.removeAttribute('data-doc-id');
+
+      // Hide uploaded status
+      var statusEl = item.querySelector('.app-form__doc-status');
+      if (statusEl) {
+        statusEl.innerHTML = '';
+        statusEl.hidden = true;
+      }
+
+      // Reset actions to show Upload button
+      var actionsEl = item.querySelector('.app-form__doc-actions');
+      if (actionsEl) {
+        actionsEl.innerHTML = `
+          <button type="button" class="btn btn--outline btn--sm doc-upload" data-doc-type="${type}">
+            <i class="fas fa-upload"></i> Upload
+          </button>
+        `;
+
+        // Re-attach event listener to new button
+        var uploadBtn = actionsEl.querySelector('.doc-upload');
+        if (uploadBtn) {
+          uploadBtn.addEventListener('click', function () {
+            var area = item.querySelector('[data-upload-area="' + type + '"]');
+            var input = item.querySelector('[data-doc-input="' + type + '"]');
+            if (area) area.hidden = false;
+            if (input) input.value = '';
+            clearDocMessage(type);
+            setPendingUpload(type, 0);
+          });
+        }
+      }
     }
 
     /**
@@ -245,9 +377,7 @@
         body: fd
       })
         .then(function (res) {
-          return res.json().catch(function () {
-            return { success: false, message: 'Invalid server response.' };
-          });
+          return parseResponse(res);
         })
         .then(function (json) {
           if (callback) callback(json, !!json.success);
@@ -351,23 +481,6 @@
 
         // Save current step responses then move
         saveStep(function () {
-          // Entering Step 4: validate required documents client-side
-          if (next === 4) {
-            var missingTypes = [];
-            document.querySelectorAll('.app-form__doc-item').forEach(function (item) {
-              var isRequired = item.querySelector('.badge--primary');
-              if (isRequired) {
-                var docId = parseInt(item.getAttribute('data-doc-id') || '0', 10);
-                if (!docId) {
-                  missingTypes.push(item.getAttribute('data-doc-type') || 'document');
-                }
-              }
-            });
-            if (missingTypes.length > 0) {
-              setSaveStatus('error', 'Please upload all required documents before continuing.');
-              return;
-            }
-          }
           showStep(next);
         });
       });
@@ -465,9 +578,7 @@
         body: body
       })
         .then(function (res) {
-          return res.json().catch(function () {
-            return { success: false, message: 'Invalid server response.' };
-          });
+          return parseResponse(res);
         })
         .then(function (json) {
           isSaving = false;

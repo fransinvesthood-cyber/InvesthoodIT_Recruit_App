@@ -37,16 +37,31 @@ document.addEventListener('DOMContentLoaded', function () {
     if (e.key === 'Escape' && sidebar && sidebar.classList.contains('open')) closeSidebar();
   });
 
-  // Dark mode
+  // Dark mode (persisted across pages)
+
+  // Restore saved theme on page load
+  const savedThemeApp = localStorage.getItem('theme');
+  if (savedThemeApp === 'dark') {
+    document.body.classList.add('dark-mode');
+  }
+
   const themeToggle = document.getElementById('themeToggle');
   if (themeToggle) {
+    // Sync icon with restored theme
+    const icon = themeToggle.querySelector('i');
+    if (icon) {
+      icon.className = document.body.classList.contains('dark-mode') ? 'fas fa-sun' : 'fas fa-moon';
+    }
+
     themeToggle.addEventListener('click', function () {
       document.body.classList.toggle('dark-mode');
       const icon = this.querySelector('i');
       if (document.body.classList.contains('dark-mode')) {
         icon.className = 'fas fa-sun';
+        localStorage.setItem('theme', 'dark');
       } else {
         icon.className = 'fas fa-moon';
+        localStorage.setItem('theme', 'light');
       }
     });
   }

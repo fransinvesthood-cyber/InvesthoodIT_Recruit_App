@@ -13,20 +13,39 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 
 require_role('candidate');
 
+// JSON-safe error handling for this AJAX endpoint.
+// PHP warnings/notices must never leak into the JSON body
+// (they would break client-side res.json() parsing), and
+// any unexpected exception is returned as JSON instead of
+// the HTML page produced by the global exception handler.
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
+/**
+ * Send a clean JSON response, discarding any accidental
+ * output emitted by included libraries before the JSON.
+ */
+function json_response(array $payload, int $status = 200): void
+{
+    http_response_code($status);
+    header_remove('Location'); // never allow a redirect to corrupt a JSON response
+    header('Content-Type: application/json');
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    echo json_encode($payload);
+    exit;
+}
+
 // Only accept POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
-    exit;
+    json_response(['success' => false, 'message' => 'Method not allowed.'], 405);
 }
 
 // CSRF protection
 if (!validate_csrf()) {
-    http_response_code(403);
-    header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'Invalid security token. Please refresh the page and try again.']);
-    exit;
+    json_response(['success' => false, 'message' => 'Invalid security token. Please refresh the page and try again.'], 403);
 }
 
 $candidateId = (int) current_user_id();
@@ -35,6 +54,7 @@ $applicationId = (int) ($_POST['application_id'] ?? 0);
 
 header('Content-Type: application/json');
 
+try {
 switch ($action) {
     case 'save_step':
         // Collect responses from POST
@@ -57,6 +77,39 @@ switch ($action) {
 
         $result = ApplicationFormController::saveResponses($candidateId, $applicationId, $responses);
 
+        echo json_encode($result);
+        break;
+
+    case 'save_review_confirmation':
+        // Stage 5: persist the candidate's temporary declaration/consent to
+        // the session only. The permanent consent record is created when the
+        // application is successfully submitted in Stage 6.
+        $declaration = !empty($_POST['declaration']) && $_POST['declaration'] === '1';
+        $consentPurposes = [];
+
+        if (!empty($_POST['consent_purposes']) && is_array($_POST['consent_purposes'])) {
+            foreach ($_POST['consent_purposes'] as $purpose) {
+                $purpose = trim((string) $purpose);
+                if ($purpose !== '') {
+                    $consentPurposes[] = $purpose;
+                }
+            }
+        }
+
+        $result = ApplicationFormController::saveReviewConfirmation(
+            $candidateId,
+            $applicationId,
+            $declaration,
+            $consentPurposes
+        );
+
+        echo json_encode($result);
+        break;
+
+    case 'validate_submission_readiness':
+        // Stage 5: server-side validation performed before the candidate
+        // proceeds to the Stage 6 submission entry point. Does NOT submit.
+        $result = ApplicationFormController::validateSubmissionReadiness($candidateId, $applicationId);
         echo json_encode($result);
         break;
 
@@ -138,7 +191,14 @@ switch ($action) {
         break;
 
     default:
-        http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Invalid action.']);
-        break;
+        json_response(['success' => false, 'message' => 'Invalid action.'], 400);
+}
+} catch (Throwable $ex) {
+    error_log('[AJAX] ' . $ex->getMessage() . ' @ ' . $ex->getFile() . ':' . $ex->getLine());
+
+    $message = APP_ENV === 'development'
+        ? 'System error: ' . $ex->getMessage()
+        : 'A system error occurred. Please try again later.';
+
+    json_response(['success' => false, 'message' => $message], 500);
 }

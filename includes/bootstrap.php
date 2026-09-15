@@ -21,6 +21,10 @@ ini_set('display_errors', APP_ENV === 'development' ? '1' : '0');
 ini_set('log_errors', '1');
 date_default_timezone_set(APP_TIMEZONE);
 
+// --- Load core helpers BEFORE session start (session timeout uses set_flash() and safe_redirect()) ---
+require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/notifications.php';
+
 // --- Start hardened session ---
 require_once __DIR__ . '/session.php';
 start_session();
@@ -76,9 +80,7 @@ if (file_exists($vendorAutoload)) {
 
 // --- Core includes ---
 require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/csrf.php';
-require_once __DIR__ . '/notifications.php';
 
 // --- Middleware includes ---
 require_once __DIR__ . '/../middleware/auth.php';

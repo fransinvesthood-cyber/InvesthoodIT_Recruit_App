@@ -966,7 +966,251 @@
 }
 
 /* ================================================
-   14. RESPONSIVE
+   14. DARK MODE SUPPORT
+body.dark-mode .settings-hero {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 55%, #1e3a5f 100%);
+}
+
+body.dark-mode .settings-hero__title {
+  color: #f1f5f9;
+}
+
+body.dark-mode .settings-hero__subtitle {
+  color: #94a3b8;
+}
+
+body.dark-mode .settings-hero__badge {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
+}
+
+body.dark-mode .settings-nav__item {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+body.dark-mode .settings-nav__item:hover {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+body.dark-mode .settings-nav__item.active {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: var(--primary-light);
+  color: #22d3ee;
+}
+
+body.dark-mode .settings-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .settings-card__header {
+  background: #0f172a;
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .settings-card__header-icon {
+  background: rgba(6, 182, 212, 0.15);
+  color: #22d3ee;
+}
+
+body.dark-mode .settings-card__header h2 {
+  color: #f1f5f9;
+}
+
+body.dark-mode .settings-card__header p {
+  color: #94a3b8;
+}
+
+body.dark-mode .settings-card__body {
+  background: #1e293b;
+}
+
+body.dark-mode .settings-subsection__title {
+  color: #e2e8f0;
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .settings-muted {
+  color: #64748b;
+}
+
+body.dark-mode .settings-input,
+body.dark-mode .settings-select,
+body.dark-mode .settings-textarea {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+body.dark-mode .settings-input:focus,
+body.dark-mode .settings-select:focus,
+body.dark-mode .settings-textarea:focus {
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2);
+}
+
+body.dark-mode .settings-label {
+  color: #94a3b8;
+}
+
+body.dark-mode .settings-toggle__track {
+  background: #334155;
+}
+
+body.dark-mode .settings-radio span {
+  background: #0f172a;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+body.dark-mode .settings-radio input:checked + span {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: var(--primary-light);
+  color: #22d3ee;
+}
+
+body.dark-mode .settings-doc-summary__item {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .settings-doc-summary__num {
+  color: #f1f5f9;
+}
+
+body.dark-mode .settings-doc-summary__label {
+  color: #94a3b8;
+}
+
+body.dark-mode .settings-recent-docs li {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .settings-recent-docs__name {
+  color: #e2e8f0;
+}
+
+body.dark-mode .settings-recent-docs__meta {
+  color: #94a3b8;
+}
+
+body.dark-mode .settings-session-item {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .settings-session-item:hover {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+body.dark-mode .settings-session-item--active {
+  border-left-color: var(--success);
+}
+
+body.dark-mode .settings-session-item__icon {
+  background: rgba(6, 182, 212, 0.15);
+  color: #22d3ee;
+}
+
+body.dark-mode .settings-session-info__device {
+  color: #e2e8f0;
+}
+
+body.dark-mode .settings-session-info__detail {
+  color: #94a3b8;
+}
+
+body.dark-mode .settings-device-item {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .settings-device-item__icon {
+  background: rgba(6, 182, 212, 0.15);
+  color: #22d3ee;
+}
+
+body.dark-mode .settings-device-info__name {
+  color: #e2e8f0;
+}
+
+body.dark-mode .settings-device-info__detail {
+  color: #94a3b8;
+}
+
+body.dark-mode .settings-quicklinks {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .settings-quicklink {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .settings-quicklink:hover {
+  background: #1e293b;
+  border-color: var(--primary-light);
+}
+
+body.dark-mode .settings-quicklink__text {
+  color: #e2e8f0;
+}
+
+body.dark-mode .settings-status-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .settings-status__label {
+  color: #94a3b8;
+}
+
+body.dark-mode .settings-status__value {
+  color: #e2e8f0;
+}
+
+body.dark-mode .settings-danger {
+  background: #1e293b;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+body.dark-mode .settings-danger__header {
+  background: rgba(239, 68, 68, 0.1);
+  border-bottom-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+body.dark-mode .settings-danger__item {
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .settings-danger__info strong {
+  color: #f1f5f9;
+}
+
+body.dark-mode .settings-danger__info p {
+  color: #94a3b8;
+}
+
+body.dark-mode .modal__icon--warn {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+body.dark-mode .modal__icon--danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+/* ================================================
+    15. RESPONSIVE
    ================================================ */
 @media (max-width: 1100px) {
   .settings-workspace {

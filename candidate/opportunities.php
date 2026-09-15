@@ -71,6 +71,7 @@ $flashes = render_flashes();
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/settings.css') ?>">
   <link rel="stylesheet" href="<?= url('css/opportunities.css') ?>">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
@@ -131,12 +132,18 @@ $flashes = render_flashes();
       <div class="dash-content">
 
         <!-- ===== PAGE HERO ===== -->
-        <section class="opp-hero">
-          <div class="opp-hero__inner">
-            <h1 class="opp-hero__title">Explore Opportunities</h1>
-            <p class="opp-hero__subtitle">Discover opportunities that match your skills, qualifications, and career goals.</p>
+        <div class="settings-hero">
+          <div class="settings-hero__inner">
+            <div class="settings-hero__text">
+              <h1 class="settings-hero__title">Explore Opportunities</h1>
+              <p class="settings-hero__subtitle">Discover opportunities that match your skills, qualifications, and career goals.</p>
+            </div>
+            <div class="settings-hero__actions">
+              <a href="<?= url('candidate/saved_opportunities.php') ?>" class="btn btn--outline"><i class="fas fa-bookmark"></i> Saved</a>
+              <a href="<?= url('candidate/applications.php') ?>" class="btn btn--primary"><i class="fas fa-file-alt"></i> My Applications</a>
+            </div>
           </div>
-        </section>
+        </div>
 
         <!-- ===== FLASH MESSAGES ===== -->
         <?= $flashes ?>

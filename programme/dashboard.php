@@ -1,34 +1,17 @@
 <?php
 /**
- * ================================================================
+ * ================================================
  * INVESTHOOD IT - Programme Manager Dashboard
- * ================================================================
+ * ================================================
  * Role: Programme Manager
- *
- * Purpose:
- * - Portfolio-level programme management
- * - Programme statistics
- * - Cohort statistics
- * - Candidate statistics
- * - Programme progress
- * - Upcoming programme dates
- * - Recent programme activity
- *
- * Data relationships:
- *
- * users
- *   -> programmes.programme_manager_id
- *   -> cohorts.programme_id
- *   -> cohort_participants.cohort_id
- *
- * IMPORTANT:
- * All programme-related data is restricted to the
- * currently logged-in Programme Manager.
- * ================================================================
  */
+
 require_once __DIR__ . '/../includes/bootstrap.php';
+
 require_role('programme_manager');
+
 $user = current_user();
+<<<<<<< HEAD
 $conn = Database::getConnection();
 $currentPage = 'dashboard';
 /*
@@ -559,10 +542,14 @@ $managerName = $user['fullname'] ?? 'Programme Manager';
 if (trim($managerName) === '') {
     $managerName = 'Programme Manager';
 }
+=======
+$flashes = render_flashes();
+>>>>>>> 69ee3b9c4b9c5032917843f6a058edc276589649
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<<<<<<< HEAD
     <meta charset="UTF-8">
     <meta
         name="viewport"
@@ -1600,17 +1587,48 @@ html.dark-mode .pm-notif__count {
 
 
     </style>
+=======
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Programme Manager Dashboard | Investhood IT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+>>>>>>> 69ee3b9c4b9c5032917843f6a058edc276589649
 </head>
 <body class="dashboard-page">
-<div class="dashboard">
-    <!-- =========================================================
-         SIDEBAR
-    ========================================================== -->
-    <?php require __DIR__ . '/sidebar.php'; ?>
-    <!-- =========================================================
-         MAIN CONTENT
-    ========================================================== -->
+  <div class="dashboard">
+    <aside class="sidebar">
+      <div class="sidebar__header">
+        <a href="<?= url('index.php') ?>" class="logo">
+          <span class="logo__icon"><i class="fas fa-code"></i></span>
+          <span class="logo__text">Investhood <span class="logo__accent">IT</span></span>
+        </a>
+      </div>
+      <nav class="sidebar__nav">
+        <div class="sidebar__section-label">Programme Manager</div>
+        <ul class="sidebar__menu">
+          <li><a href="#" class="sidebar__link active"><i class="fas fa-th-large"></i> Dashboard</a></li>
+          <li><a href="#" class="sidebar__link"><i class="fas fa-graduation-cap"></i> My Programmes</a></li>
+          <li><a href="#" class="sidebar__link"><i class="fas fa-users"></i> Candidates</a></li>
+          <li><a href="#" class="sidebar__link"><i class="fas fa-chart-line"></i> Reports</a></li>
+        </ul>
+      </nav>
+      <div class="sidebar__footer">
+        <div class="sidebar__user">
+          <div class="sidebar__user-avatar"><img src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'PM+User') ?>&background=1a56db&color=fff&size=80" alt=""></div>
+          <div class="sidebar__user-info">
+            <span class="sidebar__user-name"><?= e($user['fullname'] ?? 'Programme Manager') ?></span>
+            <span class="sidebar__user-role">Programme Manager</span>
+          </div>
+        </div>
+        <a href="<?= url('auth/logout.php') ?>" class="sidebar__logout"><i class="fas fa-sign-out-alt"></i> Sign Out</a>
+      </div>
+    </aside>
     <main class="dashboard__main">
+<<<<<<< HEAD
         <!-- =====================================================
              HEADER
         ====================================================== -->
@@ -1704,572 +1722,43 @@ html.dark-mode .pm-notif__count {
                     View All Notifications
                   </button>
            </div>
+=======
+      <header class="dash-header">
+        <div class="dash-header__left">
+          <h1 class="dash-header__title">Programme Manager Dashboard</h1>
+>>>>>>> 69ee3b9c4b9c5032917843f6a058edc276589649
         </div>
-    </div>
-
-    <div class="dash-header__user">
-        <img
-            src="https://ui-avatars.com/api/?name=<?= urlencode($managerName) ?>&background=1a56db&color=fff&size=80"
-            alt=""
-            class="dash-header__avatar"
-        >
-    </div>
-</div>
-        </header>
-        <!-- =====================================================
-             CONTENT
-        ====================================================== -->
-        <div class="dash-content">
-            <!-- =================================================
-                 WELCOME
-            ================================================== -->
-            <div class="welcome-card">
-                <div class="welcome-card__bg"></div>
-                <div class="welcome-card__content">
-                    <h1 class="welcome-card__greeting">
-                        Welcome,
-                        <span class="text-gradient">
-                            <?= e($managerName) ?>
-                        </span>
-                    </h1>
-                    <p>
-                        Manage and monitor the programmes,
-                        cohorts, candidates, and overall programme
-                        performance under your responsibility.
-                    </p>
-                </div>
-            </div>
-            <!-- =================================================
-                 PROGRAMME PORTFOLIO
-            ================================================== -->
-            <div class="pm-stat-grid">
-                <!-- Total Programmes -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--primary">
-                        <i class="fas fa-graduation-cap"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($totalProgrammes) ?>
-                        </span>
-                        <span class="overview-card__label">
-                            My Programmes
-                        </span>
-                    </div>
-                </div>
-                <!-- Active Programmes -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--cyan">
-                        <i class="fas fa-play-circle"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($activeProgrammes) ?>
-                        </span>
-                        <span class="overview-card__label">
-                            Active Programmes
-                        </span>
-                    </div>
-                </div>
-                <!-- Draft Programmes -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--amber">
-                        <i class="fas fa-file-alt"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($draftProgrammes) ?>
-                        </span>
-                        <span class="overview-card__label">
-                            Draft Programmes
-                        </span>
-                    </div>
-                </div>
-                <!-- Completed Programmes -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--primary">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($completedProgrammes) ?>
-                        </span>
-                        <span class="overview-card__label">
-                            Completed Programmes
-                        </span>
-                    </div>
-                </div>
-            </div>
-            <!-- =================================================
-                 PEOPLE / COHORT STATISTICS
-            ================================================== -->
-            <div class="pm-stat-grid">
-                <!-- Cohorts -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--primary">
-                        <i class="fas fa-layer-group"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($totalCohorts) ?>
-                        </span>
-                        <span class="overview-card__label">
-                            Total Cohorts
-                        </span>
-                    </div>
-                </div>
-                <!-- Candidates -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--cyan">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($totalCandidates) ?>
-                        </span>
-                        <span class="overview-card__label">
-                            Total Candidates
-                        </span>
-                    </div>
-                </div>
-                <!-- Active Candidates -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--primary">
-                        <i class="fas fa-user-check"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($activeCandidates) ?>
-                        </span>
-                        <span class="overview-card__label">
-                            Active Candidates
-                        </span>
-                    </div>
-                </div>
-                <!-- Completed -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--amber">
-                        <i class="fas fa-user-graduate"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($completedCandidates) ?>
-                        </span>
-                        <span class="overview-card__label">
-                            Completed Candidates
-                        </span>
-                    </div>
-                </div>
-                <!-- Withdrawn -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--amber">
-                        <i class="fas fa-user-minus"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= number_format($withdrawnCandidates) ?>
-                        </span>
-                        <span class="overview-card__label">
-                            Withdrawn Candidates
-                        </span>
-                    </div>
-                </div>
-                <!-- Overall Progress -->
-                <div class="overview-card">
-                    <div class="overview-card__icon overview-card__icon--primary">
-                        <i class="fas fa-chart-line"></i>
-                    </div>
-                    <div class="overview-card__info">
-                        <span class="overview-card__number">
-                            <?= (int) $overallProgress ?>%
-                        </span>
-                        <span class="overview-card__label">
-                            Overall Completion
-                        </span>
-                    </div>
-                </div>
-            </div>
-            <!-- =================================================
-                 PROGRAMME PORTFOLIO
-            ================================================== -->
-            <section class="pm-section">
-                <div class="welcome-card">
-                    <div class="welcome-card__content">
-                        <div class="pm-section-header">
-                            <h2>
-                                <i class="fas fa-briefcase"></i>
-                                My Programme Portfolio
-                            </h2>
-                            <p>
-                                Programmes currently assigned to
-                                you as Programme Manager.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <?php if (empty($programmes)): ?>
-                    <div
-                        class="welcome-card"
-                        style="margin-top:1rem;"
-                    >
-                        <div class="welcome-card__content pm-empty">
-                            <i
-                                class="fas fa-graduation-cap"
-                                style="font-size:2rem;"
-                            ></i>
-                            <h3>
-                                No Programmes Assigned
-                            </h3>
-                            <p>
-                                There are currently no programmes
-                                assigned to your Programme Manager
-                                account.
-                            </p>
-                        </div>
-                    </div>
-                <?php else: ?>
-                    <div
-                        class="pm-programme-grid"
-                        style="margin-top:1rem;"
-                    >
-                        <?php foreach ($programmes as $programme): ?>
-                            <?php
-                            $programmeStatus = strtolower(
-                                $programme['status'] ?? ''
-                            );
-                            $statusClass =
-                                'pm-badge--'
-                                . $programmeStatus;
-                            $progressWidth =
-                                (int) (
-                                    $programme['progress_width'] ?? 0
-                                );
-                            ?>
-                            <div class="pm-programme-card">
-                                <!-- ============================
-                                     CARD HEADER
-                                ============================= -->
-                                <div class="pm-programme-card__header">
-                                    <div>
-                                        <div class="pm-programme-card__title">
-                                            <?= e(
-                                                $programme['name']
-                                            ) ?>
-                                        </div>
-                                        <div class="pm-programme-card__meta">
-                                            <i class="fas fa-tag"></i>
-                                            <?= e(
-                                                ucwords(
-                                                    str_replace(
-                                                        '_',
-                                                        ' ',
-                                                        $programme['type']
-                                                    )
-                                                )
-                                            ) ?>
-                                        </div>
-                                    </div>
-                                    <span
-                                        class="pm-badge <?= e($statusClass) ?>"
-                                    >
-                                        <?= e(
-                                            ucwords(
-                                                str_replace(
-                                                    '_',
-                                                    ' ',
-                                                    $programmeStatus
-                                                )
-                                            )
-                                        ) ?>
-                                    </span>
-                                </div>
-                                <!-- ============================
-                                     DATES
-                                ============================= -->
-                                <div
-                                    class="pm-programme-card__meta"
-                                    style="margin-top:1rem;"
-                                >
-                                    <i class="fas fa-calendar"></i>
-                                    <?php if (!empty($programme['start_date'])): ?>
-                                        <?= e(
-                                            date(
-                                                'd M Y',
-                                                strtotime(
-                                                    $programme['start_date']
-                                                )
-                                            )
-                                        ) ?>
-                                    <?php else: ?>
-                                        Start date not set
-                                    <?php endif; ?>
-                                    <?php if (!empty($programme['end_date'])): ?>
-                                        -
-                                        <?= e(
-                                            date(
-                                                'd M Y',
-                                                strtotime(
-                                                    $programme['end_date']
-                                                )
-                                            )
-                                        ) ?>
-                                    <?php endif; ?>
-                                </div>
-                                <!-- ============================
-                                     PROGRAMME STATISTICS
-                                ============================= -->
-                                <div class="pm-programme-stats">
-                                    <div class="pm-programme-stat">
-                                        <strong>
-                                            <?= number_format(
-                                                (int) $programme['cohort_count']
-                                            ) ?>
-                                        </strong>
-                                        <span>
-                                            Cohorts
-                                        </span>
-                                    </div>
-                                    <div class="pm-programme-stat">
-                                        <strong>
-                                            <?= number_format(
-                                                (int) $programme['candidate_count']
-                                            ) ?>
-                                        </strong>
-                                        <span>
-                                            Candidates
-                                        </span>
-                                    </div>
-                                    <div class="pm-programme-stat">
-                                        <strong>
-                                            <?= number_format(
-                                                (int) $programme['active_candidate_count']
-                                            ) ?>
-                                        </strong>
-                                        <span>
-                                            Active
-                                        </span>
-                                    </div>
-                                    <div class="pm-programme-stat">
-                                        <strong>
-                                            <?= number_format(
-                                                (int) $programme['completed_candidate_count']
-                                            ) ?>
-                                        </strong>
-                                        <span>
-                                            Completed
-                                        </span>
-                                    </div>
-                                </div>
-                                <!-- ============================
-                                     PROGRESS
-                                ============================= -->
-                                <div class="pm-progress">
-                                    <div class="pm-progress__header">
-                                        <span>
-                                            Completion Progress
-                                        </span>
-                                        <strong>
-                                            <?= (int) $programme['progress'] ?>%
-                                        </strong>
-                                    </div>
-                                    <div class="pm-progress__track">
-                                        <div
-                                            class="pm-progress__bar"
-                                            style="width:<?= $progressWidth ?>%;"
-                                        ></div>
-                                    </div>
-                                </div>
-                                <!-- ============================
-                                     ACTIONS
-                                ============================= -->
-                                <div class="pm-action-row">
-                                    <a
-                                        href="<?= url(
-                                            'programme/programme_view.php?id='
-                                            . (int) $programme['id']
-                                        ) ?>"
-                                        class="pm-action"
-                                    >
-                                        <i class="fas fa-eye"></i>
-                                        View Programme
-                                    </a>
-                                    <a
-                                        href="<?= url(
-                                            'programme/cohorts.php?programme_id='
-                                            . (int) $programme['id']
-                                        ) ?>"
-                                        class="pm-action pm-action--secondary"
-                                    >
-                                        <i class="fas fa-layer-group"></i>
-                                        Cohorts
-                                    </a>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-            </section>
-            <!-- =================================================
-                 UPCOMING PROGRAMMES
-            ================================================== -->
-            <section class="pm-section">
-                <div class="welcome-card">
-                    <div class="welcome-card__content">
-                        <div class="pm-section-header">
-                            <h2>
-                                <i class="fas fa-calendar-alt"></i>
-                                Programme Schedule
-                            </h2>
-                            <p>
-                                Upcoming programme start dates
-                                within your portfolio.
-                            </p>
-                        </div>
-                        <?php if (empty($upcomingProgrammes)): ?>
-                            <div class="pm-empty">
-                                No programme dates are currently
-                                available.
-                            </div>
-                        <?php else: ?>
-                            <div>
-                                <?php foreach (
-                                    $upcomingProgrammes
-                                    as $upcoming
-                                ): ?>
-                                    <div class="pm-upcoming-item">
-                                        <div>
-                                            <strong>
-                                                <?= e(
-                                                    $upcoming['name']
-                                                ) ?>
-                                            </strong>
-                                            <div
-                                                style="
-                                                    margin-top:0.25rem;
-                                                    color:#6b7280;
-                                                    font-size:0.85rem;
-                                                "
-                                            >
-                                                <?= e(
-                                                    ucwords(
-                                                        str_replace(
-                                                            '_',
-                                                            ' ',
-                                                            $upcoming['type']
-                                                        )
-                                                    )
-                                                ) ?>
-                                                ·
-                                                <?= e(
-                                                    ucfirst(
-                                                        $upcoming['status']
-                                                    )
-                                                ) ?>
-                                            </div>
-                                        </div>
-                                        <div class="pm-date">
-                                            <?php if (
-                                                !empty(
-                                                    $upcoming['start_date']
-                                                )
-                                            ): ?>
-                                                <?= e(
-                                                    date(
-                                                        'd M Y',
-                                                        strtotime(
-                                                            $upcoming[
-                                                                'start_date'
-                                                            ]
-                                                        )
-                                                    )
-                                                ) ?>
-                                            <?php else: ?>
-                                                Date not set
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </section>
-            <!-- =================================================
-                 MANAGEMENT SUMMARY
-            ================================================== -->
-            <section class="pm-section">
-                <div class="welcome-card">
-                    <div class="welcome-card__content">
-                        <h2>
-                            <i class="fas fa-chart-pie"></i>
-                            Management Summary
-                        </h2>
-                        <p style="margin-top:0.5rem;">
-                            You currently manage
-                            <strong>
-                                <?= number_format($totalProgrammes) ?>
-                            </strong>
-                            programme(s) across
-                            <strong>
-                                <?= number_format($totalCohorts) ?>
-                            </strong>
-                            cohort(s).
-                            <?php if ($totalCandidates > 0): ?>
-                                There are currently
-                                <strong>
-                                    <?= number_format($totalCandidates) ?>
-                                </strong>
-                                candidate(s) participating in
-                                your programmes.
-                            <?php else: ?>
-                                No candidates have currently been
-                                assigned to your programme cohorts.
-                            <?php endif; ?>
-                        </p>
-                        <div
-                            style="
-                                color:#374151;
-                                margin-top:1.25rem;
-                                padding:1rem;
-                                background:#f8fafc;
-                                border-radius:10px;
-                            "
-                        >
-                            <strong>
-                                Portfolio Completion
-                            </strong>
-                            <div
-                                style="
-                                    margin-top:0.6rem;
-                                    width:100%;
-                                    height:10px;
-                                    background:#e5e7eb;
-                                    border-radius:999px;
-                                    overflow:hidden;
-                                "
-                            >
-                                
-                            </div>
-                            <div>
-                                  class="pm-progress-fill"
-                               style="width: <?= $overallProgressWidth ?>%;"
-</div>  
-                            <div>
-                                style="
-                                    margin-top:0.4rem;
-                                    font-size:0.85rem;
-                                    color:#6b7280;
-                                "
-                            >
-                                <?= (int) $overallProgress ?>%
-                                overall candidate completion
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+        <div class="dash-header__right">
+          <div class="dash-header__user">
+            <img src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'PM+User') ?>&background=1a56db&color=fff&size=80" alt="" class="dash-header__avatar">
+          </div>
         </div>
+      </header>
+      <div class="dash-content">
+        <div class="welcome-card">
+          <div class="welcome-card__bg"></div>
+          <div class="welcome-card__content">
+            <h1 class="welcome-card__greeting">Welcome, <span class="text-gradient"><?= e($user['fullname'] ?? 'Programme Manager') ?></span></h1>
+            <p>Manage your assigned programmes, monitor candidate progress, and generate reports.</p>
+          </div>
+        </div>
+        <div class="overview-grid" style="margin-top:2rem;">
+          <div class="overview-card">
+            <div class="overview-card__icon overview-card__icon--primary"><i class="fas fa-graduation-cap"></i></div>
+            <div class="overview-card__info"><span class="overview-card__number">5</span><span class="overview-card__label">Active Programmes</span></div>
+          </div>
+          <div class="overview-card">
+            <div class="overview-card__icon overview-card__icon--cyan"><i class="fas fa-users"></i></div>
+            <div class="overview-card__info"><span class="overview-card__number">42</span><span class="overview-card__label">Candidates</span></div>
+          </div>
+          <div class="overview-card">
+            <div class="overview-card__icon overview-card__icon--amber"><i class="fas fa-chart-line"></i></div>
+            <div class="overview-card__info"><span class="overview-card__number">87%</span><span class="overview-card__label">Completion Rate</span></div>
+          </div>
+        </div>
+      </div>
     </main>
+<<<<<<< HEAD
 </div>
 <!-- =========================================================
      ALL NOTIFICATIONS MODAL
@@ -2531,5 +2020,8 @@ html.dark-mode .pm-notif__count {
 </script>
 
 
+=======
+  </div>
+>>>>>>> 69ee3b9c4b9c5032917843f6a058edc276589649
 </body>
 </html>

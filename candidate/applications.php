@@ -130,30 +130,29 @@ $flashes = render_flashes();
                 ?>
                 <article class="app-card">
                   <div class="app-card__header">
-                    <div class="app-card__meta">
+                    <div class="app-card__badge-line">
                       <span class="badge badge--<?= e($badgeTone) ?>"><?= e($statusLabel) ?></span>
-                      <span class="app-card__date"><i class="far fa-calendar-alt"></i> Created <?= e(format_date($app['created_at'], 'd M Y')) ?></span>
+                      <span class="app-card__date"><i class="far fa-calendar-alt"></i> <?= e(format_date($app['created_at'], 'd M Y')) ?></span>
                     </div>
-                    <h3 class="app-card__title"><?= e($app['opportunity_title']) ?></h3>
-                    <div class="app-card__programme">
-                      <i class="fas fa-graduation-cap"></i>
-                      <span><?= e($app['programme_name']) ?><?= !empty($app['cohort_name']) ? ' &bull; ' . e($app['cohort_name']) : '' ?></span>
-                    </div>
-                    <?php if (!empty($app['organisation'])): ?>
-                      <div class="app-card__org"><i class="fas fa-building"></i> <?= e($app['organisation']) ?></div>
+                  </div>
+                  <h3 class="app-card__title"><?= e($app['opportunity_title']) ?></h3>
+                  <div class="app-card__programme">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span><?= e($app['programme_name']) ?><?= !empty($app['cohort_name']) ? ' &bull; ' . e($app['cohort_name']) : '' ?></span>
+                  </div>
+                  <?php if (!empty($app['organisation'])): ?>
+                    <div class="app-card__org"><i class="fas fa-building"></i> <?= e($app['organisation']) ?></div>
+                  <?php endif; ?>
+                  <div class="app-card__ref"><i class="fas fa-hashtag"></i> <?= e($app['application_reference']) ?></div>
+                  <div class="app-card__date app-card__date--updated">
+                    <i class="far fa-clock"></i> Last updated <?= e(format_date($app['updated_at'], 'd M Y')) ?>
+                  </div>
+                  <div class="app-card__footer">
+                    <?php if ($app['status'] === 'draft'): ?>
+                      <a href="<?= url('candidate/application_start.php?id=' . (int) $app['id']) ?>" class="btn btn--primary btn--sm">Continue Application</a>
+                    <?php else: ?>
+                      <a href="<?= url('candidate/application_detail.php?id=' . (int) $app['id']) ?>" class="btn btn--primary btn--sm">View Application</a>
                     <?php endif; ?>
-                    <div class="app-card__ref"><i class="fas fa-hashtag"></i> <?= e($app['application_reference']) ?></div>
-                    <div class="app-card__date app-card__date--updated">
-                      <i class="far fa-clock"></i> Last updated <?= e(format_date($app['updated_at'], 'd M Y')) ?>
-                    </div>
-
-                    <div class="app-card__footer">
-                      <?php if ($app['status'] === 'draft'): ?>
-                        <a href="<?= url('candidate/application_start.php?id=' . (int) $app['id']) ?>" class="btn btn--primary btn--sm">Continue Application</a>
-                      <?php else: ?>
-                        <a href="<?= url('candidate/application_detail.php?id=' . (int) $app['id']) ?>" class="btn btn--primary btn--sm">View Application</a>
-                      <?php endif; ?>
-                    </div>
                   </div>
                 </article>
               <?php endforeach; ?>

@@ -698,7 +698,96 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   // ============================================
-  // 17. LOG CONSOLE MESSAGE
+  // 17. GRADUATION CAP ANIMATION
+  // ============================================
+  (function() {
+    var container = document.getElementById('graduationCaps');
+    if (!container) return;
+
+    // Check for reduced motion preference
+    var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    // Configuration
+    var MAX_CAPS_DESKTOP = 25;
+    var MAX_CAPS_MOBILE = 12;
+    var isMobile = window.innerWidth <= 768;
+    var maxCaps = isMobile ? MAX_CAPS_MOBILE : MAX_CAPS_DESKTOP;
+    var activeCaps = 0;
+
+    function createCap() {
+      if (activeCaps >= maxCaps) return;
+
+      var cap = document.createElement('span');
+      cap.className = 'graduation-cap';
+      cap.textContent = '\uD83C\uDF93'; // 🎓 graduation cap emoji
+
+      // Randomize properties
+      var startX = Math.random() * 100; // 0-100% horizontal position
+      var duration = 12 + Math.random() * 18; // 12-30 seconds
+      var delay = Math.random() * 10; // 0-10 seconds delay
+      var size = 1 + Math.random() * 1.5; // 1-2.5rem
+      var opacity = 0.3 + Math.random() * 0.4; // 0.3-0.7 opacity
+      var drift = (Math.random() - 0.5) * 60; // -30 to +30px horizontal drift
+
+      // Apply styles
+      cap.style.left = startX + '%';
+      cap.style.fontSize = size + 'rem';
+      cap.style.opacity = opacity;
+      cap.style.animationDuration = duration + 's';
+      cap.style.animationDelay = delay + 's';
+
+      // Customize the keyframe for this cap's drift
+      var keyframesName = 'fall-' + Math.random().toString(36).substr(2, 9);
+      var style = document.createElement('style');
+      style.textContent =
+        '@keyframes ' + keyframesName + ' {' +
+        '0% { transform: translateY(-50px) translateX(0) rotate(0deg); opacity: 0; }' +
+        '10% { opacity: ' + opacity + '; }' +
+        '90% { opacity: ' + opacity + '; }' +
+        '100% { transform: translateY(100vh) translateX(' + drift + 'px) rotate(' + (360 + Math.random() * 180) + 'deg); opacity: 0; }' +
+        '}';
+      document.head.appendChild(style);
+      cap.style.animationName = keyframesName;
+
+      container.appendChild(cap);
+      activeCaps++;
+
+      // Remove cap after animation completes
+      var totalDuration = (duration + delay) * 1000;
+      setTimeout(function() {
+        if (cap.parentNode) {
+          cap.parentNode.removeChild(cap);
+          if (style.parentNode) {
+            style.parentNode.removeChild(style);
+          }
+        }
+        activeCaps--;
+      }, totalDuration);
+    }
+
+    // Create initial caps with staggered delays
+    for (var i = 0; i < maxCaps; i++) {
+      setTimeout(createCap, i * 800);
+    }
+
+    // Continue creating new caps periodically
+    setInterval(function() {
+      createCap();
+    }, 1000);
+
+    // Handle resize
+    var resizeTimeout;
+    window.addEventListener('resize', function() {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(function() {
+        isMobile = window.innerWidth <= 768;
+        maxCaps = isMobile ? MAX_CAPS_MOBILE : MAX_CAPS_DESKTOP;
+      }, 250);
+    });
+  })();
+
+  // 18. LOG CONSOLE MESSAGE
   // ============================================
   console.log('%c Investhood IT Platform ', 'background: #1a56db; color: white; font-size: 16px; font-weight: bold; padding: 8px 12px; border-radius: 4px;');
   console.log('%c Empowering Tomorrow\'s Talent Today. ', 'font-size: 13px; color: #64748b;');

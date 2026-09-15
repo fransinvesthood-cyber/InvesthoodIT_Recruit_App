@@ -240,4 +240,156 @@ class CandidateApplicationsController
                 return ['action' => 'view', 'application' => $existing];
         }
     }
+
+    /**
+     * Submit a Draft application atomically in a transaction.
+     *
+     * @param int $candidateId
+     * @param int $applicationId
+     * @return array
+     */
+    public static function submitApplication(int $candidateId, int $applicationId): array
+    {
+        $application = Application::findForCandidate($candidateId, $applicationId);
+        if (!$application) {
+            return ['success' => false, 'message' => 'Application not found.', 'redirect' => 'candidate/applications.php'];
+        }
+
+        if (($application['status'] ?? '') !== 'draft') {
+            return [
+                'success' => false,
+                'message' => 'This application has already been submitted.',
+                'redirect' => 'candidate/application_detail.php?id=' . (int) $applicationId,
+                'already_submitted' => true,
+            ];
+        }
+
+        $validation = ApplicationFormController::validateFinalSubmission($candidateId, $applicationId);
+        if (!$validation['valid']) {
+            $error = $validation['errors'][0] ?? 'We couldn\'t submit your application. Your application is still saved as a draft. Please try again.';
+            return ['success' => false, 'message' => $error, 'redirect' => 'candidate/application_submit.php?id=' . (int) $applicationId];
+        }
+
+        $opportunity = Opportunity::find((int) ($application['opportunity_id'] ?? 0));
+        if (!$opportunity) {
+            return ['success' => false, 'message' => 'The opportunity for this application could not be found.', 'redirect' => 'candidate/applications.php'];
+        }
+
+        $open = ApplicationFormController::isOpportunityOpen($opportunity, $closedReason);
+        if (!$open) {
+            return [
+                'success' => false,
+                'message' => $closedReason ?? 'Applications for this opportunity are now closed. Your application could not be submitted.',
+                'redirect' => 'candidate/application_review.php?id=' . (int) $applicationId,
+            ];
+        }
+
+        $conn = Database::getConnection();
+        $conn->begin_transaction();
+
+        try {
+            $lockStmt = $conn->prepare("SELECT * FROM applications WHERE id = ? AND candidate_id = ? FOR UPDATE");
+            if (!$lockStmt) {
+                throw new RuntimeException('Unable to lock application for submission.');
+            }
+            $lockStmt->bind_param('ii', $applicationId, $candidateId);
+            $lockStmt->execute();
+            $lockedResult = $lockStmt->get_result();
+            $lockedApplication = $lockedResult ? $lockedResult->fetch_assoc() : null;
+            $lockStmt->close();
+
+            if (!$lockedApplication) {
+                throw new RuntimeException('Application not found.');
+            }
+
+            if (($lockedApplication['status'] ?? '') !== 'draft') {
+                throw new RuntimeException('already-submitted');
+            }
+
+            $lockedOpportunity = Opportunity::find((int) ($lockedApplication['opportunity_id'] ?? 0));
+            if (!$lockedOpportunity) {
+                throw new RuntimeException('Opportunity not found.');
+            }
+
+            $stillOpen = ApplicationFormController::isOpportunityOpen($lockedOpportunity, $lockedReason);
+            if (!$stillOpen) {
+                throw new RuntimeException($lockedReason ?? 'Applications for this opportunity are now closed. Your application could not be submitted.');
+            }
+
+            $lockedValidation = ApplicationFormController::validateFinalSubmission($candidateId, $applicationId);
+            if (!$lockedValidation['valid']) {
+                throw new RuntimeException($lockedValidation['errors'][0] ?? 'Your application is not ready to be submitted.');
+            }
+
+            $confirmation = ApplicationFormController::getReviewConfirmation($candidateId, $applicationId);
+            $consentPurposes = array_values(array_unique(array_map('strval', $confirmation['consent_purposes'] ?? [])));
+            foreach ($consentPurposes as $purpose) {
+                if (in_array($purpose, ALLOWED_CONSENT_PURPOSES, true)) {
+                    Consent::grant($candidateId, $purpose);
+                }
+            }
+            if (!in_array(CONSENT_PROGRAMME, $consentPurposes, true)) {
+                Consent::grant($candidateId, CONSENT_PROGRAMME);
+            }
+
+            $reference = $lockedApplication['application_reference'] ?: Application::generateReference((int) $applicationId);
+            $updateStmt = $conn->prepare(
+                "UPDATE applications
+                 SET application_reference = ?, status = 'submitted', submitted_at = NOW(), updated_at = NOW()
+                 WHERE id = ? AND candidate_id = ? AND status = 'draft'"
+            );
+            if (!$updateStmt) {
+                throw new RuntimeException('Unable to update application status.');
+            }
+            $updateStmt->bind_param('sii', $reference, $applicationId, $candidateId);
+            $updateStmt->execute();
+            if ($updateStmt->affected_rows !== 1) {
+                throw new RuntimeException('already-submitted');
+            }
+            $updateStmt->close();
+
+            $historyTable = Database::fetchOne("SHOW TABLES LIKE 'application_status_history'");
+            if ($historyTable) {
+                $historyStmt = $conn->prepare(
+                    "INSERT INTO application_status_history (application_id, previous_status, new_status, changed_by, change_reason)
+                     VALUES (?, 'draft', 'submitted', ?, 'Candidate submitted application')"
+                );
+                if ($historyStmt) {
+                    $historyStmt->bind_param('ii', $applicationId, $candidateId);
+                    $historyStmt->execute();
+                    $historyStmt->close();
+                }
+            }
+
+            AuditLog::log($candidateId, 'application_submitted', 'application', $applicationId, 'Application submitted with reference ' . $reference);
+
+            $conn->commit();
+
+            return [
+                'success' => true,
+                'message' => 'Application submitted successfully.',
+                'redirect' => 'candidate/application_confirmation.php?id=' . (int) $applicationId,
+                'reference' => $reference,
+            ];
+        } catch (Throwable $e) {
+            $conn->rollback();
+
+            $message = $e->getMessage();
+            if ($message === 'already-submitted') {
+                return [
+                    'success' => false,
+                    'message' => 'This application has already been submitted.',
+                    'redirect' => 'candidate/application_detail.php?id=' . (int) $applicationId,
+                    'already_submitted' => true,
+                ];
+            }
+
+            if (str_contains($message, 'Applications for this opportunity are now closed')) {
+                return ['success' => false, 'message' => $message, 'redirect' => 'candidate/application_review.php?id=' . (int) $applicationId];
+            }
+
+            error_log('[Applications] Submission failed: ' . $message);
+            return ['success' => false, 'message' => 'We couldn\'t submit your application. Your application is still saved as a draft. Please try again.', 'redirect' => 'candidate/application_submit.php?id=' . (int) $applicationId];
+        }
+    }
 }

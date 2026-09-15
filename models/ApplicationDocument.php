@@ -73,7 +73,8 @@ class ApplicationDocument
      *
      * @param int   $applicationId
      * @param array $data  ['document_type', 'original_filename', 'stored_filename',
-     *                      'mime_type', 'file_size', 'file_checksum']
+     *                      'mime_type', 'file_size', 'file_checksum',
+     *                      'is_reused' => bool, 'source_document_id' => int|null]
      * @return int  New ID
      */
     public static function create(int $applicationId, array $data): int
@@ -81,9 +82,9 @@ class ApplicationDocument
         Database::execute(
             "INSERT INTO application_documents
              (application_id, document_type, original_filename, stored_filename,
-              mime_type, file_size, file_checksum)
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
-            'issssis',
+              mime_type, file_size, file_checksum, is_reused, source_document_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            'issssisii',
             [
                 $applicationId,
                 $data['document_type'],
@@ -92,6 +93,8 @@ class ApplicationDocument
                 $data['mime_type'],
                 $data['file_size'],
                 $data['file_checksum'],
+                !empty($data['is_reused']) ? 1 : 0,
+                $data['source_document_id'] ?? null,
             ]
         );
         return Database::lastInsertId();
@@ -110,7 +113,16 @@ class ApplicationDocument
         $allowed = [
             'original_filename', 'stored_filename',
             'mime_type', 'file_size', 'file_checksum',
+            'is_reused', 'source_document_id',
         ];
+        
+        // Normalise booleans/nullables
+        if (array_key_exists('is_reused', $data)) {
+            $data['is_reused'] = !empty($data['is_reused']) ? 1 : 0;
+        }
+        if (array_key_exists('source_document_id', $data)) {
+            $data['source_document_id'] = $data['source_document_id'] ? (int) $data['source_document_id'] : null;
+        }
         $sets = [];
         $types = '';
         $params = [];

@@ -1,13 +1,18 @@
 <?php
-$currentPage=$currentPage??''; if(!isset($user)||!is_array($user))$user=current_user();
-$fn=trim((string)($user['first_name']??'')); $ln=trim((string)($user['last_name']??''));
-$name=trim((string)($user['full_name']??$user['fullname']??($fn.' '.$ln))); if($name==='')$name='Programme Officer'; $initials=po_initials($fn,$ln);
-if(!function_exists('po_nav_active')){function po_nav_active(string $current,$pages):string{$pages=is_array($pages)?$pages:[$pages];return in_array($current,$pages,true)?'po-nav__item--active':'';}}
-?>
-<aside class="po-sidebar" id="poSidebar"><div class="po-sidebar__brand"><div class="po-sidebar__logo"><i class="fas fa-cubes-stacked"></i></div><div class="po-sidebar__brand-copy"><strong>Investhood IT</strong><span>Programme Platform</span></div><button class="po-sidebar__close" id="poSidebarClose" type="button"><i class="fas fa-xmark"></i></button></div>
-<div class="po-profile"><div class="po-profile__avatar"><?= e($initials) ?><span class="po-profile__online"></span></div><div class="po-profile__copy"><strong><?= e($name) ?></strong><span>Programme Officer</span></div></div>
-<nav class="po-nav"><div class="po-nav__group"><div class="po-nav__label">Main</div><a href="<?= url('programme_officer/dashboard.php') ?>" class="po-nav__item <?= po_nav_active($currentPage,'dashboard') ?>"><span class="po-nav__icon"><i class="fas fa-grid-2"></i></span><span>Dashboard</span></a></div>
-<div class="po-nav__group"><div class="po-nav__label">Programme Management</div><a href="<?= url('programme_officer/programmes.php') ?>" class="po-nav__item <?= po_nav_active($currentPage,['programmes','programme_view']) ?>"><span class="po-nav__icon"><i class="fas fa-diagram-project"></i></span><span>My Programmes</span></a><a href="<?= url('programme_officer/cohorts.php') ?>" class="po-nav__item <?= po_nav_active($currentPage,['cohorts','cohort_view']) ?>"><span class="po-nav__icon"><i class="fas fa-layer-group"></i></span><span>Cohorts</span></a><a href="<?= url('programme_officer/candidates.php') ?>" class="po-nav__item <?= po_nav_active($currentPage,['candidates','candidate_view']) ?>"><span class="po-nav__icon"><i class="fas fa-users"></i></span><span>Candidates</span></a></div>
-<div class="po-nav__group"><div class="po-nav__label">Insights</div><a href="<?= url('programme_officer/reports.php') ?>" class="po-nav__item <?= po_nav_active($currentPage,'reports') ?>"><span class="po-nav__icon"><i class="fas fa-chart-column"></i></span><span>Reports</span></a><a href="<?= url('programme_officer/activity_log.php') ?>" class="po-nav__item <?= po_nav_active($currentPage,'activity_log') ?>"><span class="po-nav__icon"><i class="fas fa-clock-rotate-left"></i></span><span>Activity Log</span></a></div>
-<div class="po-nav__group"><div class="po-nav__label">Appearance</div><button type="button" class="po-theme-control" data-po-theme-toggle><span class="po-nav__icon"><i class="fas fa-moon" data-po-theme-icon></i></span><span>Dark Mode</span><span class="po-theme-switch"></span></button></div></nav>
-<div class="po-sidebar__footer"><div class="po-secure-card"><i class="fas fa-shield-halved"></i><div><strong>Secure Workspace</strong><span>Access is restricted to Programme Officer records.</span></div></div><a href="<?= url('auth/logout.php') ?>" class="po-logout"><i class="fas fa-arrow-right-from-bracket"></i><span>Sign Out</span></a></div></aside><div class="po-overlay" id="poOverlay"></div>
+require_once __DIR__ . '/_helpers.php';
+
+$currentPage = $currentPage ?? '';
+if (!isset($user) || !is_array($user)) {
+    $user = current_user();
+}
+
+$firstName = trim((string)($user['first_name'] ?? ''));
+$lastName = trim((string)($user['last_name'] ?? ''));
+$fullName = trim((string)($user['full_name'] ?? $user['fullname'] ?? ($firstName . ' ' . $lastName)));
+if ($fullName === '') $fullName = 'Programme Officer';
+$initials = po_initials($firstName, $lastName);
+
+/*
+ * HOTFIX HEADER ONLY:
+ * Keep the rest of your existing file markup below this point.
+ */

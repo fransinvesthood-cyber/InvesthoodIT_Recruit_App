@@ -1,0 +1,728 @@
+/* ================================================
+   INVESTHOOD IT - Application Review Styles
+   Stage 5: Review & Declaration
+   Uses the existing design tokens (colours, radius,
+   typography) so the page feels like the natural
+   final step of the application form.
+   ================================================ */
+
+/* ----- Intro ----- */
+.app-review__intro {
+  margin-top: 0.5rem;
+  font-size: 0.9375rem;
+  color: var(--text-light);
+}
+
+/* ----- Alerts ----- */
+.app-review__alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.app-review__alert i {
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+  font-size: 1.125rem;
+}
+
+.app-review__alert strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.app-review__alert p {
+  margin-bottom: 0.5rem;
+}
+
+.app-review__alert--warning {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  color: var(--accent-dark);
+}
+
+.app-review__alert--error {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #b91c1c;
+}
+
+.app-review__alert--error .btn {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ----- Missing list ----- */
+.app-review__missing-list-title {
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.app-review__missing-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.25rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.app-review__missing-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: #b91c1c;
+}
+
+.app-review__missing-list li i {
+  font-size: 0.875rem;
+}
+
+/* ----- Sections (cards) ----- */
+.app-review__section {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.5rem 2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.app-review__section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.app-review__section-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius);
+  background: var(--primary-bg);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  flex-shrink: 0;
+}
+
+.app-review__section-header h2 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 0.25rem;
+}
+
+.app-review__section-header p {
+  font-size: 0.875rem;
+  color: var(--text-light);
+}
+
+.app-review__section-header .btn {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ----- Completeness Checklist ----- */
+.app-review__checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.app-review__checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-light);
+  background: var(--bg);
+}
+
+.app-review__checklist-item.is-complete {
+  background: rgba(16, 185, 129, 0.05);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.app-review__checklist-item.is-missing {
+  background: rgba(245, 158, 11, 0.05);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.app-review__checklist-icon {
+  flex-shrink: 0;
+  font-size: 1.125rem;
+}
+
+.app-review__checklist-item.is-complete .app-review__checklist-icon {
+  color: var(--success);
+}
+
+.app-review__checklist-item.is-missing .app-review__checklist-icon {
+  color: var(--accent);
+}
+
+.app-review__checklist-label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+
+.app-review__checklist-missing {
+  font-size: 0.8125rem;
+  color: var(--accent-dark);
+  text-align: right;
+}
+
+/* ----- Missing box ----- */
+.app-review__missing-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+  color: var(--accent-dark);
+}
+
+.app-review__missing-box > i {
+  margin-top: 0.25rem;
+  flex-shrink: 0;
+}
+
+.app-review__missing-box > div {
+  flex: 1;
+}
+
+.app-review__missing-box strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.app-review__missing-box p {
+  margin-bottom: 0.25rem;
+}
+
+.app-review__missing-box .btn {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* ----- Responses (questions) ----- */
+.app-review__subsection {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-light);
+}
+
+.app-review__responses {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.app-review__response {
+  padding: 1rem 1.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+}
+
+.app-review__response-q {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.375rem;
+}
+
+.app-review__response-a {
+  font-size: 0.9375rem;
+  color: var(--text);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.app-review__response-a em {
+  color: var(--text-light);
+  font-style: italic;
+}
+
+.app-review__not-provided {
+  color: var(--text-light);
+  font-style: italic;
+}
+
+/* ----- Documents ----- */
+.app-review__documents {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.app-review__doc-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.app-review__doc-card--missing {
+  border-style: dashed;
+  background: rgba(245, 158, 11, 0.04);
+}
+
+.app-review__doc-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius);
+  background: var(--primary-bg);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.0625rem;
+  flex-shrink: 0;
+}
+
+.app-review__doc-card--missing .app-review__doc-icon {
+  background: var(--border-light);
+  color: var(--text-light);
+}
+
+.app-review__doc-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.app-review__doc-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--dark);
+}
+
+.app-review__doc-title .badge {
+  font-size: 0.6875rem;
+}
+
+.app-review__doc-file {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+  color: var(--text);
+}
+
+.app-review__doc-ok {
+  color: var(--success);
+  flex-shrink: 0;
+}
+
+.app-review__doc-filename {
+  font-weight: 600;
+  word-break: break-all;
+  color: var(--text);
+}
+
+.app-review__doc-meta {
+  font-size: 0.8125rem;
+  color: var(--text-light);
+}
+
+.app-review__doc-empty {
+  font-size: 0.875rem;
+  color: var(--accent-dark);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.app-review__doc-empty i {
+  font-size: 0.875rem;
+}
+
+.app-review__doc-card .btn {
+  flex-shrink: 0;
+}
+
+/* ----- Declaration ----- */
+.app-review__declaration {
+  padding: 1.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+}
+
+.app-review__declaration-text {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.6;
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.25rem;
+  background: var(--bg-white);
+  border-left: 4px solid var(--primary);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+/* ----- Checkbox ----- */
+.app-review__checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  cursor: pointer;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-white);
+  transition: var(--transition);
+}
+
+.app-review__checkbox:hover {
+  border-color: var(--primary-light);
+  background: var(--primary-bg);
+}
+
+.app-review__checkbox input[type="checkbox"] {
+  margin-top: 0.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.app-review__checkbox-text {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.app-review__field-error {
+  color: #ef4444;
+  font-size: 0.8125rem;
+  margin-top: 0.5rem;
+  min-height: 1rem;
+}
+
+/* ----- Consent ----- */
+.app-review__consent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.app-review__consent-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+}
+
+.app-review__consent-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.app-review__consent-info strong {
+  font-size: 0.9375rem;
+  color: var(--dark);
+}
+
+.app-review__consent-info span:not(.tag):not(.app-review__consent-status) {
+  font-size: 0.8125rem;
+  color: var(--text-light);
+}
+
+.app-review__consent-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-light);
+  margin-top: 0.25rem;
+}
+
+.app-review__consent-status--granted {
+  color: var(--success);
+}
+
+.app-review__consent-item .app-review__checkbox {
+  flex-shrink: 0;
+  max-width: calc(50% - 1rem);
+}
+
+/* ----- Readiness ----- */
+.app-review__readiness {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.app-review__readiness-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--success);
+}
+
+.app-review__readiness-item--missing {
+  background: rgba(245, 158, 11, 0.05);
+  border-color: rgba(245, 158, 11, 0.2);
+  color: var(--accent-dark);
+}
+
+.app-review__readiness-item i {
+  flex-shrink: 0;
+}
+
+.app-review__ready-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--success);
+  text-align: center;
+  padding: 0.75rem;
+  background: rgba(16, 185, 129, 0.05);
+  border-radius: var(--radius);
+}
+
+/* ----- Actions ----- */
+.app-review__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-light);
+}
+
+.app-review__actions .btn {
+  min-width: 140px;
+}
+
+.app-review__disabled-hint {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+/* ----- Save Status ----- */
+.app-review__save-status {
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.75rem;
+  margin-top: 1rem;
+  border-radius: var(--radius);
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-review__save-status--saving {
+  color: var(--text-light);
+  background: var(--border-light);
+}
+
+.app-review__save-status--saved {
+  color: var(--success);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.app-review__save-status--error {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* ----- Full-width info item ----- */
+.app-form__info-item--full {
+  grid-column: 1 / -1;
+}
+
+/* ================================================
+   DARK MODE SUPPORT
+body.dark-mode .app-review__section {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .app-review__section-header {
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .app-review__section-title {
+  color: #f1f5f9;
+}
+
+body.dark-mode .app-review__section-icon {
+  background: rgba(6, 182, 212, 0.15);
+  color: #22d3ee;
+}
+
+body.dark-mode .app-review__label {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-review__value {
+  color: #e2e8f0;
+}
+
+body.dark-mode .app-review__value--muted {
+  color: #64748b;
+}
+
+body.dark-mode .app-review__declaration {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .app-review__declaration-text {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-review__declaration-text a {
+  color: #22d3ee;
+}
+
+body.dark-mode .app-review__actions {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .app-review__warning {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+body.dark-mode .app-review__warning i {
+  color: #fbbf24;
+}
+
+body.dark-mode .app-review__success {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+body.dark-mode .app-review__success i {
+  color: #34d399;
+}
+
+body.dark-mode .app-review__error {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+body.dark-mode .app-review__error i {
+  color: #f87171;
+}
+
+/* ================================================
+    RESPONSIVE
+   ================================================ */
+@media (max-width: 768px) {
+  .app-review__section {
+    padding: 1.5rem 1rem;
+  }
+
+  .app-review__section-header {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .app-review__section-header .btn {
+    margin-left: 0;
+  }
+
+  .app-review__consent-item {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .app-review__consent-item .app-review__checkbox {
+    width: 100%;
+  }
+
+  .app-review__doc-card {
+    flex-wrap: wrap;
+  }
+
+  .app-review__doc-card .btn {
+    margin-left: auto;
+  }
+
+  .app-review__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .app-review__actions .btn {
+    width: 100%;
+  }
+
+  .app-review__alert {
+    flex-direction: column;
+  }
+
+  .app-review__alert--error .btn {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-review__section-header .btn {
+    width: 100%;
+  }
+
+  .app-review__checklist-item {
+    flex-wrap: wrap;
+  }
+
+  .app-review__checklist-missing {
+    text-align: left;
+    width: 100%;
+    padding-left: 1.875rem;
+  }
+}
