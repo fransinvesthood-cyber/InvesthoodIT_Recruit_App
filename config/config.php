@@ -14,7 +14,7 @@
 // -------------------------------------------------
 define('APP_NAME', 'Investhood IT');
 define('APP_ENV', 'development');                 // 'development' | 'production'
-define('APP_URL', 'http://localhost/Recruitment-Project'); // Base URL (no trailing slash)
+define('APP_URL', 'http://localhost/InvesthoodIT_Recruit_App'); // Base URL (no trailing slash)
 define('APP_TIMEZONE', 'Africa/Johannesburg');
 
 // -------------------------------------------------

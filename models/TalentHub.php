@@ -89,7 +89,7 @@ class TalentHub
             ];
         }
     }
-}
+
 
 
     /**
@@ -388,3 +388,4 @@ class TalentHub
             return [];
         }
     }
+}

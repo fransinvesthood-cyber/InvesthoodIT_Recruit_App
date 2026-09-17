@@ -11,7 +11,7 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 require_role('programme_manager');
 
 $user = current_user();
-<<<<<<< HEAD
+
 $conn = Database::getConnection();
 $currentPage = 'dashboard';
 /*
@@ -542,9 +542,9 @@ $managerName = $user['fullname'] ?? 'Programme Manager';
 if (trim($managerName) === '') {
     $managerName = 'Programme Manager';
 }
-=======
+
 $flashes = render_flashes();
->>>>>>> 69ee3b9c4b9c5032917843f6a058edc276589649
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
