@@ -27,12 +27,94 @@ $consentFuture = Consent::hasGranted($userId, CONSENT_FUTURE_OPPORTUNITIES);
 // Opportunities integration
 $savedOpportunities = SavedOpportunity::forCandidate($userId);
 $savedCount = SavedOpportunity::countForCandidate($userId);
-$recentOpportunities = CandidateOpportunitiesController::searchOpportunities([], 1, 3)['opportunities'];
+
+// Get candidate profile data for personalized recommendations
+$candidateSkills = array_column(Skill::forUser($userId), 'skill_name');
+$candidateProvince = $profile['province'] ?? null;
+$candidateCity = $profile['city'] ?? null;
+$candidateInterests = $profile['career_interests'] ?? null;
+
+// Build personalized filters based on candidate profile
+$personalizedFilters = [];
+if (!empty($candidateProvince)) {
+    $personalizedFilters['province'] = $candidateProvince;
+}
+
+// Fetch personalized opportunities (limit to 6 for dashboard)
+$recentOpportunities = CandidateOpportunitiesController::searchOpportunities($personalizedFilters, 1, 6)['opportunities'];
+
+// Get saved opportunity IDs for quick lookup
+$savedOpportunityIds = [];
+foreach ($savedOpportunities as $saved) {
+    $savedOpportunityIds[$saved['opportunity_id']] = true;
+}
 
 // Applications integration (Stage 2)
 $appStats = Application::countByStatus($userId);
 $draftApplications = (int) ($appStats['draft'] ?? 0);
 $activeApplications = (int) ($appStats['total'] ?? 0) - (int) ($appStats['rejected'] ?? 0);
+$interviewInvitations = (int) ($appStats['under_review'] ?? 0);
+$placementStatus = (int) ($appStats['selected'] ?? 0);
+
+// Interviews integration — dynamic data sourced from the interviews table
+// via the candidate's applications (Candidate → Application → Interview).
+$candidateInterviews = Interview::forCandidate($userId);
+$interviewStats      = Interview::candidateStatusCounts($userId);
+$upcomingInterviews  = Interview::candidateUpcoming($userId, 5);
+$nextInterview       = $upcomingInterviews[0] ?? null;
+
+// Recent interviews preview for the dashboard (most recent 3),
+// excluding the featured "next upcoming" interview so it isn't duplicated.
+$recentInterviews = [];
+if (!empty($candidateInterviews)) {
+    foreach ($candidateInterviews as $iv) {
+        if ($nextInterview !== null && (int) $iv['id'] === (int) $nextInterview['id']) {
+            continue;
+        }
+        $recentInterviews[] = $iv;
+        if (count($recentInterviews) >= 3) {
+            break;
+        }
+    }
+}
+
+// Count available opportunities (published and open for applications)
+$today = date('Y-m-d');
+$availableOpportunities = Database::fetchOne(
+    "SELECT COUNT(*) AS cnt FROM opportunities
+     WHERE status = 'published'
+     AND (application_open_date IS NULL OR application_open_date <= ?)
+     AND (application_close_date IS NULL OR application_close_date >= ?)",
+    'ss',
+    [$today, $today]
+);
+$availableOpportunitiesCount = (int) ($availableOpportunities['cnt'] ?? 0);
+
+// Fetch real applications for the Application Tracker (limit to 5 most recent for dashboard)
+$allApplications = Application::forCandidate($userId);
+$trackerApplications = array_slice($allApplications, 0, 5);
+$totalApplicationCount = count($allApplications);
+
+// Define the application progress stages for the timeline
+$progressStages = [
+    'submitted' => 1,
+    'eligibility_review' => 2,
+    'screened' => 3,
+    'assessment' => 4,
+    'interview' => 5,
+    'waitlisted' => 6,
+    'selected' => 7,
+];
+
+// Define all timeline steps for display
+$timelineSteps = [
+    ['key' => 'submitted', 'label' => 'Submitted'],
+    ['key' => 'eligibility_review', 'label' => 'Review'],
+    ['key' => 'screened', 'label' => 'Screened'],
+    ['key' => 'assessment', 'label' => 'Assessment'],
+    ['key' => 'interview', 'label' => 'Interview'],
+    ['key' => 'selected', 'label' => 'Decision'],
+];
 
 $flashes = render_flashes();
 ?>
@@ -50,6 +132,7 @@ $flashes = render_flashes();
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/opportunities.css') ?>">
 </head>
 <body class="dashboard-page">
 
@@ -216,7 +299,7 @@ $flashes = render_flashes();
             <div class="overview-card">
               <div class="overview-card__icon overview-card__icon--amber"><i class="fas fa-briefcase"></i></div>
               <div class="overview-card__info">
-                <span class="overview-card__number" data-count="12">0</span>
+                <span class="overview-card__number" data-count="<?= $availableOpportunitiesCount ?>"><?= $availableOpportunitiesCount ?></span>
                 <span class="overview-card__label">Available Opportunities</span>
               </div>
               <a href="<?= url('candidate/opportunities.php') ?>" class="overview-card__link">View <i class="fas fa-arrow-right"></i></a>
@@ -224,18 +307,18 @@ $flashes = render_flashes();
             <div class="overview-card">
               <div class="overview-card__icon overview-card__icon--green"><i class="fas fa-calendar-check"></i></div>
               <div class="overview-card__info">
-                <span class="overview-card__number" data-count="3">0</span>
+                <span class="overview-card__number" data-count="<?= $interviewInvitations ?>"><?= $interviewInvitations ?></span>
                 <span class="overview-card__label">Interview Invitations</span>
               </div>
-              <a href="#" class="overview-card__link">View <i class="fas fa-arrow-right"></i></a>
+              <a href="<?= url('candidate/applications.php') ?>" class="overview-card__link">View <i class="fas fa-arrow-right"></i></a>
             </div>
             <div class="overview-card">
               <div class="overview-card__icon overview-card__icon--purple"><i class="fas fa-user-check"></i></div>
               <div class="overview-card__info">
-                <span class="overview-card__number" data-count="1">0</span>
+                <span class="overview-card__number" data-count="<?= $placementStatus ?>"><?= $placementStatus ?></span>
                 <span class="overview-card__label">Placement Status</span>
               </div>
-              <a href="#" class="overview-card__link">View <i class="fas fa-arrow-right"></i></a>
+              <a href="<?= url('candidate/applications.php') ?>" class="overview-card__link">View <i class="fas fa-arrow-right"></i></a>
             </div>
             <div class="overview-card">
               <div class="overview-card__icon overview-card__icon--red"><i class="fas fa-bell"></i></div>
@@ -304,23 +387,113 @@ $flashes = render_flashes();
           </div>
 
           <div class="opp-grid" id="oppGrid">
-            <!-- Populated by JS -->
+            <?php if (empty($recentOpportunities)): ?>
+              <div class="opp-empty-state" style="grid-column:1/-1;">
+                <div class="opp-empty-state__icon"><i class="fas fa-briefcase"></i></div>
+                <h3 class="opp-empty-state__title">No Opportunities Available</h3>
+                <p class="opp-empty-state__text">
+                  <?php if (!empty($candidateProvince)): ?>
+                    No opportunities found for your location (<?= e($candidateProvince) ?>).
+                    <a href="<?= url('candidate/opportunities.php') ?>">View all opportunities</a>.
+                  <?php else: ?>
+                    Check back later for new opportunities.
+                    <a href="<?= url('candidate/opportunities.php') ?>">Browse all opportunities</a>.
+                  <?php endif; ?>
+                </p>
+                <a href="<?= url('candidate/opportunities.php') ?>" class="btn btn--primary">View All Opportunities</a>
+              </div>
+            <?php else: ?>
+              <?php foreach ($recentOpportunities as $opp): ?>
+                <?php
+                $isSaved = isset($savedOpportunityIds[$opp['id']]);
+                $today = date('Y-m-d');
+                $isClosed = !empty($opp['application_close_date']) && $opp['application_close_date'] < $today;
+                $daysUntilClose = null;
+                if (!empty($opp['application_close_date']) && !$isClosed) {
+                    $daysUntilClose = (int) ((strtotime($opp['application_close_date']) - time()) / 86400);
+                }
+                $typeLabel = CandidateOpportunitiesController::OPPORTUNITY_TYPES_DISPLAY[$opp['type']] ?? ucfirst($opp['type'] ?? 'Opportunity');
+                $arrangementLabel = CandidateOpportunitiesController::WORK_ARRANGEMENTS_DISPLAY[$opp['work_arrangement']] ?? ($opp['work_arrangement'] ?? '');
+                $locationParts = array_filter([$opp['city'] ?? '', $opp['province'] ?? '']);
+                $locationDisplay = !empty($locationParts) ? implode(', ', $locationParts) : 'Location TBD';
+                ?>
+                <article class="opp-card" data-type="<?= e($opp['type'] ?? '') ?>" data-province="<?= e(strtolower(str_replace(' ', '-', $opp['province'] ?? ''))) ?>" data-arrangement="<?= e($opp['work_arrangement'] ?? '') ?>">
+                  <div class="opp-card__header">
+                    <div class="opp-card__meta">
+                      <span class="opp-badge opp-badge--type"><?= e($typeLabel) ?></span>
+                      <?php if ($isClosed): ?>
+                        <span class="opp-badge opp-badge--closed">Closed</span>
+                      <?php elseif ($daysUntilClose !== null && $daysUntilClose <= 7): ?>
+                        <span class="opp-badge opp-badge--urgent">Closing Soon</span>
+                      <?php endif; ?>
+                    </div>
+                    <button class="opp-card__save-btn <?= $isSaved ? 'is-saved' : '' ?>" data-opp-id="<?= (int) $opp['id'] ?>" data-saved="<?= $isSaved ? '1' : '0' ?>" aria-label="<?= $isSaved ? 'Remove from saved' : 'Save opportunity' ?>">
+                      <i class="<?= $isSaved ? 'fas' : 'far' ?> fa-bookmark"></i>
+                    </button>
+                  </div>
+                  <div class="opp-card__content">
+                    <h3 class="opp-card__title">
+                      <a href="<?= url('candidate/opportunity_detail.php?id=' . (int)$opp['id']) ?>"><?= e($opp['title']) ?></a>
+                    </h3>
+                    <?php if (!empty($opp['programme_name'])): ?>
+                      <div class="opp-card__programme">
+                        <i class="fas fa-graduation-cap"></i>
+                        <span><?= e($opp['programme_name']) ?><?= !empty($opp['cohort_name']) ? ' • ' . e($opp['cohort_name']) : '' ?></span>
+                      </div>
+                    <?php endif; ?>
+                    <?php if (!empty($opp['organisation'])): ?>
+                      <div class="opp-card__org">
+                        <i class="fas fa-building"></i>
+                        <span><?= e($opp['organisation']) ?></span>
+                      </div>
+                    <?php endif; ?>
+                    <?php if (!empty($opp['short_description'])): ?>
+                      <p class="opp-card__description"><?= e(substr($opp['short_description'], 0, 120) . (strlen($opp['short_description']) > 120 ? '...' : '')) ?></p>
+                    <?php endif; ?>
+                    <div class="opp-card__details">
+                      <div class="opp-detail">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span><?= e($locationDisplay) ?></span>
+                      </div>
+                      <?php if (!empty($arrangementLabel)): ?>
+                        <div class="opp-detail">
+                          <i class="fas fa-briefcase"></i>
+                          <span><?= e($arrangementLabel) ?></span>
+                        </div>
+                      <?php endif; ?>
+                      <?php if (!empty($opp['available_positions']) && $opp['available_positions'] > 0): ?>
+                        <div class="opp-detail">
+                          <i class="fas fa-users"></i>
+                          <span><?= (int)$opp['available_positions'] ?> position<?= (int)$opp['available_positions'] !== 1 ? 's' : '' ?></span>
+                        </div>
+                      <?php endif; ?>
+                    </div>
+                    <?php if (!$isClosed && !empty($opp['application_close_date'])): ?>
+                      <div class="opp-card__deadline">
+                        <?php if ($daysUntilClose <= 3): ?>
+                          <span class="opp-deadline-urgent"><i class="fas fa-exclamation-circle"></i> Closes in <?= (int)$daysUntilClose ?> day<?= (int)$daysUntilClose !== 1 ? 's' : '' ?></span>
+                        <?php elseif ($daysUntilClose <= 7): ?>
+                          <span class="opp-deadline-warning"><i class="fas fa-clock"></i> Closes in <?= (int)$daysUntilClose ?> days</span>
+                        <?php else: ?>
+                          <span class="opp-deadline-info"><i class="fas fa-calendar-alt"></i> Closes <?= format_date($opp['application_close_date'], 'd M Y') ?></span>
+                        <?php endif; ?>
+                      </div>
+                    <?php elseif ($isClosed): ?>
+                      <div class="opp-card__closed">
+                        <span class="opp-applications-closed"><i class="fas fa-lock"></i> Applications Closed</span>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                  <div class="opp-card__footer">
+                    <a href="<?= url('candidate/opportunity_detail.php?id=' . (int)$opp['id']) ?>" class="btn btn--primary btn--sm btn--full">View Details</a>
+                  </div>
+                </article>
+              <?php endforeach; ?>
+            <?php endif; ?>
           </div>
 
-          <div class="opp-pagination" id="oppPagination">
-            <button class="btn btn--ghost btn--sm" disabled><i class="fas fa-chevron-left"></i> Previous</button>
-            <span class="opp-pagination__info">Page 1 of 1</span>
-            <button class="btn btn--ghost btn--sm" disabled>Next <i class="fas fa-chevron-right"></i></button>
-          </div>
-
-          <!-- Recommended Section -->
-          <div class="opp-recommended">
-            <div class="opp-recommended__header">
-              <h3><i class="fas fa-star"></i> Recommended For You</h3>
-            </div>
-            <div class="opp-recommended__grid" id="oppRecommendedGrid">
-              <!-- Populated by JS -->
-            </div>
+          <div class="opp-section-footer" style="text-align:center;margin-top:2rem;">
+            <a href="<?= url('candidate/opportunities.php') ?>" class="btn btn--outline"><i class="fas fa-th-list"></i> View All Opportunities</a>
           </div>
         </section>
 
@@ -333,7 +506,107 @@ $flashes = render_flashes();
             <p class="section__text" style="font-size:0.9rem;">Track your application journey from submission to outcome.</p>
           </div>
           <div class="app-tracker" id="appTracker">
-            <!-- Populated by JS -->
+            <?php if (empty($trackerApplications)): ?>
+              <div class="empty-state" style="padding:3rem 2rem;text-align:center;background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius-md);">
+                <div class="empty-state__icon" style="font-size:3rem;color:var(--text-lighter);margin-bottom:1rem;"><i class="fas fa-file-alt"></i></div>
+                <h3 class="empty-state__title" style="font-size:1.25rem;margin-bottom:0.5rem;">No Applications Yet</h3>
+                <p class="empty-state__text" style="color:var(--text-light);margin-bottom:1.5rem;">You haven't submitted any applications yet. Start exploring opportunities and apply to programmes that match your skills and interests.</p>
+                <a href="<?= url('candidate/opportunities.php') ?>" class="btn btn--primary"><i class="fas fa-search"></i> Browse Opportunities</a>
+              </div>
+            <?php else: ?>
+              <?php foreach ($trackerApplications as $app): ?>
+                <?php
+                $appStatus = $app['status'] ?? 'draft';
+                $appStatusLabel = Application::label($appStatus);
+                $appBadgeTone = Application::badgeTone($appStatus);
+                $appTitle = $app['opportunity_title'] ?? 'Untitled Opportunity';
+                $appProgramme = $app['programme_name'] ?? '';
+                $appCohort = $app['cohort_name'] ?? '';
+                $appRef = $app['application_reference'] ?? '';
+                $appDate = !empty($app['submitted_at']) ? $app['submitted_at'] : ($app['created_at'] ?? '');
+                $appUpdatedAt = $app['updated_at'] ?? '';
+                $appCloseDate = $app['application_close_date'] ?? '';
+                $appId = (int) ($app['id'] ?? 0);
+                $appOppId = (int) ($app['opportunity_id'] ?? 0);
+                $isTerminal = in_array($appStatus, ['selected', 'rejected', 'withdrawn', 'expired'], true);
+                $isRejected = in_array($appStatus, ['rejected', 'withdrawn'], true);
+                $currentStage = $progressStages[$appStatus] ?? 0;
+                $totalStages = count($timelineSteps);
+                $progressPercent = $isTerminal ? 100 : min(100, round(($currentStage / $totalStages) * 100));
+                ?>
+                <article class="app-card" data-status="<?= e($appStatus) ?>">
+                  <div class="app-card__header">
+                    <div class="app-card__header-left">
+                      <h3 class="app-card__title"><?= e($appTitle) ?></h3>
+                      <?php if (!empty($appProgramme)): ?>
+                        <div class="app-card__programme"><i class="fas fa-graduation-cap"></i> <span><?= e($appProgramme) ?><?= !empty($appCohort) ? ' &bull; ' . e($appCohort) : '' ?></span></div>
+                      <?php endif; ?>
+                    </div>
+                    <span class="badge badge--<?= e($appBadgeTone) ?>"><?= e($appStatusLabel) ?></span>
+                  </div>
+                  <?php if ($appStatus !== 'draft'): ?>
+                  <div class="app-card__timeline">
+                    <?php foreach ($timelineSteps as $stepIndex => $step):
+                      $stepKey = $step['key'];
+                      $stepOrder = $progressStages[$stepKey] ?? 0;
+                      $isDone = $currentStage > $stepOrder;
+                      $isCurrent = $currentStage === $stepOrder;
+                      $stepClass = 'timeline-step--waiting';
+                      $stepIcon = '';
+                      if ($isRejected && $isCurrent) {
+                        $stepClass = 'timeline-step--rejected';
+                        $stepIcon = '<i class="fas fa-times"></i>';
+                      } elseif ($isDone) {
+                        $stepClass = 'timeline-step--done';
+                        $stepIcon = '<i class="fas fa-check"></i>';
+                      } elseif ($isCurrent) {
+                        $stepClass = 'timeline-step--current';
+                        $stepIcon = '<i class="fas fa-circle"></i>';
+                      }
+                    ?>
+                      <div class="timeline-step <?= $stepClass ?>">
+                        <div class="timeline-step__dot"><?= $stepIcon ?></div>
+                        <?php if ($stepIndex < count($timelineSteps) - 1): ?><div class="timeline-step__line"></div><?php endif; ?>
+                        <span class="timeline-step__label"><?= e($step['label']) ?></span>
+                      </div>
+                    <?php endforeach; ?>
+                  </div>
+                  <div class="app-card__progress">
+                    <div class="app-card__progress-bar"><div class="app-card__progress-fill" style="width:<?= (int) $progressPercent ?>%"></div></div>
+                    <span class="app-card__progress-label"><?php if ($isRejected): ?><strong style="color:#ef4444;"><?= e($appStatusLabel) ?></strong><?php elseif ($appStatus === 'selected'): ?><strong style="color:var(--success);">Congratulations! Selected</strong><?php else: ?>Current: <strong><?= e($appStatusLabel) ?></strong> &middot; <?= (int) $progressPercent ?>% complete<?php endif; ?></span>
+                  </div>
+                  <?php else: ?>
+                  <div class="app-card__progress">
+                    <div class="app-card__progress-bar"><div class="app-card__progress-fill" style="width:10%"></div></div>
+                    <span class="app-card__progress-label">Draft - Not yet submitted</span>
+                  </div>
+                  <?php endif; ?>
+                  <div class="app-card__meta">
+                    <?php if (!empty($appRef)): ?><span class="app-card__ref"><i class="fas fa-hashtag"></i> <?= e($appRef) ?></span><?php endif; ?>
+                    <?php if (!empty($appDate)): ?><span class="app-card__date"><i class="far fa-calendar-alt"></i> <?= e(format_date($appDate, 'd M Y')) ?></span><?php endif; ?>
+                    <?php if (!empty($appUpdatedAt) && $appUpdatedAt !== $appDate): ?><span class="app-card__date app-card__date--updated"><i class="far fa-clock"></i> Updated <?= e(format_date($appUpdatedAt, 'd M Y')) ?></span><?php endif; ?>
+                    <?php if (!empty($appCloseDate) && !$isTerminal): ?><span class="app-card__deadline"><i class="fas fa-hourglass-half"></i> Closes <?= e(format_date($appCloseDate, 'd M Y')) ?></span><?php endif; ?>
+                  </div>
+                  <div class="app-card__footer">
+                    <?php if ($appStatus === 'draft'): ?>
+                      <a href="<?= url('candidate/application_start.php?id=' . $appId) ?>" class="btn btn--primary btn--sm">Continue Application</a>
+                    <?php else: ?>
+                      <a href="<?= url('candidate/application_detail.php?id=' . $appId) ?>" class="btn btn--primary btn--sm">View Application</a>
+                    <?php endif; ?>
+                    <?php if (!$isTerminal && $appStatus !== 'draft'): ?><a href="<?= url('candidate/opportunity_detail.php?id=' . $appOppId) ?>" class="btn btn--ghost btn--sm">View Opportunity</a><?php endif; ?>
+                  </div>
+                </article>
+              <?php endforeach; ?>
+              <?php if ($totalApplicationCount > count($trackerApplications)): ?>
+                <div class="app-tracker__footer" style="text-align:center;margin-top:1.5rem;">
+                  <a href="<?= url('candidate/applications.php') ?>" class="btn btn--outline"><i class="fas fa-th-list"></i> View All Applications (<?= (int) $totalApplicationCount ?>)</a>
+                </div>
+              <?php elseif ($totalApplicationCount > 0): ?>
+                <div class="app-tracker__footer" style="text-align:center;margin-top:1.5rem;">
+                  <a href="<?= url('candidate/applications.php') ?>" class="btn btn--ghost btn--sm"><i class="fas fa-arrow-right"></i> Manage Applications</a>
+                </div>
+              <?php endif; ?>
+            <?php endif; ?>
           </div>
         </section>
 
@@ -640,16 +913,128 @@ $flashes = render_flashes();
           </div>
         </section>
 
-        <!-- =============================================
+                <!-- =============================================
              S9: INTERVIEW MANAGEMENT
              ============================================= -->
         <section class="dash-section" id="dashboard-interviews">
-          <div class="section__header" style="text-align:left;margin-bottom:1.5rem;">
-            <h2 class="section__title" style="font-size:1.5rem;">Interview <span class="text-gradient">Management</span></h2>
+          <div class="section__header interview-section__header">
+            <div class="interview-section__heading">
+              <h2 class="section__title" style="font-size:1.5rem;">Interview <span class="text-gradient">Management</span></h2>
+              <p class="section__text" style="font-size:0.9rem;">Schedule, status, and history of your interviews.</p>
+            </div>
+            <a href="<?= url('candidate/interviews.php') ?>" class="btn btn--primary btn--sm interview-section__manage">
+              <i class="fas fa-calendar-check"></i> Manage Interviews
+            </a>
           </div>
-          <div class="interview-grid" id="interviewGrid">
-            <!-- Populated by JS -->
+
+          <!-- Dynamic summary cards (real counts from the database) -->
+          <div class="interview-summary">
+            <div class="interview-summary__card interview-summary__card--upcoming">
+              <div class="interview-summary__icon"><i class="fas fa-hourglass-half"></i></div>
+              <div class="interview-summary__body">
+                <span class="interview-summary__number"><?= (int) ($interviewStats['upcoming'] ?? 0) ?></span>
+                <span class="interview-summary__label">Upcoming Interviews</span>
+              </div>
+            </div>
+            <div class="interview-summary__card interview-summary__card--completed">
+              <div class="interview-summary__icon"><i class="fas fa-check-circle"></i></div>
+              <div class="interview-summary__body">
+                <span class="interview-summary__number"><?= (int) ($interviewStats['completed'] ?? 0) ?></span>
+                <span class="interview-summary__label">Completed Interviews</span>
+              </div>
+            </div>
+            <div class="interview-summary__card interview-summary__card--total">
+              <div class="interview-summary__icon"><i class="fas fa-calendar-alt"></i></div>
+              <div class="interview-summary__body">
+                <span class="interview-summary__number"><?= (int) ($interviewStats['total'] ?? 0) ?></span>
+                <span class="interview-summary__label">Total Interviews</span>
+              </div>
+            </div>
           </div>
+
+          <?php if (empty($candidateInterviews)): ?>
+            <!-- Empty state: candidate has no interviews -->
+            <div class="interview-empty">
+              <div class="interview-empty__icon"><i class="fas fa-calendar-times"></i></div>
+              <h3 class="interview-empty__title">No interviews scheduled</h3>
+              <p class="interview-empty__text">You don't have any interviews scheduled at the moment. When the recruitment team schedules an interview, it will appear here.</p>
+              <a href="<?= url('candidate/interviews.php') ?>" class="btn btn--outline btn--sm"><i class="fas fa-calendar-check"></i> Manage Interviews</a>
+            </div>
+                              <?php else: ?>
+            <?php if ($nextInterview !== null): ?>
+              <?php
+                  $niStatusTone = Interview::badgeTone($nextInterview['status']);
+                  $niJoinUrl    = Interview::joinUrl($nextInterview);
+              ?>
+              <!-- Nearest upcoming interview (real data) -->
+              <article class="interview-card interview-card--featured">
+                <div class="interview-card__header">
+                  <div class="interview-card__heading">
+                    <span class="interview-card__overline">Next Upcoming Interview</span>
+                    <h3 class="interview-card__title"><?= e(Interview::typeLabel($nextInterview['interview_type'])) ?> Interview</h3>
+                    <span class="interview-card__programme">
+                      <i class="fas fa-briefcase"></i>
+                      <?= e($nextInterview['opportunity_title'] ?? '') ?>
+                      <?= !empty($nextInterview['cohort_name']) ? ' • ' . e($nextInterview['cohort_name']) : '' ?>
+                    </span>
+                  </div>
+                  <span class="tag tag--<?= e($niStatusTone) ?>"><?= e(Interview::label($nextInterview['status'])) ?></span>
+                </div>
+                <div class="interview-card__countdown">
+                  <i class="fas fa-clock"></i>
+                  <span class="interview-card__countdown-time"><?= e(Interview::countdownLabel($nextInterview['interview_date'], $nextInterview['start_time'])) ?></span>
+                </div>
+                <div class="interview-card__details">
+                  <div class="interview-card__detail"><i class="fas fa-calendar-alt"></i> <?= e(format_date($nextInterview['interview_date'], 'l, d F Y')) ?></div>
+                  <div class="interview-card__detail"><i class="fas fa-clock"></i> <?= e(Interview::timeRange($nextInterview['start_time'], $nextInterview['end_time'])) ?></div>
+                  <div class="interview-card__detail"><i class="fas <?= e(Interview::typeIcon($nextInterview['interview_type'])) ?>"></i> Format: <?= e(Interview::typeLabel($nextInterview['interview_type'])) ?></div>
+                  <?php if (!empty($nextInterview['interviewer_first_name'])): ?>
+                    <div class="interview-card__detail"><i class="fas fa-user-tie"></i> Interviewer: <?= e($nextInterview['interviewer_first_name'] . ' ' . $nextInterview['interviewer_last_name']) ?></div>
+                  <?php endif; ?>
+                  <?php if (!empty($nextInterview['location'])): ?>
+                    <div class="interview-card__detail">
+                      <i class="fas <?= $niJoinUrl ? 'fa-link' : Interview::typeIcon($nextInterview['interview_type']) ?>"></i>
+                      <?= $niJoinUrl ? '<a href="' . e($niJoinUrl) . '" target="_blank" rel="noopener">Open meeting link</a>' : e($nextInterview['location']) ?>
+                    </div>
+                  <?php endif; ?>
+                </div>
+                <div class="interview-card__actions">
+                  <?php if ($niJoinUrl): ?>
+                    <a href="<?= e($niJoinUrl) ?>" target="_blank" rel="noopener" class="btn btn--primary btn--sm"><i class="fas fa-video"></i> Join Interview</a>
+                  <?php endif; ?>
+                  <a href="<?= url('candidate/interviews.php#interview-' . (int) $nextInterview['id']) ?>" class="btn btn--outline btn--sm"><i class="fas fa-eye"></i> View Details</a>
+                </div>
+              </article>
+            <?php else: ?>
+              <!-- No upcoming but has past/terminal interviews -->
+              <div class="interview-empty interview-empty--sm" style="border-style:dashed;">
+                <h3 class="interview-empty__title">No upcoming interviews</h3>
+                <p class="interview-empty__text">You don't have any upcoming interviews. Below is your recent interview history.</p>
+              </div>
+            <?php endif; ?>
+
+            <!-- Recent interviews preview (real records) -->
+            <?php if (!empty($recentInterviews)): ?>
+              <div class="interview-list">
+                <div class="interview-list__title"><i class="fas fa-history"></i> Recent Interviews</div>
+                <?php foreach ($recentInterviews as $iv): ?>
+                  <div class="interview-list__item" id="interview-<?= (int) $iv['id'] ?>">
+                    <div class="interview-list__date">
+                      <span class="day"><?= e(format_date($iv['interview_date'], 'd')) ?></span>
+                      <span><?= e(format_date($iv['interview_date'], 'M')) ?></span>
+                    </div>
+                    <div class="interview-list__info">
+                      <strong><?= e(Interview::typeLabel($iv['interview_type'])) ?> Interview</strong>
+                      <span><?= e($iv['opportunity_title'] ?? '') ?><?= !empty($iv['programme_name']) ? ' • ' . e($iv['programme_name']) : '' ?> • <?= e(Interview::label($iv['status'])) ?></span>
+                    </div>
+                    <span class="tag tag--<?= e(Interview::badgeTone($iv['status'])) ?> tag--sm"><?= e(Interview::label($iv['status'])) ?></span>
+                    <a href="<?= url('candidate/interviews.php#interview-' . (int) $iv['id']) ?>" class="interview-list__link" title="View details"><i class="fas fa-chevron-right"></i></a>
+                  </div>
+                <?php endforeach; ?>
+                <a href="<?= url('candidate/interviews.php') ?>" class="interview-list__view-all">View all interviews <i class="fas fa-arrow-right"></i></a>
+              </div>
+            <?php endif; ?>
+          <?php endif; ?>
         </section>
 
         <!-- =============================================

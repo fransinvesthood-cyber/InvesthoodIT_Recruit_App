@@ -26,15 +26,12 @@ class Database
             mysqli_report(MYSQLI_REPORT_OFF);
 
             $conn = @new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-
-            // Check connection
             if ($conn->connect_errno) {
                 error_log('[DB] Connection failed: ' . $conn->connect_error);
                 http_response_code(500);
                 exit('A system error occurred. Please try again later.');
             }
 
-            // Set charset
             if (!$conn->set_charset(DB_CHARSET)) {
                 error_log('[DB] Failed to set charset: ' . $conn->error);
             }
@@ -45,121 +42,114 @@ class Database
         return self::$instance;
     }
 
-    /**
-     * Helper: run a SELECT with prepared statement
-     * and return a single associative row.
-     *
-     * @param string $sql
-     * @param string $types e.g. 'is'
-     * @param array  $params
-     * @return array|null
-     */
     public static function fetchOne(string $sql, string $types = '', array $params = []): ?array
     {
         $row = self::fetchAll($sql, $types, $params);
         return $row[0] ?? null;
     }
 
-    /**
-     * Helper: run a SELECT with prepared statement
-     * and return all associative rows.
-     *
-     * @param string $sql
-     * @param string $types
-     * @param array  $params
-     * @return array
-     */
     public static function fetchAll(string $sql, string $types = '', array $params = []): array
     {
         $stmt = self::prepare($sql, $types, $params);
-        $result = $stmt->get_result();
-        $rows = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
-        $stmt->close();
-        return $rows;
+        try {
+            $result = $stmt->get_result();
+            $rows = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+            if ($result) {
+                $result->free();
+            }
+            return $rows;
+        } finally {
+            $stmt->close();
+        }
     }
 
-    /**
-     * Helper: run an INSERT/UPDATE/DELETE with prepared
-     * statement and return affected rows.
-     *
-     * @param string $sql
-     * @param string $types
-     * @param array  $params
-     * @return int affected rows
-     */
     public static function execute(string $sql, string $types = '', array $params = []): int
     {
         $stmt = self::prepare($sql, $types, $params);
-        $affected = $stmt->affected_rows;
-        $stmt->close();
-        return $affected;
+        try {
+            return (int) $stmt->affected_rows;
+        } finally {
+            $stmt->close();
+        }
     }
 
     /**
-     * Prepare a statement with bound parameters.
+     * Run a raw SQL statement that cannot be parameterised (e.g. DDL such as
+     * CREATE TABLE / ALTER TABLE). Use sparingly — never with user input.
      *
      * @param string $sql
-     * @param string $types
-     * @param array  $params
-     * @return mysqli_stmt
+     * @return bool True on success
+     * @throws RuntimeException on failure
      */
+    public static function query(string $sql): bool
+    {
+        $conn = self::getConnection();
+
+        if ($conn->query($sql) === false) {
+            error_log('[DB] Query failed: ' . $conn->error . ' | SQL: ' . $sql);
+            throw new RuntimeException('Database query error.');
+        }
+
+        return true;
+    }
+
     public static function prepare(string $sql, string $types = '', array $params = []): mysqli_stmt
     {
         $conn = self::getConnection();
-        $stmt = $conn->prepare($sql);
 
+        $placeholderCount = substr_count($sql, '?');
+        if (($types !== '' || $params !== []) && strlen($types) !== $placeholderCount) {
+            throw new RuntimeException('Database prepare error.');
+        }
+
+        if ($types !== '' && count($params) > 0 && strlen($types) !== count($params)) {
+            throw new RuntimeException('Database prepare error.');
+        }
+
+        $stmt = $conn->prepare($sql);
         if (!$stmt) {
             error_log('[DB] Prepare failed: ' . $conn->error . ' | SQL: ' . $sql);
             throw new RuntimeException('Database prepare error.');
         }
 
-        if ($types !== '' && count($params) > 0) {
-            // Spread parameters by reference
+        if ($types !== '' && $params !== []) {
             $bindArgs = [$types];
-            foreach ($params as &$p) {
-                $bindArgs[] = &$p;
+            foreach ($params as $index => &$value) {
+                $bindArgs[] = &$value;
             }
-            unset($p);
-            call_user_func_array([$stmt, 'bind_param'], $bindArgs);
+            unset($value);
+
+            if (!call_user_func_array([$stmt, 'bind_param'], $bindArgs)) {
+                $stmt->close();
+                error_log('[DB] Bind failed: ' . $stmt->error . ' | SQL: ' . $sql);
+                throw new RuntimeException('Database prepare error.');
+            }
         }
 
         if (!$stmt->execute()) {
-            error_log('[DB] Execute failed: ' . $stmt->error);
+            $stmt->close();
+            error_log('[DB] Execute failed: ' . $stmt->error . ' | SQL: ' . $sql);
             throw new RuntimeException('Database execute error.');
         }
 
         return $stmt;
     }
 
-    /**
-     * Return the ID of the last inserted row.
-     *
-     * @return int
-     */
     public static function lastInsertId(): int
     {
         return (int) self::getConnection()->insert_id;
     }
 
-    /**
-     * Begin a transaction.
-     */
     public static function beginTransaction(): void
     {
         self::getConnection()->begin_transaction();
     }
 
-    /**
-     * Commit the active transaction.
-     */
     public static function commit(): void
     {
         self::getConnection()->commit();
     }
 
-    /**
-     * Roll back the active transaction.
-     */
     public static function rollback(): void
     {
         self::getConnection()->rollback();

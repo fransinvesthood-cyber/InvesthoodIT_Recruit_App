@@ -68,6 +68,7 @@ $flashes = render_flashes();
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/settings.css') ?>">
   <link rel="stylesheet" href="<?= url('css/opportunities.css') ?>">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
@@ -132,10 +133,10 @@ $flashes = render_flashes();
         <?= $flashes ?>
 
         <!-- ===== OPPORTUNITY HEADER ===== -->
-        <section class="opp-detail__header">
-          <div class="opp-detail__container">
-            <div class="opp-detail__title-section">
-              <div class="opp-detail__badges">
+        <div class="settings-hero">
+          <div class="settings-hero__inner">
+            <div class="settings-hero__text">
+              <div class="opp-detail__badges" style="margin-bottom: 0.5rem;">
                 <span class="opp-badge opp-badge--type"><?= e(CandidateOpportunitiesController::OPPORTUNITY_TYPES_DISPLAY[$opportunity['type']] ?? $opportunity['type']) ?></span>
                 <?php if ($isAfterClosing): ?>
                   <span class="opp-badge opp-badge--closed">Closed</span>
@@ -143,59 +144,59 @@ $flashes = render_flashes();
                   <span class="opp-badge opp-badge--urgent">Closing Soon</span>
                 <?php endif; ?>
               </div>
-              <h1 class="opp-detail__title"><?= e($opportunity['title']) ?></h1>
-              <div class="opp-detail__programme">
+              <h1 class="settings-hero__title"><?= e($opportunity['title']) ?></h1>
+              <p class="settings-hero__subtitle">
                 <i class="fas fa-graduation-cap"></i>
                 <span><?= e($opportunity['programme_name']) ?></span>
                 <?php if (!empty($opportunity['cohort_name'])): ?>
-                  <span class="opp-detail__separator">•</span>
+                  <span>•</span>
                   <span><?= e($opportunity['cohort_name']) ?></span>
                 <?php endif; ?>
-              </div>
+              </p>
+              <?php if (!empty($opportunity['organisation'])): ?>
+              <p class="settings-hero__subtitle" style="margin-top: 0.25rem;">
+                <i class="fas fa-building"></i>
+                <span><?= e($opportunity['organisation']) ?></span>
+              </p>
+              <?php endif; ?>
             </div>
-
-            <div class="opp-detail__actions">
+            <div class="settings-hero__actions">
               <button class="opp-detail__save-btn <?= $isSaved ? 'is-saved' : '' ?>" id="saveBtn" data-opp-id="<?= (int)$oppId ?>" data-saved="<?= $isSaved ? '1' : '0' ?>">
                 <i class="fas fa-bookmark"></i> <?= $isSaved ? 'Saved' : 'Save' ?>
               </button>
             </div>
           </div>
+        </div>
 
-          <!-- Quick Info Bar -->
-          <div class="opp-detail__quick-info">
-            <div class="opp-detail__container">
-              <div class="opp-quick-info">
-                <?php if (!empty($opportunity['city']) || !empty($opportunity['province'])): ?>
-                  <div class="opp-quick-info__item">
-                    <i class="fas fa-map-marker-alt"></i>
-                    <span><?= e($opportunity['city'] ?? $opportunity['province'] ?? 'Location TBD') ?></span>
-                  </div>
-                <?php endif; ?>
+        <!-- Quick Info Bar -->
+        <?php if (!empty($opportunity['city']) || !empty($opportunity['province']) || !empty($opportunity['work_arrangement']) || !empty($opportunity['available_positions'])): ?>
+        <div class="opp-detail__quick-info" style="margin-top: 1rem;">
+          <div class="opp-detail__container">
+            <div class="opp-quick-info">
+              <?php if (!empty($opportunity['city']) || !empty($opportunity['province'])): ?>
+                <div class="opp-quick-info__item">
+                  <i class="fas fa-map-marker-alt"></i>
+                  <span><?= e($opportunity['city'] ?? $opportunity['province'] ?? 'Location TBD') ?></span>
+                </div>
+              <?php endif; ?>
 
-                <?php if (!empty($opportunity['work_arrangement'])): ?>
-                  <div class="opp-quick-info__item">
-                    <i class="fas fa-briefcase"></i>
-                    <span><?= e(CandidateOpportunitiesController::WORK_ARRANGEMENTS_DISPLAY[$opportunity['work_arrangement']] ?? $opportunity['work_arrangement']) ?></span>
-                  </div>
-                <?php endif; ?>
+              <?php if (!empty($opportunity['work_arrangement'])): ?>
+                <div class="opp-quick-info__item">
+                  <i class="fas fa-briefcase"></i>
+                  <span><?= e(CandidateOpportunitiesController::WORK_ARRANGEMENTS_DISPLAY[$opportunity['work_arrangement']] ?? $opportunity['work_arrangement']) ?></span>
+                </div>
+              <?php endif; ?>
 
-                <?php if (!empty($opportunity['available_positions'])): ?>
-                  <div class="opp-quick-info__item">
-                    <i class="fas fa-users"></i>
-                    <span><?= (int)$opportunity['available_positions'] ?> position<?= (int)$opportunity['available_positions'] !== 1 ? 's' : '' ?></span>
-                  </div>
-                <?php endif; ?>
-
-                <?php if (!empty($opportunity['organisation'])): ?>
-                  <div class="opp-quick-info__item">
-                    <i class="fas fa-building"></i>
-                    <span><?= e($opportunity['organisation']) ?></span>
-                  </div>
-                <?php endif; ?>
-              </div>
+              <?php if (!empty($opportunity['available_positions'])): ?>
+                <div class="opp-quick-info__item">
+                  <i class="fas fa-users"></i>
+                  <span><?= (int)$opportunity['available_positions'] ?> position<?= (int)$opportunity['available_positions'] !== 1 ? 's' : '' ?></span>
+                </div>
+              <?php endif; ?>
             </div>
           </div>
-        </section>
+        </div>
+        <?php endif; ?>
 
         <!-- ===== CONTENT LAYOUT ===== -->
         <section class="opp-detail__content">
@@ -432,7 +433,7 @@ $flashes = render_flashes();
                   <p class="opp-detail__card-info">You have already applied for this opportunity.</p>
 
                 <?php elseif ($appActionType === 'apply_again' && $existingApplication): ?>
-                  <form method="POST" action="<?= url('candidate/application_actions.php') ?>" onsubmit="this.querySelector('button').disabled = true;">
+                  <form method="POST" action="<?= url('candidate/start_application.php') ?>" onsubmit="this.querySelector('button').disabled = true;">
                     <?= csrf_field() ?>
                     <input type="hidden" name="opportunity_id" value="<?= (int) $opportunity['id'] ?>">
                     <button type="submit" class="btn btn--primary btn--full">
@@ -442,7 +443,7 @@ $flashes = render_flashes();
                   <p class="opp-detail__card-info">Your previous application was withdrawn.</p>
 
                 <?php else: ?>
-                  <form method="POST" action="<?= url('candidate/application_actions.php') ?>" id="applyNowForm">
+                  <form method="POST" action="<?= url('candidate/start_application.php') ?>" id="applyNowForm">
                     <?= csrf_field() ?>
                     <input type="hidden" name="opportunity_id" value="<?= (int) $opportunity['id'] ?>">
                     <button type="submit" class="btn btn--primary btn--full" id="applyNowBtn">

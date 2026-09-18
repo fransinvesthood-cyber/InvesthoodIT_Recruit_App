@@ -6,6 +6,33 @@
 
 document.addEventListener('DOMContentLoaded', function () {
 
+  // ============================================
+  // 0. DARK MODE — Restore saved theme on ALL admin pages
+  //    (must run before early return so all pages get the theme)
+  // ============================================
+  var savedTheme = localStorage.getItem('theme');
+  if (savedTheme === 'dark') {
+    document.body.classList.add('dark-mode');
+  }
+  var themeToggleDash = document.getElementById('themeToggle');
+  if (themeToggleDash) {
+    var iconDash = themeToggleDash.querySelector('i');
+    if (iconDash) {
+      iconDash.className = document.body.classList.contains('dark-mode') ? 'fas fa-sun' : 'fas fa-moon';
+    }
+    themeToggleDash.addEventListener('click', function () {
+      document.body.classList.toggle('dark-mode');
+      var icon = this.querySelector('i');
+      if (document.body.classList.contains('dark-mode')) {
+        icon.className = 'fas fa-sun';
+        localStorage.setItem('theme', 'dark');
+      } else {
+        icon.className = 'fas fa-moon';
+        localStorage.setItem('theme', 'light');
+      }
+    });
+  }
+
   var adminContent = document.getElementById('adminDashContent');
   if (!adminContent) return; // Not an admin dashboard page
 
@@ -80,23 +107,7 @@ function openSidebar() {
   });
 
   // ============================================
-  // 2. DARK MODE TOGGLE
-  // ============================================
-  var themeToggle = document.getElementById('themeToggle');
-  if (themeToggle) {
-    themeToggle.addEventListener('click', function () {
-      document.body.classList.toggle('dark-mode');
-      var icon = this.querySelector('i');
-      if (document.body.classList.contains('dark-mode')) {
-        icon.className = 'fas fa-sun';
-      } else {
-        icon.className = 'fas fa-moon';
-      }
-    });
-  }
-
-  // ============================================
-  // 3. OVERVIEW COUNTER ANIMATION
+  // 2. OVERVIEW COUNTER ANIMATION
   // ============================================
   function animateNumber(el) {
     var target = parseInt(el.getAttribute('data-count'), 10);
@@ -655,29 +666,31 @@ function openSidebar() {
   // 11. OPPORTUNITY MANAGEMENT (server-rendered cards)
   // ============================================
   // The opportunity cards are rendered server-side from real DB data.
-  // This provides a lightweight client-side filter over those cards.
+  // This provides a lightweight client-side filter over both grids.
   var adminOppGrid = document.getElementById('adminOppGrid');
+  var adminOppGridOther = document.getElementById('adminOppGridOther');
 
   // Expose a global filter so the inline oninput handler can call it.
   window.filterDashOpportunities = function (query) {
-    if (!adminOppGrid) return;
     var q = (query || '').toString().toLowerCase().trim();
-    var cards = adminOppGrid.querySelectorAll('.admin-opp-card[data-search]');
-    var visible = 0;
-    cards.forEach(function (card) {
-      var haystack = (card.getAttribute('data-search') || '').toLowerCase();
-      var match = !q || haystack.indexOf(q) !== -1;
-      card.style.display = match ? '' : 'none';
-      if (match) visible++;
+    // Filter both opportunity grids
+    var grids = [adminOppGrid, adminOppGridOther];
+    grids.forEach(function (grid) {
+      if (!grid) return;
+      var cards = grid.querySelectorAll('.admin-opp-card[data-search]');
+      var visible = 0;
+      cards.forEach(function (card) {
+        var haystack = (card.getAttribute('data-search') || '').toLowerCase();
+        var match = !q || haystack.indexOf(q) !== -1;
+        card.style.display = match ? '' : 'none';
+        if (match) visible++;
+      });
+      // Show/hide empty state if no cards match
+      var empty = grid.querySelector('.admin-empty-state');
+      if (empty) {
+        empty.style.display = (visible === 0 && cards.length > 0) ? '' : 'none';
+      }
     });
-    // Show/hide an empty state message if no cards match.
-    var empty = adminOppGrid.querySelector('.admin-empty-state');
-    if (empty) {
-      empty.style.display = (visible === 0 && cards.length > 0) ? '' : 'none';
-    }
-    if (cards.length === 0 && empty) {
-      empty.style.display = '';
-    }
   };
 
   var adminOppSearch = document.getElementById('adminOppSearch');
@@ -688,59 +701,21 @@ function openSidebar() {
   }
 
   // ============================================
-  // 12. APPLICATION TABLE DATA & RENDER
+  // 12. APPLICATION TABLE (PHP-rendered, JS filters only)
   // ============================================
   var adminAppTable = document.getElementById('adminAppTable');
-  var applications = [
-    { id: '#APP-001', name: 'John Doe', position: 'Junior Software Developer', date: '15 May 2025', status: 'Interview', score: 88, stage: 'interview' },
-    { id: '#APP-002', name: 'Priya Singh', position: 'Cloud Engineering Intern', date: '10 Apr 2025', status: 'Screening', score: 75, stage: 'review' },
-    { id: '#APP-003', name: 'Thabo Molefe', position: 'Data Analytics Graduate', date: '20 Mar 2025', status: 'Selected', score: 94, stage: 'selected' },
-    { id: '#APP-004', name: 'Sarah Nkosi', position: 'IT Support Learnership', date: '05 Jun 2025', status: 'Submitted', score: 68, stage: 'submitted' },
-    { id: '#APP-005', name: 'Mike Johnson', position: 'Software Dev Graduate', date: '12 Jun 2025', status: 'Assessment', score: 82, stage: 'assessment' },
-    { id: '#APP-006', name: 'Lebohang Mokoena', position: 'Data Analytics Graduate', date: '18 May 2025', status: 'Waitlisted', score: 72, stage: 'waitlisted' }
-  ];
+  var appTableBody = adminAppTable ? adminAppTable.querySelector('tbody') : null;
+  var appRows = appTableBody ? Array.from(appTableBody.querySelectorAll('tr')) : [];
 
-  function renderAppTable(data) {
-    if (!adminAppTable) return;
-    if (!data.length) {
-      adminAppTable.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-light);">No applications found.</div>';
-      return;
-    }
-    adminAppTable.innerHTML = '<table class="admin-table" style="width:100%;border-collapse:collapse;min-width:700px;">' +
-      '<thead><tr style="border-bottom:1px solid var(--border);background:var(--bg);">' +
-        '<th style="padding:0.75rem 1rem;font-size:0.75rem;font-weight:700;color:var(--text-lighter);text-transform:uppercase;text-align:left;">ID</th>' +
-        '<th style="padding:0.75rem 1rem;font-size:0.75rem;font-weight:700;color:var(--text-lighter);text-transform:uppercase;text-align:left;">Candidate</th>' +
-        '<th style="padding:0.75rem 1rem;font-size:0.75rem;font-weight:700;color:var(--text-lighter);text-transform:uppercase;text-align:left;">Position</th>' +
-        '<th style="padding:0.75rem 1rem;font-size:0.75rem;font-weight:700;color:var(--text-lighter);text-transform:uppercase;text-align:left;">Date</th>' +
-        '<th style="padding:0.75rem 1rem;font-size:0.75rem;font-weight:700;color:var(--text-lighter);text-transform:uppercase;text-align:left;">Score</th>' +
-        '<th style="padding:0.75rem 1rem;font-size:0.75rem;font-weight:700;color:var(--text-lighter);text-transform:uppercase;text-align:left;">Status</th>' +
-        '<th style="padding:0.75rem 1rem;font-size:0.75rem;font-weight:700;color:var(--text-lighter);text-transform:uppercase;text-align:center;">Actions</th>' +
-      '</tr></thead><tbody>' +
-      data.map(function (a) {
-        var statusTag = a.stage === 'selected' ? 'tag--green' : a.stage === 'interview' ? 'tag--cyan' : a.stage === 'assessment' ? 'tag--amber' : a.stage === 'waitlisted' ? 'tag--purple' : a.stage === 'rejected' ? 'tag--primary' : 'tag--primary';
-        return '<tr style="border-bottom:1px solid var(--border-light);transition:background var(--transition);">' +
-          '<td style="padding:0.75rem 1rem;font-size:0.8rem;font-weight:600;color:var(--text-lighter);">' + a.id + '</td>' +
-          '<td style="padding:0.75rem 1rem;font-size:0.85rem;font-weight:600;color:var(--text);">' + a.name + '</td>' +
-          '<td style="padding:0.75rem 1rem;font-size:0.8rem;color:var(--text-light);">' + a.position + '</td>' +
-          '<td style="padding:0.75rem 1rem;font-size:0.8rem;color:var(--text-light);">' + a.date + '</td>' +
-          '<td style="padding:0.75rem 1rem;font-size:0.85rem;font-weight:700;color:' + (a.score >= 80 ? 'var(--success)' : a.score >= 70 ? 'var(--accent)' : 'var(--text)') + ';">' + a.score + '%</td>' +
-          '<td style="padding:0.75rem 1rem;"><span class="tag ' + statusTag + '" style="font-size:0.65rem;">' + a.status + '</span></td>' +
-          '<td style="padding:0.75rem 1rem;text-align:center;"><a href="#" class="btn btn--ghost btn--sm" style="font-size:0.7rem;">View</a></td>' +
-        '</tr>';
-      }).join('') +
-      '</tbody></table>';
-  }
-  renderAppTable(applications);
-
-  // Application search
+  // Application search — filters the PHP-rendered table rows in-place
   var appSearchInput = document.getElementById('appSearchInput');
-  if (appSearchInput) {
+  if (appSearchInput && appTableBody) {
     appSearchInput.addEventListener('input', function () {
       var q = this.value.toLowerCase().trim();
-      var filtered = !q ? applications : applications.filter(function (a) {
-        return a.name.toLowerCase().indexOf(q) !== -1 || a.position.toLowerCase().indexOf(q) !== -1 || a.id.toLowerCase().indexOf(q) !== -1;
+      appRows.forEach(function (row) {
+        var text = row.textContent.toLowerCase();
+        row.style.display = (!q || text.indexOf(q) !== -1) ? '' : 'none';
       });
-      renderAppTable(filtered);
     });
   }
 
@@ -792,6 +767,10 @@ function openSidebar() {
   function renderAdminInterviews(data) {
     if (!adminInterviewGrid) return;
     adminInterviewGrid.innerHTML = data.map(function (iv) {
+      var baseUrl = window.APP_URL || '';
+      var detailUrl = baseUrl + '/admin/interview.php?id=' + iv.id;
+      var rescheduleUrl = baseUrl + '/admin/interview_schedule.php?id=' + iv.id;
+      var confirmDisabled = (iv.status === 'Confirmed' || iv.status === 'Completed') ? ' style="pointer-events:none;opacity:0.5;"' : '';
       return '<div class="interview-card">' +
         '<div class="interview-card__header"><h3 class="interview-card__title">' + iv.title + '</h3><span class="interview-card__type">' + iv.type + '</span></div>' +
         '<div class="interview-card__countdown"><i class="fas fa-clock"></i><span class="interview-card__countdown-time">' + iv.cd + '</span></div>' +
@@ -802,9 +781,9 @@ function openSidebar() {
           '<div class="interview-card__detail"><i class="fas fa-video"></i> ' + iv.mode + '</div>' +
         '</div>' +
         '<div class="interview-card__actions">' +
-          '<a href="#" class="btn btn--primary btn--sm"><i class="fas fa-check"></i> Confirm</a>' +
-          '<a href="#" class="btn btn--outline btn--sm"><i class="fas fa-clock"></i> Reschedule</a>' +
-          '<a href="#" class="btn btn--ghost btn--sm">Details</a>' +
+          '<a href="' + detailUrl + '" class="btn btn--primary btn--sm"' + confirmDisabled + '><i class="fas fa-check"></i> Confirm</a>' +
+          '<a href="' + rescheduleUrl + '" class="btn btn--outline btn--sm"><i class="fas fa-clock"></i> Reschedule</a>' +
+          '<a href="' + detailUrl + '" class="btn btn--ghost btn--sm">Details</a>' +
         '</div>';
     }).join('');
   }
@@ -871,53 +850,62 @@ function openSidebar() {
   if (auditSearch) auditSearch.addEventListener('input', filterAudit);
 
   // ============================================
-  // 16. USER TABLE DATA & RENDER
+  // 16. USER TABLE SEARCH & FILTER (client-side on server-rendered data)
   // ============================================
   var adminUserTable = document.getElementById('adminUserTable');
-  var users = [
-    { id: 1, name: 'Admin User', email: 'admin@investhoodit.co.za', role: 'Super Admin', status: 'Active', lastActive: 'Now', mfa: true },
-    { id: 2, name: 'John Doe', email: 'john.doe@example.com', role: 'Candidate', status: 'Active', lastActive: '2 hours ago', mfa: false },
-    { id: 3, name: 'Sarah Mokoena', email: 'sarah.m@techcorp.co.za', role: 'Programme Manager', status: 'Active', lastActive: '1 hour ago', mfa: true },
-    { id: 4, name: 'Dr. Jane Mokoena', email: 'jane.m@investhoodit.co.za', role: 'Senior Mentor', status: 'Active', lastActive: '30 min ago', mfa: true },
-    { id: 5, name: 'Mike Johnson', email: 'mike.j@cloudnet.co.za', role: 'Employer', status: 'Active', lastActive: '3 hours ago', mfa: false },
-    { id: 6, name: 'Priya Singh', email: 'priya.s@example.com', role: 'Candidate', status: 'Suspended', lastActive: '1 week ago', mfa: false }
-  ];
 
-  function renderUserTable(data) {
-    if (!adminUserTable) return;
-    adminUserTable.innerHTML = '<table class="admin-table" style="width:100%;border-collapse:collapse;min-width:700px;">' +
-      '<thead><tr style="border-bottom:1px solid var(--border);background:var(--bg);">' +
-        '<th style="padding:0.75rem 1rem;font-size:0.7rem;font-weight:700;color:var(--text-lighter);text-transform:uppercase;">Name</th>' +
-        '<th style="padding:0.75rem 1rem;font-size:0.7rem;font-weight:700;color:var(--text-lighter);text-transform:uppercase;">Email</th>' +
-        '<th style="padding:0.75rem 1rem;font-size:0.7rem;font-weight:700;color:var(--text-lighter);text-transform:uppercase;">Role</th>' +
-        '<th style="padding:0.75rem 1rem;font-size:0.7rem;font-weight:700;color:var(--text-lighter);text-transform:uppercase;">Status</th>' +
-        '<th style="padding:0.75rem 1rem;font-size:0.7rem;font-weight:700;color:var(--text-lighter);text-transform:uppercase;">MFA</th>' +
-        '<th style="padding:0.75rem 1rem;font-size:0.7rem;font-weight:700;color:var(--text-lighter);text-transform:uppercase;">Actions</th>' +
-      '</tr></thead><tbody>' +
-      data.map(function (u) {
-        var roleTag = u.role === 'Super Admin' ? 'tag--primary' : u.role === 'Programme Manager' ? 'tag--cyan' : u.role === 'Senior Mentor' ? 'tag--purple' : u.role === 'Employer' ? 'tag--amber' : 'tag--green';
-        return '<tr style="border-bottom:1px solid var(--border-light);">' +
-          '<td style="padding:0.75rem 1rem;font-size:0.85rem;font-weight:600;color:var(--text);">' + u.name + '</td>' +
-          '<td style="padding:0.75rem 1rem;font-size:0.8rem;color:var(--text-light);">' + u.email + '</td>' +
-          '<td style="padding:0.75rem 1rem;"><span class="tag ' + roleTag + '" style="font-size:0.6rem;">' + u.role + '</span></td>' +
-          '<td style="padding:0.75rem 1rem;font-size:0.8rem;color:' + (u.status === 'Active' ? 'var(--success)' : '#ef4444') + ';font-weight:600;">' + u.status + '</td>' +
-          '<td style="padding:0.75rem 1rem;font-size:0.8rem;">' + (u.mfa ? '<span style="color:var(--success);"><i class="fas fa-shield-alt"></i> Enabled</span>' : '<span style="color:var(--text-lighter);">Disabled</span>') + '</td>' +
-          '<td style="padding:0.75rem 1rem;"><a href="#" class="btn btn--ghost btn--sm" style="font-size:0.65rem;">Manage</a></td>' +
-        '</tr>';
-      }).join('') +
-      '</tbody></table>';
-  }
-  renderUserTable(users);
-
-  // User search
+  // User search - filters the server-rendered table rows
   var userSearchInput = document.getElementById('userSearchInput');
   if (userSearchInput) {
     userSearchInput.addEventListener('input', function () {
       var q = this.value.toLowerCase().trim();
-      var filtered = !q ? users : users.filter(function (u) {
-        return u.name.toLowerCase().indexOf(q) !== -1 || u.email.toLowerCase().indexOf(q) !== -1 || u.role.toLowerCase().indexOf(q) !== -1;
+      var rows = adminUserTable.querySelectorAll('tbody tr');
+      var visibleCount = 0;
+      rows.forEach(function (row) {
+        var searchData = row.getAttribute('data-search') || '';
+        if (!q || searchData.indexOf(q) !== -1) {
+          row.style.display = '';
+          visibleCount++;
+        } else {
+          row.style.display = 'none';
+        }
       });
-      renderUserTable(filtered);
+
+      // Show empty state if no results
+      var emptyState = adminUserTable.querySelector('.admin-empty-state');
+      if (visibleCount === 0 && !emptyState) {
+        var tbody = adminUserTable.querySelector('tbody');
+        if (tbody) {
+          var emptyRow = document.createElement('tr');
+          emptyRow.id = 'userSearchEmpty';
+          emptyRow.innerHTML = '<td colspan="7" style="padding:2rem;text-align:center;"><div class="admin-empty-state"><div class="admin-empty-state__icon"><i class="fas fa-search"></i></div><h3>No users found</h3><p>No users match your search criteria.</p></div></td>';
+          tbody.appendChild(emptyRow);
+        }
+      } else {
+        var existingEmpty = document.getElementById('userSearchEmpty');
+        if (existingEmpty) existingEmpty.remove();
+      }
+    });
+  }
+
+  // Clear filters button
+  var clearUserFilters = document.getElementById('clearUserFilters');
+  if (clearUserFilters) {
+    clearUserFilters.addEventListener('click', function () {
+      var roleFilter = document.getElementById('userRoleFilter');
+      var statusFilter = document.getElementById('userStatusFilter');
+      var searchInput = document.getElementById('userSearchInput');
+      if (roleFilter) roleFilter.value = '';
+      if (statusFilter) statusFilter.value = '';
+      if (searchInput) searchInput.value = '';
+      // Submit form to clear filters
+      var form = document.getElementById('userFilterForm');
+      if (form) {
+        // Remove search input from form action to clear it
+        var hiddenSearch = form.querySelector('input[name="user_search"]');
+        if (hiddenSearch) hiddenSearch.remove();
+        form.submit();
+      }
     });
   }
 
@@ -1062,5 +1050,223 @@ function openSidebar() {
   console.log('%c Investhood IT Admin Dashboard ', 'background: #1a56db; color: white; font-size: 16px; font-weight: bold; padding: 8px 12px; border-radius: 4px;');
   console.log('%c Programme Management & Talent Intelligence Platform ', 'font-size: 13px; color: #64748b;');
 
+  // ============================================
+  // 28. TALENT INTELLIGENCE HUB - SEARCH BUTTON
+  // ============================================
+  var talentSearchBtn = document.getElementById('talentSearchBtn');
+  var talentResultsContainer = document.getElementById('talentResultsContainer');
+  var talentResultCount = document.getElementById('talentResultCount');
+
+  // Search Talent Button - runs a server-side search against the FULL
+  // candidate pool (not just this dashboard preview), so multi-filter
+  // results are always accurate.
+  if (talentSearchBtn) {
+    talentSearchBtn.addEventListener('click', function () {
+      var qualificationSelect = document.getElementById('talentQualificationFilter');
+      var qualNameSelect = document.getElementById('talentQualNameFilter');
+      var skillsSelect = document.getElementById('talentSkillsFilter');
+      var careerSelect = document.getElementById('talentCareerFilter');
+      var locationSelect = document.getElementById('talentLocationFilter');
+      var availabilitySelect = document.getElementById('talentAvailabilityFilter');
+      var experienceSelect = document.getElementById('talentExperienceFilter');
+
+      var selValue = function (s) { return s ? s.value : ''; };
+      var selValues = function (s) {
+        if (!s) return [];
+        return Array.prototype.slice.call(s.selectedOptions)
+          .map(function (o) { return o.value; })
+          .filter(function (v) { return v !== ''; });
+      };
+
+      var qualLevels = selValues(qualificationSelect);
+      var qualNames = selValues(qualNameSelect);
+      var skillList = selValues(skillsSelect);
+      var career = selValue(careerSelect);
+      var location = selValue(locationSelect);
+      var availability = selValue(availabilitySelect);
+      var experience = selValue(experienceSelect);
+
+      var activeFilters = [];
+      if (qualLevels.length > 0) activeFilters.push('Qualification: ' + qualLevels.join(', '));
+      if (qualNames.length > 0) activeFilters.push('Qualification Name: ' + qualNames.join(', '));
+      if (skillList.length > 0) activeFilters.push('Skills: ' + skillList.join(', '));
+      if (career) activeFilters.push('Career: ' + career.replace(/-/g, ' '));
+      if (location) activeFilters.push('Location: ' + location.replace(/-/g, ' '));
+      if (availability) activeFilters.push('Availability: ' + availability.replace(/-/g, ' '));
+      if (experience) activeFilters.push('Experience: ' + experience.replace(/-/g, ' '));
+
+      var query = new URLSearchParams();
+      query.set('qualifications', qualLevels.join(','));
+      query.set('qual_names', qualNames.join(','));
+      query.set('skills', skillList.join(','));
+      query.set('career', career);
+      query.set('location', location);
+      query.set('availability', availability);
+      query.set('experience', experience);
+
+      var endpoint = window.APP_URL
+        ? window.APP_URL + '/admin/ajax_talent_search.php'
+        : 'ajax_talent_search.php';
+
+      talentResultsContainer.innerHTML =
+        '<div class="admin-empty-state" style="grid-column:1/-1;">' +
+          '<div class="admin-empty-state__icon"><i class="fas fa-search"></i></div>' +
+          '<h3>Searching talent pool...</h3>' +
+          '<p>Querying all candidates across the platform.</p>' +
+        '</div>';
+
+      fetch(endpoint + '?' + query.toString())
+        .then(function (res) {
+          if (!res.ok) {
+            throw new Error('HTTP ' + res.status + ' from talent search service.');
+          }
+          var ct = res.headers.get('content-type') || '';
+          if (ct.indexOf('json') === -1) {
+            return res.text().then(function (t) {
+              throw new Error('Talent search returned non-JSON (' + (t.length > 0 ? t.slice(0, 200) : 'empty body') + ')');
+            });
+          }
+          return res.json();
+        })
+        .then(function (data) {
+          if (data.error) {
+            talentResultsContainer.innerHTML =
+              '<div class="admin-empty-state" style="grid-column:1/-1;">' +
+                '<div class="admin-empty-state__icon"><i class="fas fa-exclamation-triangle"></i></div>' +
+                '<h3>Search failed</h3><p>' + data.error + '</p>' +
+              '</div>';
+            if (talentResultCount) {
+              talentResultCount.innerHTML = 'Showing <strong>0</strong> candidates';
+            }
+            return;
+          }
+
+          talentResultsContainer.innerHTML = data.html || '';
+
+          if (talentResultCount) {
+            var countLabel = 'Showing <strong>' + data.total.toLocaleString() + '</strong> candidate' + (data.total !== 1 ? 's' : '');
+            if (activeFilters.length > 0) {
+              countLabel += ' (filtered by: ' + activeFilters.join(', ') + ')';
+            }
+            talentResultCount.innerHTML = countLabel;
+          }
+
+          if (window.InvesthoodNotifications) {
+            window.InvesthoodNotifications.show('success', 'Search Complete',
+              'Found ' + data.total.toLocaleString() + ' candidate' + (data.total !== 1 ? 's' : '') + ' matching your criteria.');
+          }
+        })
+        .catch(function (err) {
+          var msg = (err && err.message) ? err.message : 'Could not reach the talent search service.';
+          console.error('[TalentHub] Search error:', msg);
+          talentResultsContainer.innerHTML =
+            '<div class="admin-empty-state" style="grid-column:1/-1;">' +
+              '<div class="admin-empty-state__icon"><i class="fas fa-exclamation-triangle"></i></div>' +
+              '<h3>Search failed</h3><p>' + msg + '</p>' +
+            '</div>';
+          if (window.InvesthoodNotifications) {
+            window.InvesthoodNotifications.show('error', 'Search Error', msg);
+          }
+        });
+    });
+  }
+
+  // ============================================
+  // 29. TALENT INTELLIGENCE HUB - SAVE SEARCH BUTTON
+  // ============================================
+  var talentSaveSearchBtn = document.getElementById('talentSaveSearchBtn');
+  if (talentSaveSearchBtn) {
+    talentSaveSearchBtn.addEventListener('click', function () {
+      var qualificationSelectS = document.getElementById('talentQualificationFilter');
+      var qualNameSelectS = document.getElementById('talentQualNameFilter');
+      var skillsSelectSave = document.getElementById('talentSkillsFilter');
+      var careerSelectS = document.getElementById('talentCareerFilter');
+      var locationSelectS = document.getElementById('talentLocationFilter');
+      var availabilitySelectS = document.getElementById('talentAvailabilityFilter');
+      var experienceSelectS = document.getElementById('talentExperienceFilter');
+
+      var selValS = function (s) { return s ? s.value : ''; };
+      var selValsS = function (s) {
+        if (!s) return [];
+        return Array.prototype.slice.call(s.selectedOptions)
+          .map(function (o) { return o.value; })
+          .filter(function (v) { return v !== ''; });
+      };
+
+      var searchConfig = {
+        qualification: selValS(qualificationSelectS),
+        qualNames: selValsS(qualNameSelectS),
+        skills: selValsS(skillsSelectSave),
+        career: selValS(careerSelectS),
+        location: selValS(locationSelectS),
+        availability: selValS(availabilitySelectS),
+        experience: selValS(experienceSelectS),
+        savedAt: new Date().toISOString()
+      };
+
+      try {
+        var savedSearches = JSON.parse(localStorage.getItem('talentSavedSearches') || '[]');
+        savedSearches.unshift(searchConfig);
+        if (savedSearches.length > 10) savedSearches = savedSearches.slice(0, 10);
+        localStorage.setItem('talentSavedSearches', JSON.stringify(savedSearches));
+
+        if (window.InvesthoodNotifications) {
+          window.InvesthoodNotifications.show('success', 'Search Saved', 'Your search criteria has been saved successfully.');
+        }
+      } catch (err) {
+        if (window.InvesthoodNotifications) {
+          window.InvesthoodNotifications.show('error', 'Save Failed', 'Could not save search criteria.');
+        }
+      }
+    });
+  }
+
+  // ============================================
+  // 30. TALENT INTELLIGENCE HUB - EXPORT BUTTON
+  // ============================================
+  var talentExportBtn = document.getElementById('talentExportBtn');
+  if (talentExportBtn) {
+    talentExportBtn.addEventListener('click', function () {
+      var currentCards = talentResultsContainer.querySelectorAll('.admin-programme-card');
+      if (currentCards.length === 0) {
+        if (window.InvesthoodNotifications) {
+          window.InvesthoodNotifications.show('warning', 'No Data', 'There are no candidates to export.');
+        }
+        return;
+      }
+
+      var csvRows = [];
+      csvRows.push(['Name', 'Title', 'Email', 'Profile Completion', 'Status'].join(','));
+
+      currentCards.forEach(function (card) {
+        var nameEl = card.querySelector('[style*="font-weight:700"]');
+        var titleEl = card.querySelector('[style*="font-size:0.8rem"][style*="color:var(--text-light)"]');
+        var emailEl = card.querySelector('[style*="font-size:0.75rem"]');
+        var completionEl = card.querySelector('[style*="color:var(--success)"]');
+
+        var name = nameEl ? nameEl.textContent.trim().replace(/,/g, '') : '';
+        var title = titleEl ? titleEl.textContent.trim().replace(/,/g, '') : '';
+        var email = emailEl ? emailEl.textContent.trim().replace(/,/g, '') : '';
+        var completion = completionEl ? completionEl.textContent.trim() : '';
+
+        csvRows.push([name, title, email, completion, 'Active'].map(function (v) { return '"' + v + '"'; }).join(','));
+      });
+
+      var csvContent = csvRows.join('\n');
+      var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      var link = document.createElement('a');
+      var url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'talent_export_' + new Date().toISOString().slice(0, 10) + '.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      if (window.InvesthoodNotifications) {
+        window.InvesthoodNotifications.show('success', 'Export Complete', 'Exported ' + currentCards.length + ' candidate(s) to CSV.');
+      }
+    });
+  }
 });
 

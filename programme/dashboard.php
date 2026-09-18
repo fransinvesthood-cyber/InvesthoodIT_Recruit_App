@@ -1,34 +1,17 @@
 <?php
 /**
- * ================================================================
+ * ================================================
  * INVESTHOOD IT - Programme Manager Dashboard
- * ================================================================
+ * ================================================
  * Role: Programme Manager
- *
- * Purpose:
- * - Portfolio-level programme management
- * - Programme statistics
- * - Cohort statistics
- * - Candidate statistics
- * - Programme progress
- * - Upcoming programme dates
- * - Recent programme activity
- *
- * Data relationships:
- *
- * users
- *   -> programmes.programme_manager_id
- *   -> cohorts.programme_id
- *   -> cohort_participants.cohort_id
- *
- * IMPORTANT:
- * All programme-related data is restricted to the
- * currently logged-in Programme Manager.
- * ================================================================
  */
+
 require_once __DIR__ . '/../includes/bootstrap.php';
+
 require_role('programme_manager');
+
 $user = current_user();
+
 $conn = Database::getConnection();
 $currentPage = 'dashboard';
 /*
@@ -303,6 +286,7 @@ $overallProgress = min(
     )
 );
 $overallProgressWidth = $overallProgress;
+$overallProgressWidth = $overallProgress;
 /*
 |--------------------------------------------------------------------------
 | Fetch Programme Portfolio
@@ -552,6 +536,102 @@ if (!function_exists('pm_time_ago')) {
 }
 /*
 |--------------------------------------------------------------------------
+| Notification Bell (session-backed, no DB changes)
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('pm_notifications')) {
+    /**
+     * Return the current Programme Manager's notifications.
+     * Seeds the session store once so the bell has something to show.
+     */
+    function pm_notifications(int $managerId): array
+    {
+        $key = 'pm_notifications_' . $managerId;
+
+        if (!isset($_SESSION[$key])) {
+            $_SESSION[$key] = [
+                [
+                    'id'         => 1,
+                    'title'      => 'New candidate assigned',
+                    'message'    => 'A new candidate has been assigned to one of your cohorts.',
+                    'type'       => 'info',
+                    'created_at' => date('Y-m-d H:i:s', strtotime('-15 minutes')),
+                    'read'       => false,
+                    'url'        => url('programme/cohorts.php'),
+                ],
+                [
+                    'id'         => 2,
+                    'title'      => 'Programme status updated',
+                    'message'    => 'One of your programmes has been marked as active.',
+                    'type'       => 'success',
+                    'created_at' => date('Y-m-d H:i:s', strtotime('-2 hours')),
+                    'read'       => false,
+                    'url'        => url('programme/programme_view.php'),
+                ],
+                [
+                    'id'         => 3,
+                    'title'      => 'Cohort starting soon',
+                    'message'    => 'A cohort in your portfolio starts within the next 7 days.',
+                    'type'       => 'warning',
+                    'created_at' => date('Y-m-d H:i:s', strtotime('-1 day')),
+                    'read'       => false,
+                    'url'        => url('programme/cohorts.php'),
+                ],
+                [
+                    'id'         => 4,
+                    'title'      => 'Candidate completed',
+                    'message'    => 'A candidate has successfully completed their programme.',
+                    'type'       => 'success',
+                    'created_at' => date('Y-m-d H:i:s', strtotime('-2 days')),
+                    'read'       => true,
+                    'url'        => url('programme/candidates.php'),
+                ],
+                [
+                    'id'         => 5,
+                    'title'      => 'Weekly summary ready',
+                    'message'    => 'Your weekly programme performance summary is available.',
+                    'type'       => 'info',
+                    'created_at' => date('Y-m-d H:i:s', strtotime('-4 days')),
+                    'read'       => true,
+                    'url'        => url('programme/reports.php'),
+                ],
+            ];
+        }
+
+        return $_SESSION[$key];
+    }
+}
+
+$pmNotifications      = pm_notifications($managerId);
+$pmUnreadCount        = 0;
+$pmRecentNotifications = array_slice($pmNotifications, 0, 5);
+
+foreach ($pmNotifications as $n) {
+    if (empty($n['read'])) {
+        $pmUnreadCount++;
+    }
+}
+
+/**
+ * Small helper for relative time in the dropdown.
+ */
+if (!function_exists('pm_time_ago')) {
+    function pm_time_ago(string $datetime): string
+    {
+        $ts   = strtotime($datetime);
+        $diff = time() - $ts;
+
+        if ($diff < 60)        return 'Just now';
+        if ($diff < 3600)      return floor($diff / 60) . 'm ago';
+        if ($diff < 86400)     return floor($diff / 3600) . 'h ago';
+        if ($diff < 604800)    return floor($diff / 86400) . 'd ago';
+
+        return date('d M Y', $ts);
+    }
+}
+/*
+|--------------------------------------------------------------------------
 | Helper Values
 |--------------------------------------------------------------------------
 */
@@ -559,10 +639,14 @@ $managerName = $user['fullname'] ?? 'Programme Manager';
 if (trim($managerName) === '') {
     $managerName = 'Programme Manager';
 }
+
+$flashes = render_flashes();
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<<<<<<< HEAD
     <meta charset="UTF-8">
     <meta
         name="viewport"
@@ -1599,17 +1683,48 @@ html.dark-mode .pm-notif__count {
     color: #9ca3af;
 }
     </style>
+=======
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Programme Manager Dashboard | Investhood IT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+>>>>>>> 69ee3b9c4b9c5032917843f6a058edc276589649
 </head>
 <body class="dashboard-page">
-<div class="dashboard">
-    <!-- =========================================================
-         SIDEBAR
-    ========================================================== -->
-    <?php require __DIR__ . '/sidebar.php'; ?>
-    <!-- =========================================================
-         MAIN CONTENT
-    ========================================================== -->
+  <div class="dashboard">
+    <aside class="sidebar">
+      <div class="sidebar__header">
+        <a href="<?= url('index.php') ?>" class="logo">
+          <span class="logo__icon"><i class="fas fa-code"></i></span>
+          <span class="logo__text">Investhood <span class="logo__accent">IT</span></span>
+        </a>
+      </div>
+      <nav class="sidebar__nav">
+        <div class="sidebar__section-label">Programme Manager</div>
+        <ul class="sidebar__menu">
+          <li><a href="#" class="sidebar__link active"><i class="fas fa-th-large"></i> Dashboard</a></li>
+          <li><a href="#" class="sidebar__link"><i class="fas fa-graduation-cap"></i> My Programmes</a></li>
+          <li><a href="#" class="sidebar__link"><i class="fas fa-users"></i> Candidates</a></li>
+          <li><a href="#" class="sidebar__link"><i class="fas fa-chart-line"></i> Reports</a></li>
+        </ul>
+      </nav>
+      <div class="sidebar__footer">
+        <div class="sidebar__user">
+          <div class="sidebar__user-avatar"><img src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'PM+User') ?>&background=1a56db&color=fff&size=80" alt=""></div>
+          <div class="sidebar__user-info">
+            <span class="sidebar__user-name"><?= e($user['fullname'] ?? 'Programme Manager') ?></span>
+            <span class="sidebar__user-role">Programme Manager</span>
+          </div>
+        </div>
+        <a href="<?= url('auth/logout.php') ?>" class="sidebar__logout"><i class="fas fa-sign-out-alt"></i> Sign Out</a>
+      </div>
+    </aside>
     <main class="dashboard__main">
+<<<<<<< HEAD
         <!-- =====================================================
              HEADER
         ====================================================== -->

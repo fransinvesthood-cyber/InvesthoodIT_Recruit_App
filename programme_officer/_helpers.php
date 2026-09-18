@@ -21,29 +21,63 @@ if (!function_exists('po_scope')) {
     }
 }
 if (!function_exists('po_status_label')) {
-    function po_status_label(?string $status): string { $s=trim((string)$status); return $s===''?'Unknown':ucwords(str_replace('_',' ',$s)); }
+    function po_status_label(?string $status): string {
+        $s=trim((string)$status);
+        return $s===''?'Unknown':ucwords(str_replace('_',' ',$s));
+    }
 }
 if (!function_exists('po_status_class')) {
     function po_status_class(?string $status): string {
         return match (strtolower(trim((string)$status))) {
-            'active' => 'active', 'completed' => 'completed', 'withdrawn','rejected','inactive' => 'danger',
+            'active' => 'active',
+            'completed' => 'completed',
+            'withdrawn','rejected','inactive' => 'danger',
             'pending','draft','submitted','waitlisted','upcoming' => 'warning',
-            'selected','screened','assessment','interview','eligibility_review','onboarded' => 'info', default => 'neutral'
+            'selected','screened','assessment','interview','eligibility_review','onboarded' => 'info',
+            default => 'neutral'
         };
     }
 }
 if (!function_exists('po_date')) {
-    function po_date(?string $date,string $fallback='Not set'): string { if(!$date||$date==='0000-00-00'||$date==='0000-00-00 00:00:00') return $fallback; $ts=strtotime($date); return $ts?date('d M Y',$ts):$fallback; }
+    function po_date(?string $date,string $fallback='Not set'): string {
+        if(!$date||$date==='0000-00-00'||$date==='0000-00-00 00:00:00') return $fallback;
+        $ts=strtotime($date);
+        return $ts?date('d M Y',$ts):$fallback;
+    }
 }
 if (!function_exists('po_datetime')) {
-    function po_datetime(?string $date,string $fallback='Not available'): string { if(!$date) return $fallback; $ts=strtotime($date); return $ts?date('d M Y, H:i',$ts):$fallback; }
+    function po_datetime(?string $date,string $fallback='Not available'): string {
+        if(!$date) return $fallback;
+        $ts=strtotime($date);
+        return $ts?date('d M Y, H:i',$ts):$fallback;
+    }
 }
 if (!function_exists('po_initials')) {
-    function po_initials(string $first,string $last): string { $i=''; if($first!=='')$i.=strtoupper(substr($first,0,1)); if($last!=='')$i.=strtoupper(substr($last,0,1)); return $i!==''?$i:'PO'; }
+    function po_initials(string $first,string $last): string {
+        $first=trim($first); $last=trim($last); $i='';
+        if($first!=='') $i.=strtoupper(substr($first,0,1));
+        if($last!=='') $i.=strtoupper(substr($last,0,1));
+        return $i!==''?$i:'PO';
+    }
 }
 if (!function_exists('po_completion_rate')) {
-    function po_completion_rate(int $total,int $completed): int { return $total<=0?0:min(100,max(0,(int)round(($completed/$total)*100))); }
+    function po_completion_rate(int $total,int $completed): int {
+        return $total<=0?0:min(100,max(0,(int)round(($completed/$total)*100)));
+    }
 }
 if (!function_exists('po_activity_table_exists')) {
-    function po_activity_table_exists(mysqli $conn): bool { $r=$conn->query("SHOW TABLES LIKE 'programme_officer_activity_log'"); return $r && $r->num_rows>0; }
+    function po_activity_table_exists(mysqli $conn): bool {
+        $r=$conn->query("SHOW TABLES LIKE 'programme_officer_activity_log'");
+        return $r && $r->num_rows>0;
+    }
+}
+if (!function_exists('po_query_value')) {
+    function po_query_value(string $key,string $default=''): string {
+        return trim((string)($_GET[$key] ?? $default));
+    }
+}
+if (!function_exists('po_query_int')) {
+    function po_query_int(string $key,int $default=0): int {
+        return (int)($_GET[$key] ?? $default);
+    }
 }

@@ -7,13 +7,19 @@
 
 /* Applications stats grid */
 .app-stats {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 1rem;
   margin-bottom: 2rem;
 }
 
+.app-stats__grid {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
 .stat-card {
+  flex: 1 1 0;
+  min-width: 140px;
   background: var(--bg-white);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -400,10 +406,215 @@
 }
 
 /* ================================================
-   RESPONSIVE
+   DARK MODE SUPPORT
    ================================================ */
+body.dark-mode .stat-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .stat-card__number {
+  color: #f1f5f9;
+}
+
+body.dark-mode .stat-card__label {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .app-card:hover {
+  border-color: var(--primary-light);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .app-card__title {
+  color: #f1f5f9;
+}
+
+body.dark-mode .app-card__programme,
+body.dark-mode .app-card__org,
+body.dark-mode .app-card__ref,
+body.dark-mode .app-card__date {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-card__badge-line {
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .app-section .section__title {
+  color: #f1f5f9;
+}
+
+body.dark-mode .app-detail__card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .app-detail__title {
+  color: #f1f5f9;
+}
+
+body.dark-mode .app-detail__section {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .app-detail__section-title {
+  color: #e2e8f0;
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .app-detail__label {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-detail__value {
+  color: #e2e8f0;
+}
+
+body.dark-mode .app-start__card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .app-start__title {
+  color: #f1f5f9;
+}
+
+body.dark-mode .app-start__subtitle {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-start__label {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-start__value {
+  color: #e2e8f0;
+}
+
+body.dark-mode .empty-state {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .empty-state__icon {
+  background: #0f172a;
+}
+
+body.dark-mode .empty-state__title {
+  color: #f1f5f9;
+}
+
+body.dark-mode .empty-state__text {
+  color: #94a3b8;
+}
+
+body.dark-mode .opp-hero__title {
+  color: #f1f5f9;
+}
+
+body.dark-mode .opp-hero__subtitle {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-info-card {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .app-info-card__label {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-info-card__value {
+  color: #e2e8f0;
+}
+
+body.dark-mode .app-detail__programme,
+body.dark-mode .app-detail__ref,
+body.dark-mode .app-detail__separator {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-detail__header-badges .badge {
+  background: rgba(30, 41, 59, 0.8);
+  border-color: #334155;
+}
+
+body.dark-mode .app-detail__card-text {
+  color: #94a3b8;
+}
+
+body.dark-mode .app-detail__card-text strong {
+  color: #e2e8f0;
+}
+
+body.dark-mode .app-detail__card-title {
+  color: #f1f5f9;
+}
+
+body.dark-mode .badge {
+  background: rgba(30, 41, 59, 0.8);
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+body.dark-mode .badge--success {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+body.dark-mode .badge--warning {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+body.dark-mode .badge--danger {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+body.dark-mode .badge--info {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: rgba(6, 182, 212, 0.3);
+  color: #22d3ee;
+}
+
+body.dark-mode .badge--primary {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+}
+
+body.dark-mode .opp-hero {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 55%, #1e3a5f 100%);
+}
+
+body.dark-mode .dash-header__back {
+  color: #94a3b8;
+}
+
+body.dark-mode .dash-header__back:hover {
+  color: #e2e8f0;
+}
+
+body.dark-mode .app-card__date--updated {
+  color: #64748b;
+}
+
+/* ================================================
+    RESPONSIVE
+    ================================================ */
 @media (max-width: 992px) {
-  .app-stats,
   .app-grid,
   .app-detail__grid {
     grid-template-columns: 1fr 1fr;
@@ -411,7 +622,6 @@
 }
 
 @media (max-width: 768px) {
-  .app-stats,
   .app-grid,
   .app-detail__grid {
     grid-template-columns: 1fr;
