@@ -302,6 +302,7 @@ $overallProgress = min(
         $overallProgress
     )
 );
+$overallProgressWidth = $overallProgress;
 /*
 |--------------------------------------------------------------------------
 | Fetch Programme Portfolio
@@ -452,6 +453,102 @@ if ($stmt) {
         $upcomingProgrammes[] = $row;
     }
     $stmt->close();
+}
+/*
+|--------------------------------------------------------------------------
+| Notification Bell (session-backed, no DB changes)
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('pm_notifications')) {
+    /**
+     * Return the current Programme Manager's notifications.
+     * Seeds the session store once so the bell has something to show.
+     */
+    function pm_notifications(int $managerId): array
+    {
+        $key = 'pm_notifications_' . $managerId;
+
+        if (!isset($_SESSION[$key])) {
+            $_SESSION[$key] = [
+                [
+                    'id'         => 1,
+                    'title'      => 'New candidate assigned',
+                    'message'    => 'A new candidate has been assigned to one of your cohorts.',
+                    'type'       => 'info',
+                    'created_at' => date('Y-m-d H:i:s', strtotime('-15 minutes')),
+                    'read'       => false,
+                    'url'        => url('programme/cohorts.php'),
+                ],
+                [
+                    'id'         => 2,
+                    'title'      => 'Programme status updated',
+                    'message'    => 'One of your programmes has been marked as active.',
+                    'type'       => 'success',
+                    'created_at' => date('Y-m-d H:i:s', strtotime('-2 hours')),
+                    'read'       => false,
+                    'url'        => url('programme/programme_view.php'),
+                ],
+                [
+                    'id'         => 3,
+                    'title'      => 'Cohort starting soon',
+                    'message'    => 'A cohort in your portfolio starts within the next 7 days.',
+                    'type'       => 'warning',
+                    'created_at' => date('Y-m-d H:i:s', strtotime('-1 day')),
+                    'read'       => false,
+                    'url'        => url('programme/cohorts.php'),
+                ],
+                [
+                    'id'         => 4,
+                    'title'      => 'Candidate completed',
+                    'message'    => 'A candidate has successfully completed their programme.',
+                    'type'       => 'success',
+                    'created_at' => date('Y-m-d H:i:s', strtotime('-2 days')),
+                    'read'       => true,
+                    'url'        => url('programme/programme_view.php'),
+                ],
+                [
+                    'id'         => 5,
+                    'title'      => 'Weekly summary ready',
+                    'message'    => 'Your weekly programme performance summary is available.',
+                    'type'       => 'info',
+                    'created_at' => date('Y-m-d H:i:s', strtotime('-4 days')),
+                    'read'       => true,
+                    'url'        => url('dashboard.php'),
+                ],
+            ];
+        }
+
+        return $_SESSION[$key];
+    }
+}
+
+$pmNotifications      = pm_notifications($managerId);
+$pmUnreadCount        = 0;
+$pmRecentNotifications = array_slice($pmNotifications, 0, 5);
+
+foreach ($pmNotifications as $n) {
+    if (empty($n['read'])) {
+        $pmUnreadCount++;
+    }
+}
+
+/**
+ * Small helper for relative time in the dropdown.
+ */
+if (!function_exists('pm_time_ago')) {
+    function pm_time_ago(string $datetime): string
+    {
+        $ts   = strtotime($datetime);
+        $diff = time() - $ts;
+
+        if ($diff < 60)        return 'Just now';
+        if ($diff < 3600)      return floor($diff / 60) . 'm ago';
+        if ($diff < 86400)     return floor($diff / 3600) . 'h ago';
+        if ($diff < 604800)    return floor($diff / 86400) . 'd ago';
+
+        return date('d M Y', $ts);
+    }
 }
 /*
 |--------------------------------------------------------------------------
@@ -681,6 +778,308 @@ if (trim($managerName) === '') {
                 flex-direction: column;
             }
         }
+
+ /* =========================================================
+   NOTIFICATION BELL
+========================================================= */
+.pm-notif {
+    position: relative;
+    margin-right: 0.75rem;
+}
+
+.pm-notif__btn {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #374151;
+    font-size: 1.05rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.pm-notif__btn:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+.pm-notif__badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    box-shadow: 0 0 0 2px #fff;
+}
+
+.pm-notif__dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 360px;
+    max-width: calc(100vw - 2rem);
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+    z-index: 999;
+    overflow: hidden;
+}
+
+.pm-notif.is-open .pm-notif__dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.pm-notif__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.95rem;
+}
+
+.pm-notif__count {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #1a56db;
+    background: #e0e7ff;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+}
+
+.pm-notif__list {
+    max-height: 340px;
+    overflow-y: auto;
+}
+
+.pm-notif__item {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    text-decoration: none;
+    color: inherit;
+    border-bottom: 1px solid #f8fafc;
+    transition: background 0.15s ease;
+}
+
+.pm-notif__item:hover {
+    background: #f8fafc;
+}
+
+.pm-notif__item.is-unread {
+    background: #f5f8ff;
+}
+
+.pm-notif__item.is-unread:hover {
+    background: #eef4ff;
+}
+
+.pm-notif__icon {
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    background: #e0e7ff;
+    color: #3730a3;
+}
+
+.pm-notif__item--success .pm-notif__icon {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.pm-notif__item--warning .pm-notif__icon {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.pm-notif__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.pm-notif__title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.pm-notif__msg {
+    font-size: 0.8rem;
+    color: #6b7280;
+    line-height: 1.35;
+}
+
+.pm-notif__time {
+    font-size: 0.72rem;
+    color: #9ca3af;
+    margin-top: 0.15rem;
+}
+
+.pm-notif__empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: #6b7280;
+}
+
+.pm-notif__empty i {
+    font-size: 1.6rem;
+    margin-bottom: 0.5rem;
+    display: block;
+    color: #cbd5e1;
+}
+
+.pm-notif__empty p {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+.pm-notif__footer {
+    border-top: 1px solid #f1f5f9;
+    padding: 0.6rem;
+    background: #fafbfc;
+}
+
+.pm-notif__viewall {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.6rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #1a56db;
+    text-decoration: none;
+    transition: background 0.15s ease;
+}
+
+.pm-notif__viewall:hover {
+    background: #eef2ff;
+}
+
+/* =========================================================
+   DARK MODE SUPPORT
+========================================================= */
+body.dark-mode .pm-notif__btn,
+html.dark-mode .pm-notif__btn {
+    background: #1f2937;
+    border-color: #374151;
+    color: #e5e7eb;
+}
+
+body.dark-mode .pm-notif__btn:hover,
+html.dark-mode .pm-notif__btn:hover {
+    background: #374151;
+}
+
+body.dark-mode .pm-notif__dropdown,
+html.dark-mode .pm-notif__dropdown {
+    background: #111827;
+    border-color: #374151;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+}
+
+body.dark-mode .pm-notif__header,
+html.dark-mode .pm-notif__header {
+    border-bottom-color: #1f2937;
+}
+
+body.dark-mode .pm-notif__item,
+html.dark-mode .pm-notif__item {
+    border-bottom-color: #1f2937;
+    color: #e5e7eb;
+}
+
+body.dark-mode .pm-notif__item:hover,
+html.dark-mode .pm-notif__item:hover {
+    background: #1f2937;
+}
+
+body.dark-mode .pm-notif__item.is-unread,
+html.dark-mode .pm-notif__item.is-unread {
+    background: #1e293b;
+}
+
+body.dark-mode .pm-notif__item.is-unread:hover,
+html.dark-mode .pm-notif__item.is-unread:hover {
+    background: #243449;
+}
+
+body.dark-mode .pm-notif__title,
+html.dark-mode .pm-notif__title {
+    color: #f9fafb;
+}
+
+body.dark-mode .pm-notif__msg,
+html.dark-mode .pm-notif__msg {
+    color: #9ca3af;
+}
+
+body.dark-mode .pm-notif__time,
+html.dark-mode .pm-notif__time {
+    color: #6b7280;
+}
+
+body.dark-mode .pm-notif__footer,
+html.dark-mode .pm-notif__footer {
+    background: #0f172a;
+    border-top-color: #1f2937;
+}
+
+body.dark-mode .pm-notif__viewall,
+html.dark-mode .pm-notif__viewall {
+    color: #93c5fd;
+}
+
+body.dark-mode .pm-notif__viewall:hover,
+html.dark-mode .pm-notif__viewall:hover {
+    background: #1f2937;
+}
+
+body.dark-mode .pm-notif__count,
+html.dark-mode .pm-notif__count {
+    background: #1e3a8a;
+    color: #bfdbfe;
+}
+.pm-progress-fill {
+    height: 100%;
+    background: #1a56db;
+    border-radius: 999px;
+}
+
+/* Dark mode, if applicable */
+.dark-mode .pm-progress-fill,
+[data-theme="dark"] .pm-progress-fill {
+    background: #3b82f6;
+}
     </style>
 </head>
 <body class="dashboard-page">
@@ -703,14 +1102,99 @@ if (trim($managerName) === '') {
                 </h1>
             </div>
             <div class="dash-header__right">
-                <div class="dash-header__user">
-                    <img
-                        src="https://ui-avatars.com/api/?name=<?= urlencode($managerName) ?>&background=1a56db&color=fff&size=80"
-                        alt=""
-                        class="dash-header__avatar"
-                    >
-                </div>
+
+    <!-- =========================================================
+         NOTIFICATION BELL
+    ========================================================== -->
+    <div class="pm-notif" id="pmNotif">
+        <button
+            type="button"
+            class="pm-notif__btn"
+            id="pmNotifBtn"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-label="Notifications"
+        >
+            <i class="fas fa-bell"></i>
+            <?php if ($pmUnreadCount > 0): ?>
+                <span class="pm-notif__badge" id="pmNotifBadge">
+                    <?= $pmUnreadCount > 99 ? '99+' : (int) $pmUnreadCount ?>
+                </span>
+            <?php endif; ?>
+        </button>
+
+        <div class="pm-notif__dropdown" id="pmNotifDropdown" role="menu">
+            <div class="pm-notif__header">
+                <strong>Notifications</strong>
+                <?php if ($pmUnreadCount > 0): ?>
+                    <span class="pm-notif__count">
+                        <?= (int) $pmUnreadCount ?> unread
+                    </span>
+                <?php endif; ?>
             </div>
+
+            <div class="pm-notif__list">
+                <?php if (empty($pmRecentNotifications)): ?>
+                    <div class="pm-notif__empty">
+                        <i class="fas fa-bell-slash"></i>
+                        <p>No notifications yet.</p>
+                    </div>
+                <?php else: ?>
+                    <?php foreach ($pmRecentNotifications as $notif): ?>
+                        <?php
+                        $typeClass = 'pm-notif__item--' . ($notif['type'] ?? 'info');
+                        $unreadClass = empty($notif['read']) ? ' is-unread' : '';
+                        ?>
+                        <a
+                            href="<?= e($notif['url'] ?? '#') ?>"
+                            class="pm-notif__item <?= e($typeClass . $unreadClass) ?>"
+                            role="menuitem"
+                        >
+                            <span class="pm-notif__icon">
+                                <?php if (($notif['type'] ?? '') === 'success'): ?>
+                                    <i class="fas fa-check-circle"></i>
+                                <?php elseif (($notif['type'] ?? '') === 'warning'): ?>
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                <?php else: ?>
+                                    <i class="fas fa-info-circle"></i>
+                                <?php endif; ?>
+                            </span>
+                            <span class="pm-notif__body">
+                                <span class="pm-notif__title">
+                                    <?= e($notif['title'] ?? '') ?>
+                                </span>
+                                <span class="pm-notif__msg">
+                                    <?= e($notif['message'] ?? '') ?>
+                                </span>
+                                <span class="pm-notif__time">
+                                    <?= e(pm_time_ago($notif['created_at'] ?? date('Y-m-d H:i:s'))) ?>
+                                </span>
+                            </span>
+                        </a>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+
+            <div class="pm-notif__footer">
+                <a
+                    href="<?= url('programme/notifications.php') ?>"
+                    class="pm-notif__viewall"
+                >
+                    <i class="fas fa-list"></i>
+                    View All Notifications
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="dash-header__user">
+        <img
+            src="https://ui-avatars.com/api/?name=<?= urlencode($managerName) ?>&background=1a56db&color=fff&size=80"
+            alt=""
+            class="dash-header__avatar"
+        >
+    </div>
+</div>
         </header>
         <!-- =====================================================
              CONTENT
@@ -1244,16 +1728,13 @@ if (trim($managerName) === '') {
                                     overflow:hidden;
                                 "
                             >
-                                <div
-                                    style="
-                                        width:<?= (int) $overallProgress ?>%;
-                                        height:100%;
-                                        background:#1a56db;
-                                        border-radius:999px;
-                                    "
-                                ></div>
+                                
                             </div>
-                            <div
+                            <div>
+                                  class="pm-progress-fill"
+                               style="width: <?= $overallProgressWidth ?>%;"
+</div>  
+                            <div>
                                 style="
                                     margin-top:0.4rem;
                                     font-size:0.85rem;
@@ -1270,5 +1751,33 @@ if (trim($managerName) === '') {
         </div>
     </main>
 </div>
+
+<script>
+(function () {
+    const wrap = document.getElementById('pmNotif');
+    const btn  = document.getElementById('pmNotifBtn');
+    if (!wrap || !btn) return;
+
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const open = wrap.classList.toggle('is-open');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!wrap.contains(e.target)) {
+            wrap.classList.remove('is-open');
+            btn.setAttribute('aria-expanded', 'false');
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            wrap.classList.remove('is-open');
+            btn.setAttribute('aria-expanded', 'false');
+        }
+    });
+})();
+</script>
 </body>
 </html>
