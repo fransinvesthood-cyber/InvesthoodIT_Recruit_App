@@ -505,7 +505,7 @@ if (!function_exists('pm_notifications')) {
                     'type'       => 'success',
                     'created_at' => date('Y-m-d H:i:s', strtotime('-2 days')),
                     'read'       => true,
-                    'url'        => url('programme/programme_view.php'),
+                    'url'        => url('programme/candidates.php'),
                 ],
                 [
                     'id'         => 5,
@@ -514,7 +514,7 @@ if (!function_exists('pm_notifications')) {
                     'type'       => 'info',
                     'created_at' => date('Y-m-d H:i:s', strtotime('-4 days')),
                     'read'       => true,
-                    'url'        => url('dashboard.php'),
+                    'url'        => url('programme/reports.php'),
                 ],
             ];
         }
@@ -1080,6 +1080,524 @@ html.dark-mode .pm-notif__count {
 [data-theme="dark"] .pm-progress-fill {
     background: #3b82f6;
 }
+
+/* =========================================================
+   ALL NOTIFICATIONS MODAL
+========================================================= */
+.pm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s;
+}
+
+.pm-modal.is-open {
+    opacity: 1;
+    visibility: visible;
+}
+
+.pm-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+}
+
+.pm-modal__dialog {
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    max-height: calc(100vh - 2rem);
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: translateY(12px) scale(0.98);
+    transition: transform 0.22s ease;
+}
+
+.pm-modal.is-open .pm-modal__dialog {
+    transform: translateY(0) scale(1);
+}
+
+/* ---------- Header ---------- */
+.pm-modal__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.15rem 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+    background: #fff;
+}
+
+.pm-modal__title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.pm-modal__title {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #111827;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pm-modal__title i {
+    color: #1a56db;
+}
+
+.pm-modal__subtitle {
+    font-size: 0.82rem;
+    color: #6b7280;
+}
+
+.pm-modal__close {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border: 1px solid #e5e7eb;
+    border-radius: 50%;
+    background: #fff;
+    color: #4b5563;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.pm-modal__close:hover {
+    background: #f3f4f6;
+    color: #111827;
+    border-color: #d1d5db;
+}
+
+/* ---------- Tabs ---------- */
+.pm-modal__tabs {
+    display: flex;
+    gap: 0.4rem;
+    padding: 0.75rem 1.25rem 0;
+    border-bottom: 1px solid #f1f5f9;
+    background: #fff;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.pm-modal__tab {
+    border: 0;
+    background: transparent;
+    padding: 0.55rem 0.8rem;
+    border-radius: 8px 8px 0 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #6b7280;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.pm-modal__tab:hover {
+    color: #1a56db;
+    background: #f8fafc;
+}
+
+.pm-modal__tab.is-active {
+    color: #1a56db;
+    border-bottom-color: #1a56db;
+}
+
+.pm-modal__tab-count {
+    background: #e5e7eb;
+    color: #374151;
+    border-radius: 999px;
+    padding: 0.05rem 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    min-width: 22px;
+    text-align: center;
+}
+
+.pm-modal__tab.is-active .pm-modal__tab-count {
+    background: #e0e7ff;
+    color: #3730a3;
+}
+
+/* ---------- Scrollable body ---------- */
+.pm-modal__body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 180px;
+    max-height: 60vh;
+    padding: 0.4rem 0;
+    background: #fff;
+}
+
+.pm-modal__body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.pm-modal__body::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 8px;
+}
+
+.pm-modal__body::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* ---------- Items ---------- */
+.pm-modal__item {
+    display: flex;
+    gap: 0.9rem;
+    padding: 0.95rem 1.25rem;
+    text-decoration: none;
+    color: inherit;
+    border-bottom: 1px solid #f8fafc;
+    transition: background 0.15s ease;
+}
+
+.pm-modal__item:last-child {
+    border-bottom: 0;
+}
+
+.pm-modal__item:hover {
+    background: #f8fafc;
+}
+
+.pm-modal__item.is-unread {
+    background: #f5f8ff;
+}
+
+.pm-modal__item.is-unread:hover {
+    background: #eef4ff;
+}
+
+.pm-modal__item.is-read {
+    opacity: 0.88;
+}
+
+.pm-modal__item-icon {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    background: #e0e7ff;
+    color: #3730a3;
+}
+
+.pm-modal__item--success .pm-modal__item-icon {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.pm-modal__item--warning .pm-modal__item-icon {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.pm-modal__item-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+    flex: 1;
+}
+
+.pm-modal__item-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #111827;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pm-modal__dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #1a56db;
+    flex-shrink: 0;
+}
+
+.pm-modal__item-msg {
+    font-size: 0.83rem;
+    color: #6b7280;
+    line-height: 1.45;
+}
+
+.pm-modal__item-time {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-top: 0.15rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+/* ---------- Empty state ---------- */
+.pm-modal__empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: #6b7280;
+}
+
+.pm-modal__empty i {
+    font-size: 2.2rem;
+    color: #cbd5e1;
+    margin-bottom: 0.75rem;
+    display: block;
+}
+
+.pm-modal__empty h3 {
+    margin: 0 0 0.35rem;
+    color: #374151;
+    font-size: 1rem;
+}
+
+.pm-modal__empty p {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+/* ---------- Footer ---------- */
+.pm-modal__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1.25rem;
+    border-top: 1px solid #f1f5f9;
+    background: #fafbfc;
+}
+
+.pm-modal__footer-note {
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.pm-modal__footer-btn {
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #374151;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.pm-modal__footer-btn:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+/* ---------- Hidden filter state ---------- */
+.pm-modal__item[hidden] {
+    display: none;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 640px) {
+    .pm-modal {
+        padding: 0;
+        align-items: flex-end;
+    }
+
+    .pm-modal__dialog {
+        max-width: 100%;
+        max-height: 92vh;
+        border-radius: 18px 18px 0 0;
+    }
+
+    .pm-modal__body {
+        max-height: none;
+    }
+
+    .pm-modal__item {
+        padding: 0.9rem 1rem;
+    }
+
+    .pm-modal__header,
+    .pm-modal__tabs,
+    .pm-modal__footer {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+}
+
+/* =========================================================
+   DARK MODE
+========================================================= */
+.dark-mode .pm-modal__dialog,
+[data-theme="dark"] .pm-modal__dialog {
+    background: #111827;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.dark-mode .pm-modal__header,
+.dark-mode .pm-modal__tabs,
+.dark-mode .pm-modal__body,
+[data-theme="dark"] .pm-modal__header,
+[data-theme="dark"] .pm-modal__tabs,
+[data-theme="dark"] .pm-modal__body {
+    background: #111827;
+}
+
+.dark-mode .pm-modal__header,
+.dark-mode .pm-modal__tabs,
+.dark-mode .pm-modal__footer,
+[data-theme="dark"] .pm-modal__header,
+[data-theme="dark"] .pm-modal__tabs,
+[data-theme="dark"] .pm-modal__footer {
+    border-color: #1f2937;
+}
+
+.dark-mode .pm-modal__title,
+[data-theme="dark"] .pm-modal__title {
+    color: #f9fafb;
+}
+
+.dark-mode .pm-modal__subtitle,
+.dark-mode .pm-modal__footer-note,
+[data-theme="dark"] .pm-modal__subtitle,
+[data-theme="dark"] .pm-modal__footer-note {
+    color: #9ca3af;
+}
+
+.dark-mode .pm-modal__close,
+[data-theme="dark"] .pm-modal__close {
+    background: #1f2937;
+    border-color: #374151;
+    color: #e5e7eb;
+}
+
+.dark-mode .pm-modal__close:hover,
+[data-theme="dark"] .pm-modal__close:hover {
+    background: #374151;
+}
+
+.dark-mode .pm-modal__tab,
+[data-theme="dark"] .pm-modal__tab {
+    color: #9ca3af;
+}
+
+.dark-mode .pm-modal__tab:hover,
+[data-theme="dark"] .pm-modal__tab:hover {
+    color: #93c5fd;
+    background: #1f2937;
+}
+
+.dark-mode .pm-modal__tab.is-active,
+[data-theme="dark"] .pm-modal__tab.is-active {
+    color: #93c5fd;
+    border-bottom-color: #3b82f6;
+}
+
+.dark-mode .pm-modal__tab-count,
+[data-theme="dark"] .pm-modal__tab-count {
+    background: #374151;
+    color: #e5e7eb;
+}
+
+.dark-mode .pm-modal__tab.is-active .pm-modal__tab-count,
+[data-theme="dark"] .pm-modal__tab.is-active .pm-modal__tab-count {
+    background: #1e3a8a;
+    color: #bfdbfe;
+}
+
+.dark-mode .pm-modal__body::-webkit-scrollbar-thumb,
+[data-theme="dark"] .pm-modal__body::-webkit-scrollbar-thumb {
+    background: #374151;
+}
+
+.dark-mode .pm-modal__item,
+[data-theme="dark"] .pm-modal__item {
+    color: #e5e7eb;
+    border-bottom-color: #1f2937;
+}
+
+.dark-mode .pm-modal__item:hover,
+[data-theme="dark"] .pm-modal__item:hover {
+    background: #1f2937;
+}
+
+.dark-mode .pm-modal__item.is-unread,
+[data-theme="dark"] .pm-modal__item.is-unread {
+    background: #1e293b;
+}
+
+.dark-mode .pm-modal__item.is-unread:hover,
+[data-theme="dark"] .pm-modal__item.is-unread:hover {
+    background: #243449;
+}
+
+.dark-mode .pm-modal__item-title,
+[data-theme="dark"] .pm-modal__item-title {
+    color: #f9fafb;
+}
+
+.dark-mode .pm-modal__item-msg,
+[data-theme="dark"] .pm-modal__item-msg {
+    color: #9ca3af;
+}
+
+.dark-mode .pm-modal__item-time,
+[data-theme="dark"] .pm-modal__item-time {
+    color: #6b7280;
+}
+
+.dark-mode .pm-modal__footer,
+[data-theme="dark"] .pm-modal__footer {
+    background: #0f172a;
+    border-top-color: #1f2937;
+}
+
+.dark-mode .pm-modal__footer-btn,
+[data-theme="dark"] .pm-modal__footer-btn {
+    background: #1f2937;
+    border-color: #374151;
+    color: #e5e7eb;
+}
+
+.dark-mode .pm-modal__footer-btn:hover,
+[data-theme="dark"] .pm-modal__footer-btn:hover {
+    background: #374151;
+}
+
+.dark-mode .pm-modal__empty h3,
+[data-theme="dark"] .pm-modal__empty h3 {
+    color: #e5e7eb;
+}
+
+.dark-mode .pm-modal__empty,
+[data-theme="dark"] .pm-modal__empty {
+    color: #9ca3af;
+}
     </style>
 </head>
 <body class="dashboard-page">
@@ -1176,14 +1694,15 @@ html.dark-mode .pm-notif__count {
             </div>
 
             <div class="pm-notif__footer">
-                <a
-                    href="<?= url('programme/notifications.php') ?>"
-                    class="pm-notif__viewall"
-                >
-                    <i class="fas fa-list"></i>
-                    View All Notifications
-                </a>
-            </div>
+               <button
+                type="button"
+                 class="pm-notif__viewall"
+                   id="pmOpenAllNotifs"
+    >
+                 <i class="fas fa-list"></i>
+                  View All Notifications
+           </button>
+</div>
         </div>
     </div>
 
@@ -1752,30 +2271,261 @@ html.dark-mode .pm-notif__count {
     </main>
 </div>
 
+
+<!-- =========================================================
+     ALL NOTIFICATIONS MODAL
+========================================================== -->
+<div class="pm-modal" id="pmNotifModal" aria-hidden="true">
+    <div class="pm-modal__backdrop" data-pm-close></div>
+
+    <div
+        class="pm-modal__dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pmNotifModalTitle"
+    >
+        <!-- Header -->
+        <div class="pm-modal__header">
+            <div class="pm-modal__title-wrap">
+                <h2 id="pmNotifModalTitle" class="pm-modal__title">
+                    <i class="fas fa-bell"></i>
+                    All Notifications
+                </h2>
+                <span class="pm-modal__subtitle">
+                    <?php if ($pmUnreadCount > 0): ?>
+                        <?= (int) $pmUnreadCount ?> unread
+                    <?php else: ?>
+                        You're all caught up
+                    <?php endif; ?>
+                </span>
+            </div>
+
+            <button
+                type="button"
+                class="pm-modal__close"
+                data-pm-close
+                aria-label="Close notifications"
+            >
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Filter tabs -->
+        <div class="pm-modal__tabs" role="tablist">
+            <button
+                type="button"
+                class="pm-modal__tab is-active"
+                data-pm-filter="all"
+                role="tab"
+                aria-selected="true"
+            >
+                All
+                <span class="pm-modal__tab-count"><?= count($pmNotifications) ?></span>
+            </button>
+            <button
+                type="button"
+                class="pm-modal__tab"
+                data-pm-filter="unread"
+                role="tab"
+                aria-selected="false"
+            >
+                Unread
+                <span class="pm-modal__tab-count"><?= (int) $pmUnreadCount ?></span>
+            </button>
+            <button
+                type="button"
+                class="pm-modal__tab"
+                data-pm-filter="read"
+                role="tab"
+                aria-selected="false"
+            >
+                Read
+                <span class="pm-modal__tab-count">
+                    <?= count($pmNotifications) - (int) $pmUnreadCount ?>
+                </span>
+            </button>
+        </div>
+
+        <!-- Scrollable list -->
+        <div class="pm-modal__body" id="pmNotifModalList">
+            <?php if (empty($pmNotifications)): ?>
+                <div class="pm-modal__empty">
+                    <i class="fas fa-bell-slash"></i>
+                    <h3>No notifications yet</h3>
+                    <p>When something happens in your portfolio, it'll show up here.</p>
+                </div>
+            <?php else: ?>
+                <?php foreach ($pmNotifications as $notif): ?>
+                    <?php
+                    $isRead      = !empty($notif['read']);
+                    $type        = $notif['type'] ?? 'info';
+                    $typeClass   = 'pm-modal__item--' . $type;
+                    $readClass   = $isRead ? ' is-read' : ' is-unread';
+                    $dataRead    = $isRead ? 'read' : 'unread';
+                    ?>
+                    <a
+                        href="<?= e($notif['url'] ?? '#') ?>"
+                        class="pm-modal__item <?= e($typeClass . $readClass) ?>"
+                        data-pm-read-state="<?= e($dataRead) ?>"
+                        data-pm-id="<?= (int) ($notif['id'] ?? 0) ?>"
+                    >
+                        <span class="pm-modal__item-icon">
+                            <?php if ($type === 'success'): ?>
+                                <i class="fas fa-check-circle"></i>
+                            <?php elseif ($type === 'warning'): ?>
+                                <i class="fas fa-exclamation-triangle"></i>
+                            <?php else: ?>
+                                <i class="fas fa-info-circle"></i>
+                            <?php endif; ?>
+                        </span>
+
+                        <span class="pm-modal__item-body">
+                            <span class="pm-modal__item-title">
+                                <?= e($notif['title'] ?? '') ?>
+                                <?php if (!$isRead): ?>
+                                    <span class="pm-modal__dot" aria-label="Unread"></span>
+                                <?php endif; ?>
+                            </span>
+                            <span class="pm-modal__item-msg">
+                                <?= e($notif['message'] ?? '') ?>
+                            </span>
+                            <span class="pm-modal__item-time">
+                                <i class="fas fa-clock"></i>
+                                <?= e(pm_time_ago($notif['created_at'] ?? date('Y-m-d H:i:s'))) ?>
+                            </span>
+                        </span>
+                    </a>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+
+        <!-- Footer -->
+        <div class="pm-modal__footer">
+            <span class="pm-modal__footer-note">
+                <?= count($pmNotifications) ?> total notification(s)
+            </span>
+            <button
+                type="button"
+                class="pm-modal__footer-btn"
+                data-pm-close
+            >
+                Close
+            </button>
+        </div>
+    </div>
+</div>
 <script>
 (function () {
+    /* --------------------------------------------------
+       Bell dropdown (existing behaviour)
+    -------------------------------------------------- */
     const wrap = document.getElementById('pmNotif');
     const btn  = document.getElementById('pmNotifBtn');
-    if (!wrap || !btn) return;
 
-    btn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        const open = wrap.classList.toggle('is-open');
-        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    });
+    if (wrap && btn) {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const open = wrap.classList.toggle('is-open');
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
 
-    document.addEventListener('click', function (e) {
-        if (!wrap.contains(e.target)) {
+        document.addEventListener('click', function (e) {
+            if (!wrap.contains(e.target)) {
+                wrap.classList.remove('is-open');
+                btn.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+
+    /* --------------------------------------------------
+       All Notifications modal
+    -------------------------------------------------- */
+    const modal       = document.getElementById('pmNotifModal');
+    const openBtn     = document.getElementById('pmOpenAllNotifs');
+    const closeEls    = modal ? modal.querySelectorAll('[data-pm-close]') : [];
+    const tabs        = modal ? modal.querySelectorAll('.pm-modal__tab') : [];
+    const items       = modal ? modal.querySelectorAll('.pm-modal__item') : [];
+
+    function openModal() {
+        if (!modal) return;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+
+        // Close the little dropdown so they don't overlap
+        if (wrap) {
             wrap.classList.remove('is-open');
-            btn.setAttribute('aria-expanded', 'false');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
         }
-    });
+    }
+
+    function closeModal() {
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    if (openBtn) openBtn.addEventListener('click', openModal);
+    closeEls.forEach(el => el.addEventListener('click', closeModal));
 
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') {
-            wrap.classList.remove('is-open');
-            btn.setAttribute('aria-expanded', 'false');
+        if (e.key === 'Escape' && modal && modal.classList.contains('is-open')) {
+            closeModal();
         }
+    });
+
+    /* --------------------------------------------------
+       Filter tabs (All / Unread / Read)
+    -------------------------------------------------- */
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function () {
+            const filter = tab.getAttribute('data-pm-filter');
+
+            tabs.forEach(t => {
+                t.classList.toggle('is-active', t === tab);
+                t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+            });
+
+            items.forEach(item => {
+                const state = item.getAttribute('data-pm-read-state');
+                let show = true;
+
+                if (filter === 'unread') show = state === 'unread';
+                if (filter === 'read')   show = state === 'read';
+
+                item.hidden = !show;
+            });
+        });
+    });
+
+    /* --------------------------------------------------
+       Mark as read on click (visual only — no DB)
+       Removes the unread styling + dot when clicked,
+       and decrements the bell badge.
+    -------------------------------------------------- */
+    items.forEach(item => {
+        item.addEventListener('click', function () {
+            if (item.getAttribute('data-pm-read-state') === 'unread') {
+                item.setAttribute('data-pm-read-state', 'read');
+                item.classList.remove('is-unread');
+                item.classList.add('is-read');
+
+                const dot = item.querySelector('.pm-modal__dot');
+                if (dot) dot.remove();
+
+                const badge = document.getElementById('pmNotifBadge');
+                if (badge) {
+                    const current = parseInt(badge.textContent.replace('+', ''), 10) || 0;
+                    const next    = Math.max(0, current - 1);
+                    if (next === 0) {
+                        badge.remove();
+                    } else {
+                        badge.textContent = next;
+                    }
+                }
+            }
+        });
     });
 })();
 </script>
