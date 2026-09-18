@@ -440,6 +440,110 @@ if ($stmt) {
 }
 /*
 |--------------------------------------------------------------------------
+| Candidate Progress Tracking (dashboard-embedded)
+|--------------------------------------------------------------------------
+| One row per (candidate, cohort, programme). Maps each candidate's
+| cohort_participants.status into an ordered pipeline stage.
+| No DB changes — reads existing tables only.
+|--------------------------------------------------------------------------
+*/
+
+$CP_STAGES = [
+    'submitted'   => ['label' => 'Submitted',          'icon' => 'fa-paper-plane',     'color' => 'grey'],
+    'eligibility' => ['label' => 'Eligibility Review', 'icon' => 'fa-clipboard-check', 'color' => 'blue'],
+    'screened'    => ['label' => 'Screened',           'icon' => 'fa-filter',          'color' => 'indigo'],
+    'assessment'  => ['label' => 'Assessment',         'icon' => 'fa-file-pen',        'color' => 'purple'],
+    'interview'   => ['label' => 'Interview',          'icon' => 'fa-comments',        'color' => 'amber'],
+    'waitlisted'  => ['label' => 'Waitlisted',         'icon' => 'fa-hourglass-half',  'color' => 'orange'],
+    'selected'    => ['label' => 'Selected',           'icon' => 'fa-circle-check',    'color' => 'green'],
+];
+
+if (!function_exists('cp_resolve_stage')) {
+    function cp_resolve_stage(string $rawStatus, array $STAGES): array
+    {
+        $status = strtolower(trim($rawStatus));
+
+        if (in_array($status, ['onboarded', 'active', 'completed'], true)) {
+            return [
+                'number' => 7, 'key' => 'selected',
+                'label'  => ucfirst($status), 'color' => 'green',
+                'terminal' => true, 'positive' => true,
+            ];
+        }
+        if ($status === 'rejected') {
+            return [
+                'number' => 0, 'key' => 'rejected',
+                'label'  => 'Rejected', 'color' => 'red',
+                'terminal' => true, 'positive' => false,
+            ];
+        }
+        if ($status === 'withdrawn') {
+            return [
+                'number' => 0, 'key' => 'withdrawn',
+                'label'  => 'Withdrawn', 'color' => 'grey',
+                'terminal' => true, 'positive' => false,
+            ];
+        }
+
+        $keys = array_keys($STAGES);
+        $idx  = array_search($status, $keys, true);
+
+        if ($idx === false) {
+            return [
+                'number' => 1, 'key' => 'submitted',
+                'label'  => ucwords(str_replace('_', ' ', $status ?: 'unknown')),
+                'color'  => 'grey',
+                'terminal' => false, 'positive' => true,
+            ];
+        }
+
+        $key = $keys[$idx];
+        return [
+            'number' => $idx + 1, 'key' => $key,
+            'label'  => $STAGES[$key]['label'],
+            'color'  => $STAGES[$key]['color'],
+            'terminal' => false, 'positive' => true,
+        ];
+    }
+}
+
+$cpCandidates = [];
+$cpStmt = $conn->prepare("
+    SELECT
+        cp.id          AS participant_id,
+        cp.user_id     AS candidate_id,
+        cp.status      AS status,
+        c.name         AS cohort_name,
+        p.name         AS programme_name,
+        u.fullname     AS candidate_name,
+        u.email        AS candidate_email
+    FROM cohort_participants cp
+    INNER JOIN cohorts c     ON c.id = cp.cohort_id
+    INNER JOIN programmes p  ON p.id = c.programme_id
+    LEFT  JOIN users u       ON u.user_id = cp.user_id
+    WHERE p.programme_manager_id = ?
+    ORDER BY p.name ASC, c.name ASC, u.fullname ASC
+    LIMIT 50
+");
+if ($cpStmt) {
+    $cpStmt->bind_param('i', $managerId);
+    $cpStmt->execute();
+    $cpRes = $cpStmt->get_result();
+    while ($row = $cpRes->fetch_assoc()) {
+        $row['stage'] = cp_resolve_stage((string) $row['status'], $CP_STAGES);
+        $cpCandidates[] = $row;
+    }
+    $cpStmt->close();
+}
+
+$cpByStage    = [];
+$cpTotal      = count($cpCandidates);
+foreach ($cpCandidates as $c) {
+    $k = $c['stage']['key'];
+    $cpByStage[$k] = ($cpByStage[$k] ?? 0) + 1;
+}
+/*
+|--------------------------------------------------------------------------
 | Notification Bell (session-backed, no DB changes)
 |--------------------------------------------------------------------------
 */
@@ -646,7 +750,6 @@ $flashes = render_flashes();
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<<<<<<< HEAD
     <meta charset="UTF-8">
     <meta
         name="viewport"
@@ -1682,17 +1785,180 @@ html.dark-mode .pm-notif__count {
 [data-theme="dark"] .pm-modal__empty {
     color: #9ca3af;
 }
+/* =========================================================
+   CANDIDATE PROGRESS (dashboard-embedded)
+========================================================= */
+.pm-cp-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0 1.25rem;
+}
+
+.pm-cp-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.pm-cp-chip--grey   { background:#f3f4f6; color:#374151; }
+.pm-cp-chip--blue   { background:#dbeafe; color:#1e40af; }
+.pm-cp-chip--indigo { background:#e0e7ff; color:#3730a3; }
+.pm-cp-chip--purple { background:#ede9fe; color:#5b21b6; }
+.pm-cp-chip--amber  { background:#fef3c7; color:#92400e; }
+.pm-cp-chip--orange { background:#ffedd5; color:#9a3412; }
+.pm-cp-chip--green  { background:#dcfce7; color:#166534; }
+.pm-cp-chip--red    { background:#fee2e2; color:#991b1b; }
+
+.pm-cp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.pm-cp-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 1.15rem;
+    box-shadow: 0 4px 18px rgba(0,0,0,.06);
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.pm-cp-card__top {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.pm-cp-card__avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.pm-cp-card__who {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.pm-cp-card__name {
+    font-weight: 700;
+    color: #111827;
+    font-size: 0.92rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pm-cp-card__email {
+    font-size: 0.75rem;
+    color: #6b7280;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pm-cp-card__meta {
+    font-size: 0.78rem;
+    color: #6b7280;
+    line-height: 1.5;
+}
+
+.pm-cp-card__meta i {
+    width: 14px;
+    color: #9ca3af;
+    margin-right: 0.3rem;
+}
+
+.pm-cp-stage {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    align-self: flex-start;
+}
+
+.pm-cp-stage--grey   { background:#f3f4f6; color:#374151; }
+.pm-cp-stage--blue   { background:#dbeafe; color:#1e40af; }
+.pm-cp-stage--indigo { background:#e0e7ff; color:#3730a3; }
+.pm-cp-stage--purple { background:#ede9fe; color:#5b21b6; }
+.pm-cp-stage--amber  { background:#fef3c7; color:#92400e; }
+.pm-cp-stage--orange { background:#ffedd5; color:#9a3412; }
+.pm-cp-stage--green  { background:#dcfce7; color:#166534; }
+.pm-cp-stage--red    { background:#fee2e2; color:#991b1b; }
+
+.pm-cp-pipeline {
+    display: flex;
+    gap: 0.2rem;
+    margin-top: 0.2rem;
+}
+
+.pm-cp-pipeline__step {
+    flex: 1;
+    height: 7px;
+    border-radius: 999px;
+    background: #e5e7eb;
+}
+
+.pm-cp-pipeline__step.is-done    { background: #1a56db; }
+.pm-cp-pipeline__step.is-current { background: #1a56db; box-shadow: 0 0 0 3px rgba(26,86,219,.2); }
+.pm-cp-pipeline__step.is-rejected{ background: #ef4444; }
+
+.pm-cp-pipeline__labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.35rem;
+    font-size: 0.68rem;
+    color: #9ca3af;
+}
+
+.pm-cp-empty {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: #6b7280;
+}
+
+.pm-cp-empty i {
+    font-size: 2rem;
+    color: #cbd5e1;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+/* Dark mode */
+.dark-mode .pm-cp-card,
+[data-theme="dark"] .pm-cp-card {
+    background: #111827;
+    box-shadow: 0 4px 18px rgba(0,0,0,.5);
+}
+
+.dark-mode .pm-cp-card__name,
+[data-theme="dark"] .pm-cp-card__name { color: #f9fafb; }
+
+.dark-mode .pm-cp-card__email,
+.dark-mode .pm-cp-card__meta,
+[data-theme="dark"] .pm-cp-card__email,
+[data-theme="dark"] .pm-cp-card__meta { color: #9ca3af; }
+
+.dark-mode .pm-cp-pipeline__step,
+[data-theme="dark"] .pm-cp-pipeline__step { background: #374151; }
+
     </style>
-=======
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Programme Manager Dashboard | Investhood IT</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
-  <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
->>>>>>> 69ee3b9c4b9c5032917843f6a058edc276589649
 </head>
 <body class="dashboard-page">
   <div class="dashboard">
@@ -2223,6 +2489,146 @@ html.dark-mode .pm-notif__count {
                     </div>
                 <?php endif; ?>
             </section>
+
+            <!-- =================================================
+     CANDIDATE PROGRESS
+================================================== -->
+<section class="pm-section">
+    <div class="welcome-card">
+        <div class="welcome-card__content">
+            <div class="pm-section-header">
+                <h2>
+                    <i class="fas fa-diagram-project"></i>
+                    Candidate Progress
+                </h2>
+                <p>
+                    Track candidates as they move through the
+                    recruitment pipeline.
+                </p>
+            </div>
+
+            <!-- Stage summary chips -->
+            <div class="pm-cp-chips">
+                <span class="pm-cp-chip">
+                    <i class="fas fa-users"></i>
+                    <?= number_format($cpTotal) ?> total
+                </span>
+                <?php foreach ($CP_STAGES as $key => $meta): ?>
+                    <?php if (!empty($cpByStage[$key])): ?>
+                        <span class="pm-cp-chip pm-cp-chip--<?= e($meta['color']) ?>">
+                            <i class="fas <?= e($meta['icon']) ?>"></i>
+                            <?= e($meta['label']) ?>: <?= (int) $cpByStage[$key] ?>
+                        </span>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+                <?php if (!empty($cpByStage['rejected'])): ?>
+                    <span class="pm-cp-chip pm-cp-chip--red">
+                        <i class="fas fa-circle-xmark"></i>
+                        Rejected: <?= (int) $cpByStage['rejected'] ?>
+                    </span>
+                <?php endif; ?>
+                <?php if (!empty($cpByStage['withdrawn'])): ?>
+                    <span class="pm-cp-chip pm-cp-chip--grey">
+                        <i class="fas fa-user-minus"></i>
+                        Withdrawn: <?= (int) $cpByStage['withdrawn'] ?>
+                    </span>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <?php if (empty($cpCandidates)): ?>
+        <div class="welcome-card" style="margin-top:1rem;">
+            <div class="welcome-card__content pm-cp-empty">
+                <i class="fas fa-user-slash"></i>
+                <h3>No candidates yet</h3>
+                <p>
+                    Candidates will appear here once they are added
+                    to your programme cohorts.
+                </p>
+            </div>
+        </div>
+    <?php else: ?>
+        <div class="pm-cp-grid">
+            <?php foreach ($cpCandidates as $c): ?>
+                <?php
+                $stage       = $c['stage'];
+                $isRejected  = $stage['key'] === 'rejected';
+                $isWithdrawn = $stage['key'] === 'withdrawn';
+                $stageNum    = (int) $stage['number'];
+                $stageIcon   = $isRejected
+                    ? 'fa-circle-xmark'
+                    : ($isWithdrawn
+                        ? 'fa-user-minus'
+                        : ($CP_STAGES[$stage['key']]['icon'] ?? 'fa-circle'));
+                ?>
+                <div class="pm-cp-card">
+                    <!-- Who -->
+                    <div class="pm-cp-card__top">
+                        <img
+                            class="pm-cp-card__avatar"
+                            src="https://ui-avatars.com/api/?name=<?= urlencode($c['candidate_name'] ?? 'Candidate') ?>&background=e0e7ff&color=3730a3&size=80"
+                            alt=""
+                        >
+                        <div class="pm-cp-card__who">
+                            <span class="pm-cp-card__name">
+                                <?= e($c['candidate_name'] ?? 'Unknown candidate') ?>
+                            </span>
+                            <span class="pm-cp-card__email">
+                                <?= e($c['candidate_email'] ?? '') ?>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Programme / Cohort -->
+                    <div class="pm-cp-card__meta">
+                        <div>
+                            <i class="fas fa-graduation-cap"></i>
+                            <?= e($c['programme_name']) ?>
+                        </div>
+                        <div>
+                            <i class="fas fa-layer-group"></i>
+                            <?= e($c['cohort_name']) ?>
+                        </div>
+                    </div>
+
+                    <!-- Current stage pill -->
+                    <span class="pm-cp-stage pm-cp-stage--<?= e($stage['color']) ?>">
+                        <i class="fas <?= e($stageIcon) ?>"></i>
+                        <?= e($stage['label']) ?>
+                    </span>
+
+                    <!-- Pipeline -->
+                    <div>
+                        <div class="pm-cp-pipeline">
+                            <?php foreach ($CP_STAGES as $i => $meta): ?>
+                                <?php
+                                $stepNum = $i + 1;
+                                $classes = ['pm-cp-pipeline__step'];
+
+                                if ($isRejected) {
+                                    if ($stepNum === 1) $classes[] = 'is-rejected';
+                                } else {
+                                    if ($stepNum < $stageNum)   $classes[] = 'is-done';
+                                    if ($stepNum === $stageNum) $classes[] = 'is-current';
+                                }
+                                ?>
+                                <div
+                                    class="<?= e(implode(' ', $classes)) ?>"
+                                    title="<?= e($meta['label']) ?>"
+                                ></div>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="pm-cp-pipeline__labels">
+                            <span>Submitted</span>
+                            <span>Selected</span>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</section>
             <!-- =================================================
                  UPCOMING PROGRAMMES
             ================================================== -->
