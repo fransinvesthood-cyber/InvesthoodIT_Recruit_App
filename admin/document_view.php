@@ -1,10 +1,13 @@
 <?php
 /**
  * ================================================
- * INVESTHOOD IT - Document Download Handler
+ * INVESTHOOD IT - Document View Handler
  * ================================================
  * Securely serves application and candidate documents
- * to authorized administrators. Files are stored outside web root.
+ * to authorized administrators for inline viewing.
+ * Files are stored outside web root.
+ * This handler uses Content-Disposition: inline so that
+ * the browser displays the document without forcing a download.
  */
 
 require_once __DIR__ . '/../includes/bootstrap.php';
@@ -90,7 +93,7 @@ if (!file_exists($filePath)) {
     // Try alternative upload directory
     $uploadDir = __DIR__ . '/../uploads/documents/';
     $filePath = $uploadDir . $doc['stored_filename'];
-    
+
     if (!file_exists($filePath)) {
         http_response_code(404);
         exit('File not found on server.');
@@ -101,15 +104,16 @@ if (!file_exists($filePath)) {
 if (!empty($doc['file_checksum'])) {
     $actualChecksum = hash_file('sha256', $filePath);
     if (!hash_equals($doc['file_checksum'], $actualChecksum)) {
-        error_log("[Document Download] Checksum mismatch for document ID: {$documentId}");
+        error_log("[Document View] Checksum mismatch for document ID: {$documentId}");
         http_response_code(500);
         exit('File integrity check failed.');
     }
 }
 
-// Set headers for download
-header('Content-Type: ' . ($doc['mime_type'] ?? 'application/octet-stream'));
-header('Content-Disposition: attachment; filename="' . basename($doc['original_filename']) . '"');
+// Set headers for inline viewing
+$mimeType = $doc['mime_type'] ?? 'application/octet-stream';
+header('Content-Type: ' . $mimeType);
+header('Content-Disposition: inline; filename="' . basename($doc['original_filename']) . '"');
 header('Content-Length: ' . filesize($filePath));
 header('Cache-Control: private, no-cache, must-revalidate');
 header('Pragma: no-cache');

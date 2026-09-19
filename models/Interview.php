@@ -73,6 +73,36 @@ class Interview
         'poor'      => 'Poor',
     ];
 
+    /** @var string[] Valid feedback interview outcome / decision values */
+    public const OUTCOMES = ['selected', 'waitlisted', 'rejected', 'further_review', 'another_interview'];
+
+    /** @var string[] Human-friendly outcome labels */
+    public const OUTCOME_LABELS = [
+        'selected'          => 'Selected',
+        'waitlisted'        => 'Waitlisted',
+        'rejected'          => 'Rejected',
+        'further_review'    => 'Further Review',
+        'another_interview' => 'Recommended for Another Interview',
+    ];
+
+    /** @var string[] Outcome badge tones */
+    public const OUTCOME_BADGES = [
+        'selected'          => 'green',
+        'waitlisted'        => 'amber',
+        'rejected'          => 'danger',
+        'further_review'    => 'primary',
+        'another_interview' => 'primary',
+    ];
+
+    /** @var array<string,string> Interview outcome => application status mapping */
+    public const OUTCOME_APPLICATION_STATUS = [
+        'selected'          => 'selected',
+        'waitlisted'        => 'waitlisted',
+        'rejected'          => 'rejected',
+        'further_review'    => 'under_review',
+        'another_interview' => 'interview_required',
+    ];
+
     // --------------------------------------------------------
     // HELPERS
     // --------------------------------------------------------
@@ -90,6 +120,21 @@ class Interview
     public static function typeLabel(?string $type): string
     {
         return self::TYPE_LABELS[$type ?? ''] ?? ucfirst(str_replace('_', ' ', (string) $type));
+    }
+
+    public static function outcomeLabel(?string $outcome): string
+    {
+        return self::OUTCOME_LABELS[$outcome ?? ''] ?? ($outcome ? ucfirst(str_replace('_', ' ', (string) $outcome)) : '—');
+    }
+
+    public static function outcomeBadgeTone(?string $outcome): string
+    {
+        return self::OUTCOME_BADGES[$outcome ?? ''] ?? 'muted';
+    }
+
+    public static function outcomeApplicationStatus(?string $outcome): ?string
+    {
+        return self::OUTCOME_APPLICATION_STATUS[$outcome ?? ''] ?? null;
     }
 
     public static function recommendationLabel(?string $rec): string
@@ -111,6 +156,26 @@ class Interview
         $where = [];
         $types = '';
         $params = [];
+
+        // Feedback enrichment (tolerant: read-only, never migrates on list page).
+        $fbCols = self::feedbackColumns();
+        $fbTable = in_array('interview_id', $fbCols, true);
+        $fbHas = static function (string $c) use ($fbCols): bool { return in_array($c, $fbCols, true); };
+        $fbSelect = '';
+        $fbJoin = '';
+        if ($fbTable) {
+            $adminExpr = $fbHas('admin_id') ? 'fb.admin_id' : 'fb.interviewer_id';
+            $outcomeExpr = $fbHas('outcome') && $fbHas('recommendation')
+                ? 'COALESCE(fb.outcome, fb.recommendation)'
+                : ($fbHas('outcome') ? 'fb.outcome' : ($fbHas('recommendation') ? 'fb.recommendation' : 'NULL'));
+            $ratingExpr = $fbHas('overall_rating') ? 'fb.overall_rating' : 'NULL';
+            $dateExpr = $fbHas('submitted_at') ? 'fb.submitted_at' : ($fbHas('created_at') ? 'fb.created_at' : 'NULL');
+            $fbSelect = ", {$outcomeExpr} AS feedback_outcome, {$ratingExpr} AS feedback_rating,"
+                . " {$dateExpr} AS feedback_submitted_at,"
+                . " TRIM(CONCAT(COALESCE(fbu.first_name, ''), ' ', COALESCE(fbu.last_name, ''))) AS feedback_admin_name";
+            $fbJoin = " LEFT JOIN interview_feedback fb ON fb.interview_id = i.id"
+                . " LEFT JOIN users fbu ON fbu.id = {$adminExpr}";
+        }
 
         if (!empty($filters['search'])) {
             $where[] = "(u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR a.application_reference LIKE ? OR o.title LIKE ? OR p.name LIKE ?)";
@@ -158,6 +223,10 @@ class Interview
             $types .= 's';
             $params[] = $filters['date_to'];
         }
+        // Virtual "Upcoming" filter: active statuses that are still to happen
+        if (!empty($filters['upcoming_only'])) {
+            $where[] = self::stillUpcomingSql('i');
+        }
 
         $whereSql = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
@@ -177,8 +246,7 @@ class Interview
         $page = min($page, $pages);
         $offset = ($page - 1) * $perPage;
 
-        $records = Database::fetchAll(
-            "SELECT i.*, a.application_reference, a.status AS application_status,
+        $sql = "SELECT i.*, a.application_reference, a.status AS application_status,
                     a.candidate_id,
                     u.first_name AS candidate_first_name, u.last_name AS candidate_last_name,
                     u.email AS candidate_email, u.phone AS candidate_phone,
@@ -186,20 +254,20 @@ class Interview
                     p.id AS programme_id, p.name AS programme_name,
                     c.id AS cohort_id, c.name AS cohort_name,
                     iu.first_name AS interviewer_first_name, iu.last_name AS interviewer_last_name,
-                    iu.email AS interviewer_email,
-                    (SELECT COUNT(*) FROM interview_feedback f WHERE f.interview_id = i.id) AS has_feedback
+                    iu.email AS interviewer_email, "
+            . ($fbTable ? "(SELECT COUNT(*) FROM interview_feedback f WHERE f.interview_id = i.id) AS has_feedback" : "0 AS has_feedback")
+            . " {$fbSelect}
              FROM interviews i
              INNER JOIN applications a ON a.id = i.application_id
              INNER JOIN users u ON u.id = a.candidate_id
              INNER JOIN opportunities o ON o.id = a.opportunity_id
              INNER JOIN programmes p ON p.id = o.programme_id
              LEFT JOIN cohorts c ON c.id = o.cohort_id
-             LEFT JOIN users iu ON iu.id = i.interviewer_id
-             $whereSql
+             LEFT JOIN users iu ON iu.id = i.interviewer_id{$fbJoin}
+             {$whereSql}
              ORDER BY i.interview_date DESC, i.start_time DESC
-             LIMIT $perPage OFFSET $offset",
-            $types, $params
-        );
+             LIMIT {$perPage} OFFSET {$offset}";
+        $records = Database::fetchAll($sql, $types, $params);
 
         return ['records' => $records, 'total' => $total, 'pages' => $pages];
     }
@@ -260,6 +328,174 @@ class Interview
              ORDER BY i.updated_at DESC
              LIMIT ?",
             'i', [$limit]
+        );
+    }
+
+    // --------------------------------------------------------
+    // DASHBOARD / AGGREGATES
+    // --------------------------------------------------------
+
+    /**
+     * SQL fragment matching interviews that are still to take place,
+     * based on the current date AND time.
+     */
+    private static function stillUpcomingSql(string $alias = 'i'): string
+    {
+        return "{$alias}.status IN ('scheduled','confirmed','rescheduled')
+                AND ({$alias}.interview_date > CURDATE()
+                     OR ({$alias}.interview_date = CURDATE() AND {$alias}.end_time >= CURTIME()))";
+    }
+
+    /**
+     * Real number of upcoming interviews (still to happen, nothing finished).
+     */
+    public static function countUpcoming(): int
+    {
+        $row = Database::fetchOne(
+            "SELECT COUNT(*) AS cnt FROM interviews i WHERE " . self::stillUpcomingSql('i')
+        );
+        return (int) ($row['cnt'] ?? 0);
+    }
+
+    /**
+     * Number of interviews (any status) booked on a specific date.
+     */
+    public static function countOnDate(string $date): int
+    {
+        $row = Database::fetchOne(
+            "SELECT COUNT(*) AS cnt FROM interviews i WHERE i.interview_date = ?",
+            's', [$date]
+        );
+        return (int) ($row['cnt'] ?? 0);
+    }
+
+    /**
+     * Per-day interview totals between two dates (cancelled interviews excluded).
+     *
+     * @return array<string,int> Map of 'Y-m-d' => count
+     */
+    public static function countsByDateRange(string $startDate, string $endDate): array
+    {
+        $rows = Database::fetchAll(
+            "SELECT i.interview_date, COUNT(*) AS cnt
+             FROM interviews i
+             WHERE i.interview_date BETWEEN ? AND ?
+               AND i.status <> 'cancelled'
+             GROUP BY i.interview_date
+             ORDER BY i.interview_date ASC",
+            'ss', [$startDate, $endDate]
+        );
+
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[(string) $row['interview_date']] = (int) $row['cnt'];
+        }
+        return $counts;
+    }
+
+    /**
+     * Aggregate interview totals for a date window (single query).
+     *
+     * @return array{total:int,completed:int,upcoming:int,cancelled:int,no_show:int}
+     */
+    public static function rangeSummary(string $startDate, string $endDate): array
+    {
+        $row = Database::fetchOne(
+            "SELECT COUNT(*) AS total,
+                    COALESCE(SUM(i.status = 'completed'), 0) AS completed,
+                    COALESCE(SUM(i.status IN ('scheduled','confirmed','rescheduled')), 0) AS upcoming,
+                    COALESCE(SUM(i.status = 'cancelled'), 0) AS cancelled,
+                    COALESCE(SUM(i.status = 'no_show'), 0) AS no_show
+             FROM interviews i
+             WHERE i.interview_date BETWEEN ? AND ?",
+            'ss', [$startDate, $endDate]
+        );
+
+        return [
+            'total'     => (int) ($row['total'] ?? 0),
+            'completed' => (int) ($row['completed'] ?? 0),
+            'upcoming'  => (int) ($row['upcoming'] ?? 0),
+            'cancelled' => (int) ($row['cancelled'] ?? 0),
+            'no_show'   => (int) ($row['no_show'] ?? 0),
+        ];
+    }
+
+    /**
+     * Upcoming interviews (still to happen) with every related record needed
+     * for dashboard display. Ordered with the nearest interview first.
+     *
+     * @param string|null $fromDate Optional lower date bound (Y-m-d)
+     * @param string|null $toDate   Optional upper date bound (Y-m-d)
+     */
+    public static function dashboardUpcoming(?string $fromDate = null, ?string $toDate = null, int $limit = 9): array
+    {
+        $sql = "SELECT i.id, i.application_id, i.interview_date, i.start_time, i.end_time,
+                       i.interview_type, i.status, i.location, i.reschedule_count,
+                       a.application_reference,
+                       u.first_name AS candidate_first_name, u.last_name AS candidate_last_name,
+                       u.email AS candidate_email,
+                       o.id AS opportunity_id, o.title AS opportunity_title,
+                       p.id AS programme_id, p.name AS programme_name,
+                       c.id AS cohort_id, c.name AS cohort_name,
+                       iu.first_name AS interviewer_first_name, iu.last_name AS interviewer_last_name,
+                       iu.email AS interviewer_email
+                FROM interviews i
+                INNER JOIN applications a ON a.id = i.application_id
+                INNER JOIN users u ON u.id = a.candidate_id
+                INNER JOIN opportunities o ON o.id = a.opportunity_id
+                INNER JOIN programmes p ON p.id = o.programme_id
+                LEFT JOIN cohorts c ON c.id = o.cohort_id
+                LEFT JOIN users iu ON iu.id = i.interviewer_id
+                WHERE " . self::stillUpcomingSql('i');
+
+        $types  = '';
+        $params = [];
+
+        if ($fromDate !== null) {
+            $sql .= " AND i.interview_date >= ?";
+            $types .= 's';
+            $params[] = $fromDate;
+        }
+        if ($toDate !== null) {
+            $sql .= " AND i.interview_date <= ?";
+            $types .= 's';
+            $params[] = $toDate;
+        }
+
+        $sql .= " ORDER BY i.interview_date ASC, i.start_time ASC LIMIT ?";
+        $types .= 'i';
+        $params[] = max(1, $limit);
+
+        return Database::fetchAll($sql, $types, $params);
+    }
+
+    /**
+     * Every interview booked on a given date (all statuses), earliest first.
+     */
+    public static function dashboardOnDate(string $date, int $limit = 10): array
+    {
+        return Database::fetchAll(
+            "SELECT i.id, i.application_id, i.interview_date, i.start_time, i.end_time,
+                    i.interview_type, i.status, i.location,
+                    a.application_reference,
+                    u.first_name AS candidate_first_name, u.last_name AS candidate_last_name,
+                    u.email AS candidate_email,
+                    o.id AS opportunity_id, o.title AS opportunity_title,
+                    p.id AS programme_id, p.name AS programme_name,
+                    c.id AS cohort_id, c.name AS cohort_name,
+                    iu.first_name AS interviewer_first_name, iu.last_name AS interviewer_last_name,
+                    iu.email AS interviewer_email
+             FROM interviews i
+             INNER JOIN applications a ON a.id = i.application_id
+             INNER JOIN users u ON u.id = a.candidate_id
+             INNER JOIN opportunities o ON o.id = a.opportunity_id
+             INNER JOIN programmes p ON p.id = o.programme_id
+             LEFT JOIN cohorts c ON c.id = o.cohort_id
+             LEFT JOIN users iu ON iu.id = i.interviewer_id
+             WHERE i.interview_date = ?
+             ORDER BY i.start_time ASC
+             LIMIT ?",
+            'si', [$date, max(1, $limit)]
         );
     }
 
@@ -758,15 +994,112 @@ class Interview
 
     public static function getFeedback(int $interviewId): ?array
     {
-        return Database::fetchOne(
-            "SELECT f.*,
-                    u.first_name AS interviewer_first_name, u.last_name AS interviewer_last_name
-             FROM interview_feedback f
-             LEFT JOIN users u ON u.id = f.interviewer_id
-             WHERE f.interview_id = ?
-             LIMIT 1",
-            'i', [$interviewId]
-        );
+        try {
+            $cols = self::feedbackColumns();
+            if (!in_array('interview_id', $cols, true)) { return null; }
+            $has  = static fn (string $c): bool => in_array($c, $cols, true);
+            $adminJoin = 'fb.interviewer_id';
+            if ($has('admin_id') && $has('interviewer_id')) { $adminJoin = 'COALESCE(fb.admin_id, fb.interviewer_id)'; }
+            elseif ($has('admin_id')) { $adminJoin = 'fb.admin_id'; }
+            return Database::fetchOne(
+                "SELECT fb.*,
+                        CONCAT(u.first_name, ' ', u.last_name) AS reviewer_name,
+                        u.email AS reviewer_email
+                 FROM interview_feedback fb
+                 LEFT JOIN users u ON u.id = {$adminJoin}
+                 WHERE fb.interview_id = ?
+                 LIMIT 1",
+                'i', [$interviewId]
+            );
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    public static function rawFeedbackColumns($tableExists = null): array
+    {
+        if (empty($tableExists)) { return []; }
+        try {
+            $rows = Database::fetchAll('SHOW COLUMNS FROM interview_feedback');
+            return array_map(static fn (array $r): string => (string) ($r['Field'] ?? ''), $rows);
+        } catch (Exception $e) { return []; }
+    }
+
+    public static function feedbackColumns(): array
+    {
+        try {
+            $rows = Database::fetchAll('SHOW COLUMNS FROM interview_feedback');
+            return array_map(static fn (array $r): string => (string) ($r['Field'] ?? ''), $rows);
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+
+    public static function ensureFeedbackColumns(): void
+    {
+        static $done = false;
+        if ($done) { return; }
+        try {
+            $exists = Database::fetchOne("SHOW TABLES LIKE 'interview_feedback'");
+            if (!$exists) {
+                Database::query(
+                    'CREATE TABLE IF NOT EXISTS `interview_feedback` (
+                      `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                      `interview_id` INT UNSIGNED NOT NULL,
+                      `application_id` INT UNSIGNED NOT NULL,
+                      `interviewer_id` INT UNSIGNED NULL,
+                      `admin_id` INT UNSIGNED NULL,
+                      `overall_rating` TINYINT NULL,
+                      `technical_rating` TINYINT NULL,
+                      `communication_rating` TINYINT NULL,
+                      `problem_solving_rating` TINYINT NULL,
+                      `programme_suitability` VARCHAR(50) NULL,
+                      `strengths` TEXT NULL,
+                      `areas_for_improvement` TEXT NULL,
+                      `areas_of_concern` TEXT NULL,
+                      `general_comments` TEXT NULL,
+                      `general_feedback` TEXT NULL,
+                      `internal_notes` TEXT NULL,
+                      `recommendation` VARCHAR(50) NULL,
+                      `outcome` VARCHAR(50) NULL,
+                      `submitted_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                      PRIMARY KEY (`id`),
+                      UNIQUE KEY `uq_interview_feedback_interview` (`interview_id`)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+                );
+                $done = true;
+                return;
+            }
+            $cols = self::rawFeedbackColumns(!empty($exists));
+            $add = static function (string $col, string $def) use ($cols): void {
+                if (!in_array($col, $cols, true)) {
+                    Database::query("ALTER TABLE `interview_feedback` ADD COLUMN {$def}");
+                }
+            };
+            $add('admin_id', '`admin_id` INT UNSIGNED NULL AFTER `interviewer_id`');
+            $add('outcome', "`outcome` VARCHAR(50) NULL AFTER `recommendation`");
+            $add('areas_of_concern', '`areas_of_concern` TEXT NULL AFTER `areas_for_improvement`');
+            $add('general_feedback', '`general_feedback` TEXT NULL AFTER `general_comments`');
+            $add('internal_notes', '`internal_notes` TEXT NULL AFTER `general_feedback`');
+            $colsAfter = self::feedbackColumns();
+            if (in_array('interview_id', $colsAfter, true)) {
+                try {
+                    $idxRows = Database::fetchAll('SHOW INDEX FROM interview_feedback');
+                    $hasUq = false;
+                    foreach ($idxRows as $ix) {
+                        if (($ix['Key_name'] ?? '') === 'uq_interview_feedback_interview') { $hasUq = true; break; }
+                    }
+                    if (!$hasUq) {
+                        Database::query('ALTER TABLE `interview_feedback` ADD UNIQUE KEY `uq_interview_feedback_interview` (`interview_id`)');
+                    }
+                } catch (Exception $e) { /* unique key is best-effort */ }
+            }
+            $done = true;
+        } catch (Exception $e) {
+            error_log('[Interview] feedback migration skipped: ' . $e->getMessage());
+        }
     }
 
     public static function saveFeedback(array $data): int
