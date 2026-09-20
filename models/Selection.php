@@ -75,9 +75,15 @@ class Selection
     /**
      * Which current application statuses allow each decision.
      * Waitlisted is stored as the existing pipeline value 'on_hold'.
+     *
+     * 'selected' is also allowed FROM 'selected': the application may
+     * already be in the Selected status (e.g. seeded directly, or set
+     * before the decision table existed) while the documented decision
+     * record is still missing. Recording it then documents the decision
+     * and internal note WITHOUT changing the status (see decide()).
      */
     private const DECISION_ALLOWED_FROM = [
-        'selected'     => ['interview_completed', 'on_hold'],
+        'selected'     => ['interview_completed', 'on_hold', 'selected'],
         'waitlisted'   => ['interview_completed', 'selected'],
         'not_selected' => ['interview_completed', 'selected', 'on_hold'],
     ];
@@ -385,6 +391,30 @@ class Selection
         $needDecisionJoin = false;
         $params = [];
         $types  = '';
+
+        // ---- Selection Management page scope (admin/selection.php) ----
+        // The page only surfaces candidates whose CURRENT application
+        // status is 'selected' AND whose CURRENT (latest) interview is
+        // marked 'completed' — the same "latest interview per application"
+        // rule LIST_SELECT uses for the rendered interview_status column
+        // (MAX(id)). An interview still 'scheduled' (or cancelled/no_show)
+        // keeps the candidate OFF this page until it is marked completed.
+        // Enforcing it here (query level) keeps the count, pagination and
+        // row set consistent — a PHP-level array_filter() applied after
+        // pagination would silently drop in-scope rows landing on later
+        // pages. The interviews subquery branch is guarded with
+        // tableExists() (same graceful-degradation rule as
+        // COUNT_BASE_WHERE: a missing interviews table must never throw
+        // or zero the count).
+        if (($filters['scope'] ?? '') === 'selected_completed') {
+            $where[] = "a.status = 'selected'";
+            if (self::tableExists('interviews')) {
+                $where[] = "EXISTS (SELECT 1 FROM interviews sie"
+                         . " WHERE sie.application_id = a.id AND sie.status = 'completed'"
+                         . " AND sie.id = (SELECT MAX(i2.id) FROM interviews i2"
+                         . "               WHERE i2.application_id = a.id))";
+            }
+        }
 
         if (!empty($filters['search'])) {
             $search = '%' . $filters['search'] . '%';
@@ -911,23 +941,30 @@ class Selection
 
             $newStatus = self::DECISION_TO_STATUS[$decision];
 
-            // ---- 1. Update application status (existing pipeline) ----
-            Database::execute(
-                'UPDATE applications SET status = ?, updated_at = NOW() WHERE id = ?',
-                'si',
-                [$newStatus, $applicationId]
-            );
+            if ($newStatus !== $currentStatus) {
+                // ---- 1. Update application status (existing pipeline) ----
+                Database::execute(
+                    'UPDATE applications SET status = ?, updated_at = NOW() WHERE id = ?',
+                    'si',
+                    [$newStatus, $applicationId]
+                );
 
-            // ---- 2. Record status history through the EXISTING mechanism ----
-            $historyReason = 'Selection decision: ' . self::decisionLabel($decision)
-                . ($reason !== null && $reason !== '' ? ' — ' . $reason : '');
-            Application::recordStatusHistory(
-                $applicationId,
-                $currentStatus,
-                $newStatus,
-                $adminId,
-                mb_substr($historyReason, 0, 500)
-            );
+                // ---- 2. Record status history through the EXISTING mechanism ----
+                $historyReason = 'Selection decision: ' . self::decisionLabel($decision)
+                    . ($reason !== null && $reason !== '' ? ' — ' . $reason : '');
+                Application::recordStatusHistory(
+                    $applicationId,
+                    $currentStatus,
+                    $newStatus,
+                    $adminId,
+                    mb_substr($historyReason, 0, 500)
+                );
+            }
+            // When the decision's target status equals the current status
+            // (e.g. 'selected' on an already-'selected' application), the
+            // pipeline is left untouched — no redundant status rewrite and
+            // no "Selected → Selected" history row. Only the decision
+            // record below is written.
 
             // ---- 3. Save the selection decision + internal note ----
             Database::execute(
@@ -939,7 +976,7 @@ class Selection
                     decided_by = VALUES(decided_by),
                     decision_note = VALUES(decision_note),
                     decided_at = NOW()",
-                'iiiiss',
+                'iiisis',
                 [$applicationId, (int) $app['candidate_id'], (int) $app['opportunity_id'], $decision, $adminId, $note]
             );
 
@@ -1292,13 +1329,16 @@ class Selection
                      title, position, start_date, end_date, location, compensation,
                      expiry_date, terms, status, created_by)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)",
-                'iiiiiisssssssi',
+                'iiiiissssssssi',
                 [
                     $applicationId,
                     (int) $app['candidate_id'],
                     (int) $app['opportunity_id'],
                     (int) $app['programme_id'],
-                    (int) $app['cohort_id'],
+                    // cohort_id is nullable on the opportunity — keep NULL
+                    // (never cast to 0, which would violate fk_offers_cohort).
+                    // mysqli binds PHP NULL as SQL NULL with the 'i' type.
+                    $app['cohort_id'] !== null ? (int) $app['cohort_id'] : null,
                     $clean['title'],
                     $clean['position'],
                     $clean['start_date'],

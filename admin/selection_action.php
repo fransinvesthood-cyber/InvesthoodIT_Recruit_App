@@ -41,13 +41,23 @@ $decisionLabel = Selection::decisionLabel($decision);
 try {
     $result = Selection::decide($applicationId, $decision, $adminId, $note, $reason);
 
-    set_flash(
-        'success',
-        'Selection Decision Recorded',
-        $decisionLabel . ' recorded — application status updated from "'
-        . Application::label($result['previous_status']) . '" to "'
-        . Application::label($result['new_status']) . '". The change is recorded on the application timeline.'
-    );
+    if ($result['previous_status'] === $result['new_status']) {
+        set_flash(
+            'success',
+            'Selection Decision Recorded',
+            $decisionLabel . ' recorded — the application is already in the "'
+            . Application::label($result['new_status']) . '" status, so its status was left unchanged. '
+            . 'The decision (and internal note) is saved to the decision record.'
+        );
+    } else {
+        set_flash(
+            'success',
+            'Selection Decision Recorded',
+            $decisionLabel . ' recorded — application status updated from "'
+            . Application::label($result['previous_status']) . '" to "'
+            . Application::label($result['new_status']) . '". The change is recorded on the application timeline.'
+        );
+    }
 } catch (RuntimeException $e) {
     set_flash('error', 'Decision Not Saved', $e->getMessage());
 } catch (Exception $e) {

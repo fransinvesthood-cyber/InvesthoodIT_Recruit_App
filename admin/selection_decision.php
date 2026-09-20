@@ -348,7 +348,9 @@ $flashes = render_flashes();
                 </div>
                 <form class="sel-form" method="post" action="<?= url('admin/selection_action.php') ?>"
                       data-confirm-title="Record selection decision?"
-                      data-confirm-message="The application status will be updated and the decision recorded with an audit trail. This action is logged and traceable."
+                      data-confirm-message="<?= e(($record['status'] ?? '') === 'selected'
+                          ? 'The application is already in the Selected status. The decision will be recorded with an audit trail; the status itself will not change.'
+                          : 'The application status will be updated and the decision recorded with an audit trail. This action is logged and traceable.') ?>"
                       data-confirm-label="Record Decision">
                   <?= csrf_field() ?>
                   <input type="hidden" name="application_id" value="<?= (int) $applicationId ?>">
@@ -358,7 +360,11 @@ $flashes = render_flashes();
                       <input type="radio" name="decision" value="selected" <?= ($decision['decision'] ?? '') === 'selected' ? 'checked' : '' ?>>
                       <span class="decision-option__body">
                         <span class="decision-option__title"><i class="fas fa-user-check"></i> Selected</span>
-                        <span class="decision-option__hint">Application status becomes &ldquo;Selected&rdquo;. An offer can then be created for this candidate.</span>
+                        <?php if (($record['status'] ?? '') === 'selected'): ?>
+                          <span class="decision-option__hint">The application is already in the &ldquo;Selected&rdquo; status. Recording this decision documents it (status unchanged) and enables offer creation.</span>
+                        <?php else: ?>
+                          <span class="decision-option__hint">Application status becomes &ldquo;Selected&rdquo;. An offer can then be created for this candidate.</span>
+                        <?php endif; ?>
                       </span>
                     </label>
                     <label class="decision-option decision-option--waitlisted">

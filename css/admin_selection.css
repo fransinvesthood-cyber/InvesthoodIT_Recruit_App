@@ -441,3 +441,89 @@ body.dark-mode .sel-decision-badge--danger  { background: rgba(239, 68, 68, 0.15
 body.dark-mode .sel-decision-badge--muted   { background: #1e293b; color: #94a3b8; }
 body.dark-mode .sel-decision-badge--primary { background: rgba(59, 130, 246, 0.15); color: #93c5fd; }
 body.dark-mode .sel-module .app-table tr { background: #0f172a; border-color: #334155; }
+
+/* ================================================================
+   Dashboard: Selection & Offers stat cards (reuses dashboard
+   tokens from styles.css — identical spacing/typography to the
+   interview stat cards for visual consistency)
+   ================================================================ */
+
+/* Stat card grid — matches admin-analytics-stats layout */
+.sel-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.sel-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  cursor: default;
+}
+.sel-stat-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+.sel-stat-card__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  color: #fff;
+  flex-shrink: 0;
+}
+.sel-stat-card__content {
+  flex: 1;
+  min-width: 0;
+}
+.sel-stat-card__value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text, #111827);
+  line-height: 1.2;
+}
+.sel-stat-card__label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted, #6b7280);
+  font-weight: 600;
+}
+
+/* Per-status icon gradients (match interview stat card tones) */
+.sel-stat-card--selected .sel-stat-card__icon     { background: linear-gradient(135deg, #10b981, #059669); }
+.sel-stat-card--pending .sel-stat-card__icon      { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.sel-stat-card--sent .sel-stat-card__icon          { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+.sel-stat-card--accepted .sel-stat-card__icon     { background: linear-gradient(135deg, #10b981, #059669); }
+.sel-stat-card--declined .sel-stat-card__icon     { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.sel-stat-card--waitlisted .sel-stat-card__icon   { background: linear-gradient(135deg, #f59e0b, #d97706); }
+
+/* Dark mode */
+body.dark-mode .sel-stats-grid .sel-stat-card     { background: #0f172a; border-color: #334155; }
+body.dark-mode .sel-stat-card__value              { color: #f1f5f9; }
+body.dark-mode .sel-stat-card__label              { color: #94a3b8; }
+body.dark-mode .sel-stat-card:hover               { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); }
+
+@media (max-width: 767px) {
+  .sel-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  .sel-stat-card__value { font-size: 1.2rem; }
+}
+
+@media (max-width: 480px) {
+  .sel-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -639,11 +639,14 @@ if ($interviewPrevMonth['total'] > 0) {
 // Simple counts only — no analytics or reporting.
 // ------------------------------------------------------------
 $selectionStats = [
-    'selected'         => 0,
-    'pending_offers'   => 0,
-    'offers_issued'    => 0,
-    'offers_accepted'  => 0,
-    'offers_declined'  => 0,
+    'awaiting_decision' => 0,
+    'selected'          => 0,
+    'waitlisted'        => 0,
+    'not_selected'      => 0,
+    'pending_offers'    => 0,
+    'offers_issued'     => 0,
+    'offers_accepted'   => 0,
+    'offers_declined'   => 0,
 ];
 try {
     $selectionStats = Selection::dashboardStats();
@@ -651,11 +654,32 @@ try {
     error_log('[Admin Dashboard] Selection summary unavailable: ' . $ex->getMessage());
 }
 
-$selectedCandidates = (int) ($selectionStats['selected'] ?? 0);
-$pendingOffers      = (int) ($selectionStats['pending_offers'] ?? 0);
-$offersIssued       = (int) ($selectionStats['offers_issued'] ?? 0);
-$offersAccepted     = (int) ($selectionStats['offers_accepted'] ?? 0);
-$offersDeclined     = (int) ($selectionStats['offers_declined'] ?? 0);
+$selectedCandidates  = (int) ($selectionStats['selected'] ?? 0);
+$waitlistedCandidates = (int) ($selectionStats['waitlisted'] ?? 0);
+$offersPending      = (int) ($selectionStats['pending_offers'] ?? 0);
+$offersSent         = (int) ($selectionStats['offers_issued'] ?? 0);
+$offersAcceptedVal  = (int) ($selectionStats['offers_accepted'] ?? 0);
+$offersDeclinedVal  = (int) ($selectionStats['offers_declined'] ?? 0);
+
+// Map to the names used in the template below (kept short for readability)
+$pendingOffers       = $offersPending;
+$offersIssued        = $offersSent;
+$offersAccepted      = $offersAcceptedVal;
+$offersDeclined      = $offersDeclinedVal;
+
+// ------------------------------------------------------------
+// STAGE 11 — RECENT SELECTION & OFFER ACTIVITY (real data)
+// Reuse the existing Selection::adminList() which already joins
+// applications → candidate → opportunity → programme → interview
+// → selection_decision → offer in one query. No duplicate API.
+// ------------------------------------------------------------
+$recentSelections = [];
+try {
+    $recentResult = Selection::adminList([], 1, 8);
+    $recentSelections = is_array($recentResult['records'] ?? null) ? $recentResult['records'] : [];
+} catch (Exception $ex) {
+    error_log('[Admin Dashboard] Recent selections unavailable: ' . $ex->getMessage());
+}
 
 ?>
 <!DOCTYPE html>
@@ -673,7 +697,8 @@ $offersDeclined     = (int) ($selectionStats['offers_declined'] ?? 0);
 <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
   <link rel="stylesheet" href="<?= url('css/admin_programmes.css') ?>">
   <link rel="stylesheet" href="<?= url('css/admin_opportunities.css') ?>">
-  <link rel="stylesheet" href="<?= url('css/admin_applications.css') ?>">
+    <link rel="stylesheet" href="<?= url('css/admin_applications.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/admin_selection.css') ?>">
 </head>
 <body class="dashboard-page admin-dashboard">
 
@@ -709,8 +734,7 @@ $offersDeclined     = (int) ($selectionStats['offers_declined'] ?? 0);
           <li><a href="#admin-applications" class="sidebar__link" data-section="applications"><i class="fas fa-file-alt"></i> Applications</a></li>
           <li><a href="#admin-placements" class="sidebar__link" data-section="placements"><i class="fas fa-handshake"></i> Placements</a></li>
           <li><a href="<?= url('admin/dashboard.php') ?>#admin-interviews" class="sidebar__link"><i class="fas fa-calendar-check"></i> Interviews</a></li>
-          <li><a href="<?= url('admin/selection.php') ?>" class="sidebar__link"><i class="fas fa-user-check"></i> Selection &amp; Offers</a></li>
-          <li><a href="<?= url('admin/offers.php') ?>" class="sidebar__link"><i class="fas fa-file-signature"></i> Offer Management</a></li>
+          <li><a href="#admin-selection" class="sidebar__link" data-section="selection"><i class="fas fa-user-check"></i> Selection &amp; Offers</a></li>
         </ul>
 
         <div class="sidebar__section-label">Talent</div>
@@ -944,37 +968,6 @@ $offersDeclined     = (int) ($selectionStats['offers_declined'] ?? 0);
               <div class="admin-exec-card__footer">
                 <span class="admin-exec-card__period"><i class="fas fa-user"></i> <?= (int)$completeProfiles ?> complete profiles</span>
                 <a href="#" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
-              </div>
-            </div>
-          </div>
-
-<!-- Mini Charts Row -->
-          <div class="admin-mini-charts">
-            <div class="admin-mini-chart-card">
-              <div class="admin-mini-chart-card__header">
-                <h4>Candidate Growth</h4>
-                <span class="admin-mini-chart-card__period">Last 6 months</span>
-              </div>
-              <div class="admin-mini-chart-container">
-                <canvas id="execCandidateChart"></canvas>
-              </div>
-            </div>
-            <div class="admin-mini-chart-card">
-              <div class="admin-mini-chart-card__header">
-                <h4>Applications Trend</h4>
-                <span class="admin-mini-chart-card__period">Weekly comparison</span>
-              </div>
-              <div class="admin-mini-chart-container">
-                <canvas id="execApplicationChart"></canvas>
-              </div>
-            </div>
-            <div class="admin-mini-chart-card">
-              <div class="admin-mini-chart-card__header">
-                <h4>Placement Success</h4>
-                <span class="admin-mini-chart-card__period">Monthly rate</span>
-              </div>
-              <div class="admin-mini-chart-container">
-                <canvas id="execPlacementChart"></canvas>
               </div>
             </div>
           </div>
@@ -2000,6 +1993,163 @@ $offersDeclined     = (int) ($selectionStats['offers_declined'] ?? 0);
           <div style="margin-top:1.25rem;text-align:right;">
             <a href="<?= url('admin/interviews.php') ?>" class="btn btn--primary btn--sm"><i class="fas fa-calendar-check"></i> Manage Interviews</a>
           </div>
+                </section>
+
+        <!-- =============================================
+             SECTION 8B: SELECTION & OFFERS OVERVIEW
+             Real-time data from selection_decisions, offers
+             and the applications pipeline (Stage 11)
+             ============================================= -->
+        <section class="dash-section admin-section sel-module" id="admin-selection" data-section="selection">
+          <div class="section__header" style="text-align:left;margin-bottom:1.5rem;">
+            <span class="section__badge">Selection &amp; Offers</span>
+            <h2 class="section__title" style="font-size:1.5rem;">Selection <span class="text-gradient">and Offers</span></h2>
+            <p class="section__text" style="font-size:0.9rem;">Candidates progressing through the selection process after interviews, with offer workflow tracking.</p>
+          </div>
+
+          <!-- ===== Selection & Offer Stats Grid ===== -->
+          <div class="sel-stats-grid">
+            <div class="sel-stat-card sel-stat-card--selected">
+              <div class="sel-stat-card__icon"><i class="fas fa-user-check"></i></div>
+              <div class="sel-stat-card__content">
+                <span class="sel-stat-card__value" data-count="<?= (int)$selectedCandidates ?>"><?= (int)$selectedCandidates ?></span>
+                <span class="sel-stat-card__label">Selected</span>
+              </div>
+            </div>
+
+            <div class="sel-stat-card sel-stat-card--pending">
+              <div class="sel-stat-card__icon"><i class="fas fa-hourglass-half"></i></div>
+              <div class="sel-stat-card__content">
+                <span class="sel-stat-card__value" data-count="<?= (int)$pendingOffers ?>"><?= (int)$pendingOffers ?></span>
+                <span class="sel-stat-card__label">Offers Pending</span>
+              </div>
+            </div>
+
+            <div class="sel-stat-card sel-stat-card--sent">
+              <div class="sel-stat-card__icon"><i class="fas fa-paper-plane"></i></div>
+              <div class="sel-stat-card__content">
+                <span class="sel-stat-card__value" data-count="<?= (int)$offersIssued ?>"><?= (int)$offersIssued ?></span>
+                <span class="sel-stat-card__label">Offers Sent</span>
+              </div>
+            </div>
+
+            <div class="sel-stat-card sel-stat-card--accepted">
+              <div class="sel-stat-card__icon"><i class="fas fa-handshake"></i></div>
+              <div class="sel-stat-card__content">
+                <span class="sel-stat-card__value" data-count="<?= (int)$offersAccepted ?>"><?= (int)$offersAccepted ?></span>
+                <span class="sel-stat-card__label">Offers Accepted</span>
+              </div>
+            </div>
+
+            <div class="sel-stat-card sel-stat-card--declined">
+              <div class="sel-stat-card__icon"><i class="fas fa-user-times"></i></div>
+              <div class="sel-stat-card__content">
+                <span class="sel-stat-card__value" data-count="<?= (int)$offersDeclined ?>"><?= (int)$offersDeclined ?></span>
+                <span class="sel-stat-card__label">Offers Declined</span>
+              </div>
+            </div>
+
+            <div class="sel-stat-card sel-stat-card--waitlisted">
+              <div class="sel-stat-card__icon"><i class="fas fa-user-clock"></i></div>
+              <div class="sel-stat-card__content">
+                <span class="sel-stat-card__value" data-count="<?= (int)$waitlistedCandidates ?>"><?= (int)$waitlistedCandidates ?></span>
+                <span class="sel-stat-card__label">Waitlisted</span>
+              </div>
+            </div>
+          </div>
+
+                    <!-- ===== Section Actions ===== -->
+          <div style="margin: 1.5rem 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+            <a href="<?= url('admin/selection.php') ?>" class="btn btn--primary btn--md"><i class="fas fa-user-check"></i> Manage Selection &amp; Offers</a>
+            <div class="admin-search-bar" style="max-width:280px;">
+              <i class="fas fa-search"></i>
+              <input type="text" class="admin-search-input" id="selectionActivitySearch" placeholder="Search candidates…">
+            </div>
+          </div>
+
+          <!-- ===== Recent Selection & Offer Activity ===== -->
+          <h3 class="section__title" style="font-size:1.05rem;text-align:left;margin:1.5rem 0 1rem;">
+            <i class="fas fa-history" style="color:var(--primary);"></i>
+            Recent Selection &amp; Offer Activity
+            <span style="font-size:0.8rem;font-weight:400;color:var(--text-light);">(<?= (int) count($recentSelections) ?> latest)</span>
+          </h3>
+
+                    <?php if (empty($recentSelections)): ?>
+            <div class="admin-empty-state">
+              <div class="admin-empty-state__icon"><i class="fas fa-user-check"></i></div>
+              <h3>No Selection Activity Yet</h3>
+              <p style="color:var(--text-light);">No candidates have entered the selection pipeline. Once interviews are completed and selection decisions are recorded, they will appear here.</p>
+              <a href="<?= url('admin/interviews.php') ?>" class="btn btn--primary btn--sm"><i class="fas fa-calendar-check"></i> Go to Interviews</a>
+            </div>
+          <?php else: ?>
+            <div class="app-table-container">
+              <table class="app-table">
+                <thead>
+                  <tr>
+                    <th>Candidate</th>
+                    <th>Programme / Opportunity</th>
+                    <th>Selection Status</th>
+                    <th>Interview</th>
+                    <th>Date</th>
+                    <th class="app-actions">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($recentSelections as $rec): ?>
+                    <?php
+                      $recStatus        = $rec['status'] ?? 'draft';
+                      $recBadgeTone     = Application::badgeTone($recStatus);
+                      $recStatusLabel   = Application::label($recStatus);
+                      $recDecision      = $rec['decision'] ?? null;
+                      $recInterviewStatus = $rec['interview_status'] ?? null;
+                      $recInterviewLabel  = $recInterviewStatus ? Interview::label($recInterviewStatus) : 'Not interviewed';
+                      $recInterviewTone   = $recInterviewStatus ? Interview::badgeTone($recInterviewStatus) : 'muted';
+                      $activityDate = $rec['decision_at'] ?? $rec['offer_issued_at'] ?? $rec['updated_at'] ?? $rec['created_at'] ?? null;
+                      $actionHref = $rec['offer_id']
+                        ? url('admin/offer.php?id=' . (int) $rec['offer_id'])
+                        : url('admin/selection_decision.php?id=' . (int) $rec['id']);
+                    ?>
+                    <tr>
+                      <td>
+                        <div class="app-candidate">
+                          <div class="app-candidate__name"><?= e($rec['candidate_name'] ?? '—') ?></div>
+                          <div class="app-candidate__email"><?= e($rec['candidate_email'] ?? '') ?></div>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="app-opportunity">
+                          <div class="app-opportunity__title"><?= e($rec['opportunity_title'] ?? '—') ?></div>
+                          <div class="app-opportunity__programme"><?= e($rec['programme_name'] ?? '') ?></div>
+                        </div>
+                      </td>
+                      <td>
+                        <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                          <?php if ($recDecision): ?>
+                            <span class="sel-decision-badge sel-decision-badge--<?= $recDecision === 'selected' ? 'success' : ($recDecision === 'waitlisted' ? 'amber' : 'danger') ?>">
+                              <?= e(Selection::decisionLabel($recDecision)) ?>
+                            </span>
+                          <?php endif; ?>
+                          <span class="app-status-badge app-status-badge--<?= e($recBadgeTone) ?>"><?= e($recStatusLabel) ?></span>
+                        </div>
+                      </td>
+                      <td>
+                        <span class="tag tag--<?= e($recInterviewTone) ?>"><?= e($recInterviewLabel) ?></span>
+                      </td>
+                      <td class="app-date">
+                        <?= $activityDate ? e(format_date($activityDate, 'd M Y')) : '<span class="app-status-badge app-status-badge--muted">—</span>' ?>
+                      </td>
+                      <td class="app-actions">
+                        <a href="<?= $actionHref ?>" class="btn btn--primary btn--sm" title="View / Manage">
+                          <i class="fas fa-eye"></i> View
+                        </a>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
+
         </section>
 
         <!-- =============================================
@@ -3050,181 +3200,6 @@ $talentSkillsCategories = (int) ($talentSkillsCategoriesRow['cnt'] ?? 0);
               <div class="admin-quick-action__icon admin-quick-action__icon--purple"><i class="fas fa-sign-out-alt"></i></div>
               <span>Sign Out</span>
             </a>
-          </div>
-        </section>
-
-        <!-- ===== TALENT INTELLIGENCE HUB SECTION ===== -->
-        <section class="dash-section admin-section" id="admin-talent-hub" data-section="talent" style="margin-top:2rem;">
-          <div class="section__header" style="text-align:left;margin-bottom:1.5rem;">
-            <span class="section__badge">Talent Intelligence</span>
-            <h2 class="section__title" style="font-size:1.5rem;">Talent <span class="text-gradient">Intelligence Hub</span></h2>
-            <p class="section__text" style="font-size:0.9rem;">Search and discover candidates from the complete talent pool.</p>
-          </div>
-
-          <!-- Talent Filters -->
-          <div class="admin-talent-filters" style="background:var(--bg-white);border:1px solid var(--border);border-radius:14px;padding:1.25rem;margin-bottom:1.5rem;">
-            <div class="admin-talent-filters__row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.875rem;margin-bottom:1rem;">
-              <div>
-                <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;display:block;">Qualification Level</label>
-                <select id="talentQualificationFilter" class="admin-filter-select" style="width:100%;">
-                  <option value="">All Levels</option>
-                  <option value="certificate">Certificate</option>
-                  <option value="diploma">Diploma</option>
-                  <option value="degree">Degree</option>
-                  <option value="masters">Masters</option>
-                  <option value="phd">PhD</option>
-                </select>
-              </div>
-              <div>
-                <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;display:block;">Skills</label>
-                <select id="talentSkillsFilter" multiple style="width:100%;min-height:42px;">
-                  <?php foreach ($skills as $s): ?><option value="<?= e($s['name']) ?>"><?= e($s['name']) ?></option><?php endforeach; ?>
-                </select>
-              </div>
-              <div>
-                <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;display:block;">Location</label>
-                <select id="talentLocationFilter" class="admin-filter-select" style="width:100%;">
-                  <option value="">All Locations</option>
-                  <?php foreach ($cityList as $c): ?><option value="<?= e(strtolower(str_replace(' ', '-', trim($c)))) ?>"><?= e(trim($c)) ?></option><?php endforeach; ?>
-                </select>
-              </div>
-              <div>
-                <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;display:block;">Career Interest</label>
-                <select id="talentCareerFilter" class="admin-filter-select" style="width:100%;">
-                  <option value="">All Careers</option>
-                  <option value="software-development">Software Development</option>
-                  <option value="it-support">IT Support</option>
-                  <option value="data-analysis">Data Analysis</option>
-                  <option value="cybersecurity">Cybersecurity</option>
-                  <option value="networking">Networking</option>
-                </select>
-              </div>
-              <div>
-                <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;display:block;">Availability</label>
-                <select id="talentAvailabilityFilter" class="admin-filter-select" style="width:100%;">
-                  <option value="">All Statuses</option>
-                  <option value="unemployed">Unemployed</option>
-                  <option value="employed">Employed</option>
-                  <option value="recent-graduate">Recent Graduate</option>
-                </select>
-              </div>
-              <div>
-                <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;display:block;">Experience</label>
-                <select id="talentExperienceFilter" class="admin-filter-select" style="width:100%;">
-                  <option value="">Any Experience</option>
-                  <option value="none">No Experience</option>
-                  <option value="1-2">1-2 Years</option>
-                  <option value="3+">3+ Years</option>
-                </select>
-              </div>
-            </div>
-            <div class="admin-talent-filters__actions" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;">
-              <button class="btn btn--primary btn--sm" id="talentSearchBtn"><i class="fas fa-search"></i> Search Talent</button>
-              <button class="btn btn--outline btn--sm" id="talentSaveSearchBtn"><i class="fas fa-bookmark"></i> Save Search</button>
-              <button class="btn btn--outline btn--sm" id="talentExportBtn"><i class="fas fa-download"></i> Export</button>
-              <span class="admin-talent-filters__count" id="talentResultCount" style="margin-left:auto;font-size:0.8rem;color:var(--text-muted);">Showing <strong><?= count($initialCandidates) ?></strong> candidate<?= count($initialCandidates) !== 1 ? 's' : '' ?></span>
-            </div>
-          </div>
-
-          <!-- Talent Results Container -->
-          <div class="admin-talent-results" id="talentResultsContainer" style="display:grid;grid-template-columns:repeat(2,1fr);gap:1.25rem;">
-            <?php if (!empty($initialCandidates)): ?>
-              <?php foreach ($initialCandidates as $cand): ?>
-                <?php
-                  $cId = (int) $cand['id'];
-                  $cName = e($cand['first_name'] . ' ' . $cand['last_name']);
-                  $cTitle = e($cand['professional_title'] ?? 'Candidate');
-                  $cEmail = e($cand['email']);
-                  $cCompletion = (int) ($cand['completion_percent'] ?? 0);
-                  $cCity = e(strtolower(str_replace(' ', '-', $cand['city'] ?? '')));
-                  $cInitials = strtoupper(substr($cand['first_name'] ?? '', 0, 1) . substr($cand['last_name'] ?? '', 0, 1));
-                  $completionColor = $cCompletion >= 80 ? 'var(--success)' : ($cCompletion >= 50 ? 'var(--warning)' : 'var(--danger)');
-                ?>
-                <div class="admin-programme-card" style="flex-direction:column;align-items:stretch;gap:0.75rem;" data-city="<?= $cCity ?>" data-title="<?= e(strtolower($cTitle)) ?>" data-name="<?= e(strtolower($cName)) ?>">
-                  <div style="display:flex;align-items:center;gap:0.875rem;">
-                    <div style="width:48px;height:48px;border-radius:50%;background:var(--primary-bg);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;"><?= $cInitials ?></div>
-                    <div style="flex:1;min-width:0;">
-                      <div style="font-weight:700;color:var(--dark);"><?= $cName ?></div>
-                      <div style="font-size:0.8rem;color:var(--text-light);"><?= $cTitle ?></div>
-                      <div style="font-size:0.75rem;color:var(--text-lighter);"><?= $cEmail ?></div>
-                    </div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-light);">
-                    <i class="fas fa-map-marker-alt" style="color:var(--primary);font-size:0.7rem;"></i>
-                    <span><?= e($cand['city'] ?? 'Not specified') ?></span>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:0.5rem;margin-top:auto;">
-                    <div style="flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden;">
-                      <div style="width:<?= $cCompletion ?>%;height:100%;background:<?= $completionColor ?>;border-radius:3px;"></div>
-                    </div>
-                    <span style="font-size:0.75rem;font-weight:600;color:<?= $completionColor ?>;"><?= $cCompletion ?>%</span>
-                  </div>
-                  <a class="btn btn--primary btn--sm" href="<?= url('admin/candidate_profile.php?user_id=' . $cId) ?>" style="width:100%;justify-content:center;"><i class="fas fa-user"></i> View Profile</a>
-                </div>
-              <?php endforeach; ?>
-            <?php else: ?>
-              <div class="admin-empty-state" style="grid-column:1/-1;">
-                <div class="admin-empty-state__icon"><i class="fas fa-users"></i></div>
-                <h3>No candidates yet</h3>
-                <p>Candidates will appear here once they register on the platform.</p>
-              </div>
-            <?php endif; ?>
-          </div>
-        </section>
-
-
-      <!-- =============================================
-             SECTION: SELECTION & OFFERS (STAGE 11)
-             Real database counts — no analytics/reporting.
-             ============================================= -->
-        <section class="dash-section admin-section" id="admin-selection-offers" data-section="selection-offers">
-          <div class="section__header" style="text-align:left;margin-bottom:1.25rem;">
-            <span class="section__badge">Selection &amp; Offers</span>
-            <h2 class="section__title" style="font-size:1.5rem;">Selection &amp; <span class="text-gradient">Offers</span></h2>
-            <p class="section__text" style="font-size:0.9rem;">Final selection decisions after interviews and the offer pipeline for selected candidates.</p>
-          </div>
-
-          <div class="app-stats">
-            <div class="app-stat app-stat--selected">
-              <div class="app-stat__icon"><i class="fas fa-user-check"></i></div>
-              <div>
-                <span class="app-stat__value"><?= number_format($selectedCandidates) ?></span>
-                <span class="app-stat__label">Selected Candidates</span>
-              </div>
-            </div>
-            <div class="app-stat app-stat--review">
-              <div class="app-stat__icon"><i class="fas fa-hourglass-half"></i></div>
-              <div>
-                <span class="app-stat__value"><?= number_format($pendingOffers) ?></span>
-                <span class="app-stat__label">Pending Offers</span>
-              </div>
-            </div>
-            <div class="app-stat app-stat--interview">
-              <div class="app-stat__icon"><i class="fas fa-file-signature"></i></div>
-              <div>
-                <span class="app-stat__value"><?= number_format($offersIssued) ?></span>
-                <span class="app-stat__label">Offers Issued</span>
-              </div>
-            </div>
-            <div class="app-stat app-stat--submitted">
-              <div class="app-stat__icon"><i class="fas fa-check-circle"></i></div>
-              <div>
-                <span class="app-stat__value"><?= number_format($offersAccepted) ?></span>
-                <span class="app-stat__label">Offers Accepted</span>
-              </div>
-            </div>
-            <div class="app-stat app-stat--rejected">
-              <div class="app-stat__icon"><i class="fas fa-times-circle"></i></div>
-              <div>
-                <span class="app-stat__value"><?= number_format($offersDeclined) ?></span>
-                <span class="app-stat__label">Offers Declined</span>
-              </div>
-            </div>
-          </div>
-
-          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:1.25rem;">
-            <a href="<?= url('admin/selection.php') ?>" class="btn btn--primary"><i class="fas fa-user-check"></i> Selection Management</a>
-            <a href="<?= url('admin/offers.php') ?>" class="btn btn--outline"><i class="fas fa-file-signature"></i> Offer Management</a>
           </div>
         </section>
 

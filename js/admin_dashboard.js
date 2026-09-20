@@ -132,7 +132,7 @@ function openSidebar() {
     });
   }, { threshold: 0.3 });
 
-  document.querySelectorAll('.admin-exec-card__number[data-count], .admin-stat-chip__value[data-count], .admin-analytics-stat__number[data-count]').forEach(function (n) {
+    document.querySelectorAll('.admin-exec-card__number[data-count], .admin-stat-chip__value[data-count], .admin-analytics-stat__number[data-count], .sel-stat-card__value[data-count]').forEach(function (n) {
     adminObs.observe(n);
   });
 
@@ -1253,9 +1253,29 @@ function openSidebar() {
       link.click();
       document.body.removeChild(link);
 
-      if (window.InvesthoodNotifications) {
+            if (window.InvesthoodNotifications) {
         window.InvesthoodNotifications.show('success', 'Export Complete', 'Exported ' + currentCards.length + ' candidate(s) to CSV.');
       }
+    });
+  }
+
+  // ============================================
+  // 26. SELECTION ACTIVITY TABLE SEARCH (dashboard)
+  //     Simple client-side row filter on the server-rendered
+  //     selection activity table — no mock data involved.
+  // ============================================
+  var selectionSearch = document.getElementById('selectionActivitySearch');
+  if (selectionSearch) {
+    selectionSearch.addEventListener('input', function () {
+      var q = this.value.toLowerCase().trim();
+      var table = document.querySelector('#admin-selection .app-table');
+      if (!table) return;
+      var rows = table.querySelectorAll('tbody tr');
+      rows.forEach(function (row) {
+        var text = row.textContent.toLowerCase();
+        var show = !q || text.indexOf(q) !== -1;
+        row.style.display = show ? '' : 'none';
+      });
     });
   }
 });

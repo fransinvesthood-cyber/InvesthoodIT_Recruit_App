@@ -120,15 +120,21 @@ class Database
             unset($value);
 
             if (!call_user_func_array([$stmt, 'bind_param'], $bindArgs)) {
+                // Capture the error BEFORE closing the statement — accessing
+                // ->error on a closed mysqli_stmt throws
+                // "mysqli_stmt object is already closed" and masks the real
+                // database problem.
+                $error = $stmt->error;
                 $stmt->close();
-                error_log('[DB] Bind failed: ' . $stmt->error . ' | SQL: ' . $sql);
+                error_log('[DB] Bind failed: ' . $error . ' | SQL: ' . $sql);
                 throw new RuntimeException('Database prepare error.');
             }
         }
 
         if (!$stmt->execute()) {
+            $error = $stmt->error;
             $stmt->close();
-            error_log('[DB] Execute failed: ' . $stmt->error . ' | SQL: ' . $sql);
+            error_log('[DB] Execute failed: ' . $error . ' | SQL: ' . $sql);
             throw new RuntimeException('Database execute error.');
         }
 

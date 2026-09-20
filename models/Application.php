@@ -718,7 +718,7 @@ class Application
                     "INSERT INTO application_status_history
                         (application_id, previous_status, new_status, changed_by, change_reason)
                      VALUES (?, ?, ?, ?, ?)",
-                    'iisis',
+                    'issis',
                     [$applicationId, $previousStatus, $newStatus, $adminId, $reason]
                 );
             } elseif (in_array('actor_id', $names, true)) {
@@ -727,7 +727,7 @@ class Application
                     "INSERT INTO application_status_history
                         (application_id, previous_status, new_status, actor_id, reason, changed_at)
                      VALUES (?, ?, ?, ?, ?, NOW())",
-                    'iiiss',
+                    'issis',
                     [$applicationId, $previousStatus, $newStatus, $adminId, $reason]
                 );
             } else {

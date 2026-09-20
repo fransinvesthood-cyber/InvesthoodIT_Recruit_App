@@ -3,10 +3,16 @@
  * ================================================
  * INVESTHOOD IT - Admin Selection Management (Stage 11)
  * ================================================
- * Lists candidates that reached the selection stage after
- * interviews, with their assessment/interview state, current
- * application status, recorded selection decision and actions.
+ * Lists ONLY candidates whose CURRENT application status is "selected"
+ * and whose CURRENT (latest) interview is MARKED COMPLETED — an interview
+ * still "scheduled" keeps the candidate off this page. Rows carry their
+ * assessment/interview state, recorded selection decision and actions.
  * Accessible only by administrators.
+ *
+ * The page scope is enforced at query level inside
+ * Selection::adminList() through the 'scope' => 'selected_completed'
+ * filter below, so the row list, result count and pagination all
+ * agree on the same scoped set.
  */
 
 require_once __DIR__ . '/../includes/bootstrap.php';
@@ -38,6 +44,13 @@ $filters = [
     'programme_id'   => $fProgramme,
     'cohort_id'      => $fCohort,
     'opportunity_id' => $fOpportunity,
+    // ---- Fixed page scope (enforced inside Selection::adminList()) ----
+    // This page lists ONLY candidates whose CURRENT application status
+    // is 'selected' AND whose CURRENT (latest) interview is marked
+    // 'completed' — an interview still 'scheduled' keeps the candidate
+    // off this page. The scope is applied to both the COUNT and LIST
+    // queries so the result count and pagination stay truthful.
+    'scope'          => 'selected_completed',
 ];
 
 // Fetch selection records with pagination
@@ -45,6 +58,14 @@ $result     = Selection::adminList($filters, $page, $perPage);
 $records    = $result['records'];
 $totalCount = $result['total'];
 $totalPages = $result['pages'];
+
+// ---- Page scope note ----
+// The scope of this page (current application status = 'selected' AND the
+// CURRENT (latest) interview MARKED 'completed') is enforced at QUERY
+// level inside Selection::adminList() via the 'scope' =>
+// 'selected_completed' filter above. The returned rows, $totalCount and
+// $totalPages therefore already reflect the scoped set — no post-query
+// filtering (which would silently break pagination) is performed here.
 
 // Stats + filter options
 $stats          = Selection::dashboardStats();
@@ -177,8 +198,8 @@ function sel_interview_chip(array $record): string
               <span class="section__badge">Selection &amp; Offers</span>
               <h1 class="app-hero__title">Selection Management</h1>
               <p class="app-hero__subtitle">
-                Make and manage final selection decisions for candidates who completed the interview stage,
-                then create and track offers for selected candidates.
+                Review candidates whose application status is selected and who have completed the interview stage.
+                Record and review selection decisions here, then create and track offers for selected candidates.
               </p>
             </div>
             <div class="app-hero__actions">
@@ -277,23 +298,23 @@ function sel_interview_chip(array $record): string
 
         <!-- ===== RESULTS COUNT ===== -->
         <div class="app-results-count">
-          Showing <?= $totalCount > 0 ? ((($result['page'] - 1) * $perPage) + 1) : 0 ?>–<?= min($result['page'] * $perPage, $totalCount) ?> of <?= $totalCount ?> candidate<?= $totalCount !== 1 ? 's' : '' ?> in the selection workflow
+          <?php $shownPage = (int) $result['page']; ?>
+          Showing <?= $totalCount > 0 ? (($shownPage - 1) * $perPage + 1) : 0 ?>–<?= min($shownPage * $perPage, $totalCount) ?> of <?= number_format($totalCount) ?> candidate<?= $totalCount !== 1 ? 's' : '' ?> selected with the interview marked completed
         </div>
 
         <!-- ===== SELECTION TABLE ===== -->
         <?php if (empty($records)): ?>
           <div class="app-empty">
             <div class="app-empty__icon"><i class="fas fa-user-check"></i></div>
-            <h3 class="app-empty__title">No candidates in the selection workflow</h3>
+            <h3 class="app-empty__title">No selected candidates with completed interviews</h3>
             <p class="app-empty__text">
               <?php if ($fStatus !== '' || $fDecision !== '' || $search !== '' || $fProgramme !== '' || $fCohort !== '' || $fOpportunity !== ''): ?>
-                No candidates match the current filters
-                <?php if ($fStatus !== ''): ?> (application status: “<?= e(Application::label($fStatus)) ?>”)<?php endif; ?>
-                <?php if ($fStatus === 'rejected'): ?> — rejected applications only appear here when they have a completed interview<?php endif; ?>.
-                Try clearing a filter or two.
+                No candidates match the current filters.
+                <?php if ($fStatus !== ''): ?> Application status filter: “<?= e(Application::label($fStatus)) ?>”.<?php endif; ?>
+                This page only lists candidates whose application status is selected and who have completed the interview stage.
               <?php else: ?>
-                Candidates appear here once they complete the interview stage of an application.
-                Try adjusting your filters.
+                No candidates are currently selected with a completed interview.
+                Candidates appear here once their application status is selected and an interview is marked completed.
               <?php endif; ?>
             </p>
           </div>
@@ -386,6 +407,9 @@ function sel_interview_chip(array $record): string
           <?php if ($totalPages > 1): ?>
             <nav class="app-pagination">
               <?php
+              // The query is already scoped (selected + completed
+              // interview), so $result['page'] and $result['pages'] are
+              // authoritative — no extra clamping needed.
               $page        = (int) $result['page'];
               $queryParams = $_GET;
               unset($queryParams['page']);
