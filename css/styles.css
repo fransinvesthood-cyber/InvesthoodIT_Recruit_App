@@ -5058,6 +5058,15 @@ body.dark-mode .interview-modal__panel { background: #1e293b; border-color: #334
 body.dark-mode .interview-modal__title { color: #e2e8f0; }
 body.dark-mode .interview-modal__overlay { background: rgba(0,0,0,0.55); }
 
+/* Interview status badges on the admin dashboard interview section
+   (scoped to #admin-interviews so other admin sections are untouched) */
+body.dark-mode #admin-interviews .tag--primary { background: rgba(59,130,246,0.18); color: #93c5fd; }
+body.dark-mode #admin-interviews .tag--success,
+body.dark-mode #admin-interviews .tag--green { background: rgba(16,185,129,0.18); color: #34d399; }
+body.dark-mode #admin-interviews .tag--amber { background: rgba(245,158,11,0.18); color: #fbbf24; }
+body.dark-mode #admin-interviews .tag--danger { background: rgba(239,68,68,0.18); color: #f87171; }
+body.dark-mode #admin-interviews .tag--muted { background: rgba(148,163,184,0.18); color: #cbd5e1; }
+
 /* Responsive */
 @media (max-width: 1024px) {
   .interview-section__header { align-items: flex-start; }

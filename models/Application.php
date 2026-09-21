@@ -24,8 +24,10 @@ class Application
         'shortlisted',
         'assessment',
         'interview_scheduled',
+        'interview_required',
         'interview_completed',
         'selected',
+        'waitlisted',
         'offer_sent',
         'offer_accepted',
         'offer_declined',
@@ -46,8 +48,10 @@ class Application
         'shortlisted'         => 'Shortlisted',
         'assessment'          => 'Assessment',
         'interview_scheduled' => 'Interview Scheduled',
+        'interview_required'  => 'Interview Required',
         'interview_completed' => 'Interview Completed',
         'selected'            => 'Selected',
+        'waitlisted'          => 'Waitlisted',
         'offer_sent'          => 'Offer Sent',
         'offer_accepted'      => 'Offer Accepted',
         'offer_declined'      => 'Offer Declined',
@@ -68,8 +72,10 @@ class Application
         'shortlisted'         => 'primary',
         'assessment'          => 'amber',
         'interview_scheduled' => 'amber',
+        'interview_required'  => 'amber',
         'interview_completed' => 'amber',
         'selected'            => 'success',
+        'waitlisted'          => 'amber',
         'offer_sent'          => 'success',
         'offer_accepted'      => 'success',
         'offer_declined'      => 'danger',
@@ -486,8 +492,10 @@ class Application
             'shortlisted'         => 0,
             'assessment'          => 0,
             'interview_scheduled' => 0,
+            'interview_required'  => 0,
             'interview_completed' => 0,
             'selected'            => 0,
+            'waitlisted'          => 0,
             'offer_sent'          => 0,
             'offer_accepted'      => 0,
             'offer_declined'      => 0,
@@ -684,7 +692,7 @@ class Application
      * @param string|null $reason
      * @return void
      */
-    private static function recordStatusHistory(
+    public static function recordStatusHistory(
         int $applicationId,
         string $previousStatus,
         string $newStatus,
@@ -710,7 +718,7 @@ class Application
                     "INSERT INTO application_status_history
                         (application_id, previous_status, new_status, changed_by, change_reason)
                      VALUES (?, ?, ?, ?, ?)",
-                    'iisis',
+                    'issis',
                     [$applicationId, $previousStatus, $newStatus, $adminId, $reason]
                 );
             } elseif (in_array('actor_id', $names, true)) {
@@ -719,7 +727,7 @@ class Application
                     "INSERT INTO application_status_history
                         (application_id, previous_status, new_status, actor_id, reason, changed_at)
                      VALUES (?, ?, ?, ?, ?, NOW())",
-                    'iiiss',
+                    'issis',
                     [$applicationId, $previousStatus, $newStatus, $adminId, $reason]
                 );
             } else {
@@ -745,7 +753,7 @@ class Application
      * @return void
      * @throws RuntimeException when the automatic migration fails
      */
-    private static function ensureStatusColumnSupport(): void
+    public static function ensureStatusColumnSupport(): void
     {
         if (self::$statusColumnVerified === true) {
             return;
@@ -781,12 +789,13 @@ class Application
         }
 
         if ($missing !== []) {
-            $legacyValues = ['eligibility_review', 'screened', 'interview', 'waitlisted', 'expired'];
+            // New App::STATUSES may collide with historic legacy values.
+            // 'waitlisted' is now a first-class status, so only remap legacies that
+            // are NOT in the final set (and never remap a missing value onto itself).
             $legacyRemaps = [
                 'eligibility_review' => 'under_review',
                 'screened'           => 'shortlisted',
                 'interview'          => 'interview_scheduled',
-                'waitlisted'         => 'on_hold',
                 'expired'            => 'rejected',
             ];
 
@@ -795,7 +804,7 @@ class Application
             // ---- 1. Widen the ENUM to include the legacy AND new values.
             //         Remapping to a value not yet in the ENUM would fail in
             //         strict mode (or truncate to '' otherwise). ----
-            $union = array_values(array_unique(array_merge($legacyValues, self::STATUSES)));
+            $union = array_values(array_unique(array_merge(array_keys($legacyRemaps), self::STATUSES)));
             Database::query(
                 "ALTER TABLE `applications`
                  MODIFY COLUMN `status` ENUM(" . implode(',', array_map($quote, $union)) . ")

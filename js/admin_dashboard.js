@@ -132,7 +132,7 @@ function openSidebar() {
     });
   }, { threshold: 0.3 });
 
-  document.querySelectorAll('.admin-exec-card__number[data-count], .admin-stat-chip__value[data-count], .admin-analytics-stat__number[data-count]').forEach(function (n) {
+    document.querySelectorAll('.admin-exec-card__number[data-count], .admin-stat-chip__value[data-count], .admin-analytics-stat__number[data-count], .sel-stat-card__value[data-count]').forEach(function (n) {
     adminObs.observe(n);
   });
 
@@ -752,42 +752,34 @@ function openSidebar() {
   renderPlacements(placements);
 
   // ============================================
-  // 14. INTERVIEW GRID DATA & RENDER
+  // 14. INTERVIEW CARDS (server-rendered from the interviews table)
+  //     admin/dashboard.php renders real records — no mock data here.
+  //     This only filters the rendered cards by their data-search value.
   // ============================================
   var adminInterviewGrid = document.getElementById('adminInterviewGrid');
-  var adminInterviews = [
-    { id: 1, title: 'Technical Interview - J. Doe', candidate: 'John Doe', type: 'Technical', dt: '24 Jul 2025, 10:00', with: 'TechCorp SA', mode: 'Video Call', cd: '2 days', status: 'Scheduled' },
-    { id: 2, title: 'Skills Assessment - P. Singh', candidate: 'Priya Singh', type: 'Assessment', dt: '25 Jul 2025, 09:00', with: 'CloudNet SA', mode: 'Online', cd: '3 days', status: 'Scheduled' },
-    { id: 3, title: 'Behavioural - T. Molefe', candidate: 'Thabo Molefe', type: 'Behavioural', dt: '28 Jul 2025, 14:00', with: 'DataFlow Inc.', mode: 'In-Person', cd: '6 days', status: 'Pending' },
-    { id: 4, title: 'Technical - L. Mokoena', candidate: 'Lebohang Mokoena', type: 'Technical', dt: '30 Jul 2025, 11:00', with: 'Investhood IT', mode: 'Video Call', cd: '8 days', status: 'Pending' },
-    { id: 5, title: 'Final Interview - S. Nkosi', candidate: 'Sarah Nkosi', type: 'Final', dt: '01 Aug 2025, 10:00', with: 'IT Solutions Ltd', mode: 'In-Person', cd: '10 days', status: 'Scheduled' },
-    { id: 6, title: 'Panel Interview - M. Johnson', candidate: 'Mike Johnson', type: 'Panel', dt: '22 Jul 2025, 15:00', with: 'Investhood IT', mode: 'Video Call', cd: 'Today', status: 'Confirmed' }
-  ];
+  var adminInterviewCards = adminInterviewGrid
+    ? Array.prototype.slice.call(adminInterviewGrid.querySelectorAll('.interview-card'))
+    : [];
+  var adminInterviewEmpty = document.getElementById('adminInterviewSearchEmptyLive')
+    || document.getElementById('adminInterviewSearchEmpty');
 
-  function renderAdminInterviews(data) {
+  function filterAdminInterviews(query) {
     if (!adminInterviewGrid) return;
-    adminInterviewGrid.innerHTML = data.map(function (iv) {
-      var baseUrl = window.APP_URL || '';
-      var detailUrl = baseUrl + '/admin/interview.php?id=' + iv.id;
-      var rescheduleUrl = baseUrl + '/admin/interview_schedule.php?id=' + iv.id;
-      var confirmDisabled = (iv.status === 'Confirmed' || iv.status === 'Completed') ? ' style="pointer-events:none;opacity:0.5;"' : '';
-      return '<div class="interview-card">' +
-        '<div class="interview-card__header"><h3 class="interview-card__title">' + iv.title + '</h3><span class="interview-card__type">' + iv.type + '</span></div>' +
-        '<div class="interview-card__countdown"><i class="fas fa-clock"></i><span class="interview-card__countdown-time">' + iv.cd + '</span></div>' +
-        '<div class="interview-card__details">' +
-          '<div class="interview-card__detail"><i class="fas fa-user"></i> ' + iv.candidate + '</div>' +
-          '<div class="interview-card__detail"><i class="fas fa-calendar"></i> ' + iv.dt + '</div>' +
-          '<div class="interview-card__detail"><i class="fas fa-building"></i> ' + iv.with + '</div>' +
-          '<div class="interview-card__detail"><i class="fas fa-video"></i> ' + iv.mode + '</div>' +
-        '</div>' +
-        '<div class="interview-card__actions">' +
-          '<a href="' + detailUrl + '" class="btn btn--primary btn--sm"' + confirmDisabled + '><i class="fas fa-check"></i> Confirm</a>' +
-          '<a href="' + rescheduleUrl + '" class="btn btn--outline btn--sm"><i class="fas fa-clock"></i> Reschedule</a>' +
-          '<a href="' + detailUrl + '" class="btn btn--ghost btn--sm">Details</a>' +
-        '</div>';
-    }).join('');
+
+    var q = (query || '').toLowerCase().trim();
+    var visible = 0;
+
+    adminInterviewCards.forEach(function (card) {
+      var haystack = (card.getAttribute('data-search') || '').toLowerCase();
+      var matches = !q || haystack.indexOf(q) !== -1;
+      card.style.display = matches ? '' : 'none';
+      if (matches) visible++;
+    });
+
+    if (adminInterviewEmpty) {
+      adminInterviewEmpty.style.display = (visible === 0 && q) ? '' : 'none';
+    }
   }
-  renderAdminInterviews(adminInterviews);
 
   // ============================================
   // 15. AUDIT LOG TABLE DATA & RENDER
@@ -929,11 +921,7 @@ function openSidebar() {
   var interviewSearch = document.getElementById('interviewSearch');
   if (interviewSearch) {
     interviewSearch.addEventListener('input', function () {
-      var q = this.value.toLowerCase().trim();
-      var filtered = !q ? adminInterviews : adminInterviews.filter(function (iv) {
-        return iv.title.toLowerCase().indexOf(q) !== -1 || iv.candidate.toLowerCase().indexOf(q) !== -1 || iv.with.toLowerCase().indexOf(q) !== -1;
-      });
-      renderAdminInterviews(filtered);
+      filterAdminInterviews(this.value);
     });
   }
 
@@ -950,14 +938,16 @@ function openSidebar() {
   }
 
   // ============================================
-  // 21. INTERVIEW DATE FILTER
+  // 21. INTERVIEW DATE RANGE FILTER
+  //     Navigates with ?interview_range=... so the dashboard re-queries the
+  //     database for the selected range (no client-side mock filtering).
   // ============================================
   var interviewFilterDate = document.getElementById('interviewFilterDate');
   if (interviewFilterDate) {
     interviewFilterDate.addEventListener('change', function () {
-      if (window.InvesthoodNotifications) {
-        window.InvesthoodNotifications.show('info', 'Filter Applied', 'Showing interviews for: ' + this.options[this.selectedIndex].text);
-      }
+      var baseUrl = window.APP_URL || '';
+      window.location.href = baseUrl + '/admin/dashboard.php?interview_range='
+        + encodeURIComponent(this.value) + '#admin-interviews';
     });
   }
 
@@ -1263,9 +1253,29 @@ function openSidebar() {
       link.click();
       document.body.removeChild(link);
 
-      if (window.InvesthoodNotifications) {
+            if (window.InvesthoodNotifications) {
         window.InvesthoodNotifications.show('success', 'Export Complete', 'Exported ' + currentCards.length + ' candidate(s) to CSV.');
       }
+    });
+  }
+
+  // ============================================
+  // 26. SELECTION ACTIVITY TABLE SEARCH (dashboard)
+  //     Simple client-side row filter on the server-rendered
+  //     selection activity table — no mock data involved.
+  // ============================================
+  var selectionSearch = document.getElementById('selectionActivitySearch');
+  if (selectionSearch) {
+    selectionSearch.addEventListener('input', function () {
+      var q = this.value.toLowerCase().trim();
+      var table = document.querySelector('#admin-selection .app-table');
+      if (!table) return;
+      var rows = table.querySelectorAll('tbody tr');
+      rows.forEach(function (row) {
+        var text = row.textContent.toLowerCase();
+        var show = !q || text.indexOf(q) !== -1;
+        row.style.display = show ? '' : 'none';
+      });
     });
   }
 });

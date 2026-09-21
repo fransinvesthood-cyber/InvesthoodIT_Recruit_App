@@ -36,6 +36,14 @@ $filters = [
     'date_to'       => $dateTo,
 ];
 
+// "Upcoming" is a virtual filter (active statuses that are still to happen,
+// based on the current date and time) — it is not a value stored in the DB.
+$upcomingOnly = ($fStatus === 'upcoming');
+if ($upcomingOnly) {
+    $filters['status'] = '';
+}
+$filters['upcoming_only'] = $upcomingOnly;
+
 $result        = Interview::adminList($filters, $page, $perPage);
 $interviews    = $result['records'];
 $totalCount    = $result['total'];
@@ -43,7 +51,7 @@ $totalPages    = $result['pages'];
 
 $statusCounts    = Interview::countByStatus();
 $totalInterviews = array_sum($statusCounts);
-$upcomingCount   = ($statusCounts['scheduled'] ?? 0) + ($statusCounts['confirmed'] ?? 0) + ($statusCounts['rescheduled'] ?? 0);
+$upcomingCount   = Interview::countUpcoming();
 
 $upcomingInterviews = Interview::upcoming(5);
 $recentInterviews   = Interview::recent(5);
@@ -93,12 +101,13 @@ $flashes = render_flashes();
         <ul class="sidebar__menu">
           <li><a href="<?= url('admin/programmes.php') ?>" class="sidebar__link"><i class="fas fa-graduation-cap"></i> Programmes</a></li>
           <li><a href="<?= url('admin/opportunities.php') ?>" class="sidebar__link"><i class="fas fa-briefcase"></i> Opportunities</a></li>
-          <li><a href="<?= url('admin/applications.php') ?>" class="sidebar__link"><i class="fas fa-file-alt"></i> Applications</a></li>
-        </ul>
+                    <li><a href="<?= url('admin/applications.php') ?>" class="sidebar__link"><i class="fas fa-file-alt"></i> Applications</a></li>
+                  </ul>
         <div class="sidebar__section-label">Operations</div>
         <ul class="sidebar__menu">
+          <li><a href="<?= url('admin/selection.php') ?>" class="sidebar__link"><i class="fas fa-user-check"></i> Selection &amp; Offers</a></li>
           <li><a href="<?= url('admin/interviews.php') ?>" class="sidebar__link active"><i class="fas fa-calendar-check"></i> Interviews</a></li>
-          <li><a href="<?= url('admin/dashboard.php') ?>" class="sidebar__link"><i class="fas fa-history"></i> Audit Log</a></li>
+                              <li><a href="<?= url('admin/dashboard.php') ?>" class="sidebar__link"><i class="fas fa-history"></i> Audit Log</a></li>
         </ul>
       </nav>
       <div class="sidebar__footer">
@@ -146,6 +155,66 @@ $flashes = render_flashes();
           </div>
         </section>
 
+        <!-- ===== SUMMARY CARDS (clickable → filtered list) ===== -->
+        <section class="int-stats">
+          <a class="int-stat-card int-stat-card--total" href="<?= url('admin/interviews.php') ?>">
+            <div class="int-stat-card__icon"><i class="fas fa-calendar-check"></i></div>
+            <div class="int-stat-card__body">
+              <span class="int-stat-card__number"><?= (int) $totalInterviews ?></span>
+              <span class="int-stat-card__label">Total Interviews</span>
+            </div>
+          </a>
+          <a class="int-stat-card int-stat-card--upcoming" href="<?= url('admin/interviews.php?status=upcoming') ?>">
+            <div class="int-stat-card__icon"><i class="fas fa-hourglass-half"></i></div>
+            <div class="int-stat-card__body">
+              <span class="int-stat-card__number"><?= (int) $upcomingCount ?></span>
+              <span class="int-stat-card__label">Upcoming</span>
+            </div>
+          </a>
+          <a class="int-stat-card int-stat-card--scheduled" href="<?= url('admin/interviews.php?status=scheduled') ?>">
+            <div class="int-stat-card__icon"><i class="fas fa-clock"></i></div>
+            <div class="int-stat-card__body">
+              <span class="int-stat-card__number"><?= (int) ($statusCounts['scheduled'] ?? 0) ?></span>
+              <span class="int-stat-card__label">Scheduled</span>
+            </div>
+          </a>
+          <a class="int-stat-card int-stat-card--completed" href="<?= url('admin/interviews.php?status=confirmed') ?>">
+            <div class="int-stat-card__icon"><i class="fas fa-thumbs-up"></i></div>
+            <div class="int-stat-card__body">
+              <span class="int-stat-card__number"><?= (int) ($statusCounts['confirmed'] ?? 0) ?></span>
+              <span class="int-stat-card__label">Confirmed</span>
+            </div>
+          </a>
+          <a class="int-stat-card int-stat-card--rescheduled" href="<?= url('admin/interviews.php?status=rescheduled') ?>">
+            <div class="int-stat-card__icon"><i class="fas fa-redo"></i></div>
+            <div class="int-stat-card__body">
+              <span class="int-stat-card__number"><?= (int) ($statusCounts['rescheduled'] ?? 0) ?></span>
+              <span class="int-stat-card__label">Rescheduled</span>
+            </div>
+          </a>
+          <a class="int-stat-card int-stat-card--total" href="<?= url('admin/interviews.php?status=completed') ?>">
+            <div class="int-stat-card__icon"><i class="fas fa-check-circle"></i></div>
+            <div class="int-stat-card__body">
+              <span class="int-stat-card__number"><?= (int) ($statusCounts['completed'] ?? 0) ?></span>
+              <span class="int-stat-card__label">Completed</span>
+            </div>
+          </a>
+          <a class="int-stat-card int-stat-card--cancelled" href="<?= url('admin/interviews.php?status=cancelled') ?>">
+            <div class="int-stat-card__icon"><i class="fas fa-times-circle"></i></div>
+            <div class="int-stat-card__body">
+              <span class="int-stat-card__number"><?= (int) ($statusCounts['cancelled'] ?? 0) ?></span>
+              <span class="int-stat-card__label">Cancelled</span>
+            </div>
+          </a>
+          <a class="int-stat-card int-stat-card--noshow" href="<?= url('admin/interviews.php?status=no_show') ?>">
+            <div class="int-stat-card__icon"><i class="fas fa-user-slash"></i></div>
+            <div class="int-stat-card__body">
+              <span class="int-stat-card__number"><?= (int) ($statusCounts['no_show'] ?? 0) ?></span>
+              <span class="int-stat-card__label">No Show</span>
+            </div>
+          </a>
+        </section>
+
         <!-- ===== FILTERS ===== -->
         <section class="int-filters">
           <form method="GET" action="<?= url('admin/interviews.php') ?>" class="int-filters__form">
@@ -156,6 +225,7 @@ $flashes = render_flashes();
               </div>
               <select name="status" class="int-filters__select">
                 <option value="">All Statuses</option>
+                <option value="upcoming" <?= $fStatus === 'upcoming' ? 'selected' : '' ?>>Upcoming (still to happen)</option>
                 <?php foreach (Interview::STATUSES as $s): ?>
                   <option value="<?= $s ?>" <?= $fStatus === $s ? 'selected' : '' ?>><?= e(Interview::label($s)) ?></option>
                 <?php endforeach; ?>
@@ -214,9 +284,11 @@ $flashes = render_flashes();
                     <th>Candidate</th>
                     <th>Programme</th>
                     <th>Opportunity</th>
-                    <th>Date & Time</th>
+                    <th>Date &amp; Time</th>
                     <th>Type</th>
-                    <th>Interviewer</th>
+                    <th>Application Status</th>
+                    <th>Outcome</th>
+                    <th>Feedback By / Date</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
@@ -226,7 +298,13 @@ $flashes = render_flashes();
                     <?php
                     $statusBadge = Interview::badgeTone($int['status']);
                     $typeLabel = Interview::typeLabel($int['interview_type']);
-                    $interviewerName = !empty($int['interviewer_first_name']) ? e($int['interviewer_first_name'] . ' ' . $int['interviewer_last_name']) : '<span class="text-muted">—</span>';
+                    $hasFb = !empty($int['has_feedback']);
+                    $fbOutcomeRaw = $int['feedback_outcome'] ?? null;
+                    $fbOutcomeLabel = $hasFb ? InterviewFeedback::label($fbOutcomeRaw) : '—';
+                    $fbOutcomeTone = InterviewFeedback::tone($fbOutcomeRaw);
+                    $fbAdmin = trim((string)($int['feedback_admin_name'] ?? ''));
+                    $fbDate = $int['feedback_submitted_at'] ?? null;
+                    $appTone = Application::badgeTone($int['application_status'] ?? null);
                     ?>
                     <tr>
                       <td>
@@ -254,13 +332,28 @@ $flashes = render_flashes();
                         </div>
                       </td>
                       <td><span class="int-type int-type--<?= e($int['interview_type']) ?>"><?= e($typeLabel) ?></span></td>
-                      <td><?= $interviewerName ?></td>
+                      <td><span class="int-status int-status--<?= e($appTone) ?>"><?= e(Application::label($int['application_status'] ?? null)) ?></span></td>
+                      <td><?= $hasFb ? '<span class="int-status int-status--' . e($fbOutcomeTone) . '">' . e($fbOutcomeLabel) . '</span>' : '<span class="text-muted">—</span>' ?></td>
+                      <td>
+                        <?php if ($hasFb): ?>
+                          <div class="int-datetime"><span class="int-datetime__date"><?= e($fbAdmin !== '' ? $fbAdmin : '—') ?></span><span class="int-datetime__time"><?= e(format_date($fbDate, 'd M Y, H:i')) ?></span></div>
+                        <?php else: ?>
+                          <span class="text-muted">—</span>
+                        <?php endif; ?>
+                      </td>
                       <td><span class="int-status int-status--<?= e($statusBadge) ?>"><?= e(Interview::label($int['status'])) ?></span></td>
                       <td>
                         <div class="int-actions">
                           <a href="<?= url('admin/interview.php?id=' . (int) $int['id']) ?>" class="btn btn--ghost btn--sm" title="View"><i class="fas fa-eye"></i></a>
                           <?php if (!in_array($int['status'], ['completed', 'cancelled'])): ?>
                             <a href="<?= url('admin/interview_schedule.php?id=' . (int) $int['id']) ?>" class="btn btn--ghost btn--sm" title="Reschedule"><i class="fas fa-edit"></i></a>
+                          <?php endif; ?>
+                          <?php if ($int['status'] === 'completed'): ?>
+                            <?php if ($hasFb): ?>
+                              <a href="<?= url('admin/interview.php?id=' . (int) $int['id']) ?>#feedbackView" class="btn btn--ghost btn--sm" title="View Feedback"><i class="fas fa-comment-dots"></i></a>
+                            <?php else: ?>
+                              <a href="<?= url('admin/interview.php?id=' . (int) $int['id']) ?>" class="btn btn--primary btn--sm" title="Give Feedback"><i class="fas fa-plus"></i></a>
+                            <?php endif; ?>
                           <?php endif; ?>
                         </div>
                       </td>
@@ -278,55 +371,3 @@ $flashes = render_flashes();
   <script src="<?= url('js/admin_interviews.js') ?>"></script>
 </body>
 </html>
-        <!-- ===== SUMMARY CARDS ===== -->
-        <section class="int-stats">
-          <div class="int-stat-card int-stat-card--total">
-            <div class="int-stat-card__icon"><i class="fas fa-calendar-check"></i></div>
-            <div class="int-stat-card__body">
-              <span class="int-stat-card__number"><?= $totalInterviews ?></span>
-              <span class="int-stat-card__label">Total Interviews</span>
-            </div>
-          </div>
-          <div class="int-stat-card int-stat-card--scheduled">
-            <div class="int-stat-card__icon"><i class="fas fa-clock"></i></div>
-            <div class="int-stat-card__body">
-              <span class="int-stat-card__number"><?= $statusCounts['scheduled'] ?? 0 ?></span>
-              <span class="int-stat-card__label">Scheduled</span>
-            </div>
-          </div>
-          <div class="int-stat-card int-stat-card--upcoming">
-            <div class="int-stat-card__icon"><i class="fas fa-hourglass-half"></i></div>
-            <div class="int-stat-card__body">
-              <span class="int-stat-card__number"><?= $upcomingCount ?></span>
-              <span class="int-stat-card__label">Upcoming</span>
-            </div>
-          </div>
-          <div class="int-stat-card int-stat-card--completed">
-            <div class="int-stat-card__icon"><i class="fas fa-check-circle"></i></div>
-            <div class="int-stat-card__body">
-              <span class="int-stat-card__number"><?= $statusCounts['completed'] ?? 0 ?></span>
-              <span class="int-stat-card__label">Completed</span>
-            </div>
-          </div>
-          <div class="int-stat-card int-stat-card--rescheduled">
-            <div class="int-stat-card__icon"><i class="fas fa-redo"></i></div>
-            <div class="int-stat-card__body">
-              <span class="int-stat-card__number"><?= $statusCounts['rescheduled'] ?? 0 ?></span>
-              <span class="int-stat-card__label">Rescheduled</span>
-            </div>
-          </div>
-          <div class="int-stat-card int-stat-card--cancelled">
-            <div class="int-stat-card__icon"><i class="fas fa-times-circle"></i></div>
-            <div class="int-stat-card__body">
-              <span class="int-stat-card__number"><?= $statusCounts['cancelled'] ?? 0 ?></span>
-              <span class="int-stat-card__label">Cancelled</span>
-            </div>
-          </div>
-          <div class="int-stat-card int-stat-card--noshow">
-            <div class="int-stat-card__icon"><i class="fas fa-user-slash"></i></div>
-            <div class="int-stat-card__body">
-              <span class="int-stat-card__number"><?= $statusCounts['no_show'] ?? 0 ?></span>
-              <span class="int-stat-card__label">No Show</span>
-            </div>
-          </div>
-        </section>

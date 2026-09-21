@@ -1107,3 +1107,106 @@ body.dark-mode .alert--error {
 body.dark-mode .app-status-final {
   color: #94a3b8;
 }
+
+/* ================================================================
+   DOCUMENT VIEWER MODAL (Admin Application Detail)
+   ================================================================ */
+.app-doc-viewer[hidden] {
+  display: none !important;
+}
+.app-doc-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+.app-doc-viewer__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(2px);
+}
+.app-doc-viewer__panel {
+  position: relative;
+  width: min(1000px, 100%);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 16px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+.app-doc-viewer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  background: var(--bg, #f9fafb);
+}
+.app-doc-viewer__title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text, #111827);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.app-doc-viewer__title i {
+  color: var(--primary, #1a56db);
+}
+.app-doc-viewer__title span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-doc-viewer__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.app-doc-viewer__body {
+  min-height: 60vh;
+  height: 70vh;
+  background: #0f172a;
+}
+.app-doc-viewer__body iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+body.dark-mode .app-doc-viewer__panel {
+  background: #0f172a;
+  border-color: #334155;
+}
+body.dark-mode .app-doc-viewer__header {
+  background: #1e293b;
+  border-bottom-color: #334155;
+}
+body.dark-mode .app-doc-viewer__title {
+  color: #f1f5f9;
+}
+@media (max-width: 640px) {
+  .app-doc-viewer {
+    padding: 0.75rem;
+  }
+  .app-doc-viewer__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .app-doc-viewer__header-actions {
+    flex-wrap: wrap;
+  }
+  .app-doc-viewer__body {
+    height: 65vh;
+  }
+}
