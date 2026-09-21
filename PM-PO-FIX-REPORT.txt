@@ -1,0 +1,6 @@
+Built against current uploaded project.
+- PM dashboard overview cards: responsive 4/2/1 grid and mini-modal script loaded after markup.
+- PM Activity Log: new functioning page backed by existing audit_logs table and current logged-in PM user.
+- PO real data: actual supplied DB schema has no programme_officer_id on programmes/cohorts. The portal now uses authenticated role-level portfolio access instead of the old 1=0 empty scope, so it queries real programmes, cohorts and participants.
+- Security: programme_officer role guard remains mandatory; no anonymous access introduced.
+PHP checked 297, failures 0. JS checked 25, failures 0.

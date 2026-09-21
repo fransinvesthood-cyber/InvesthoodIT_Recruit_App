@@ -20,3 +20,476 @@ html[data-theme=dark]{--po-bg:#07101d;--po-surface:#101828;--po-soft:#151f2e;--p
 .po-timeline__item{position:relative;padding:0 0 22px 39px;min-height:48px}.po-timeline__item:last-child{padding-bottom:0}.po-timeline__item:not(:last-child):before{content:"";position:absolute;left:14px;top:28px;width:2px;height:calc(100% - 11px);background:var(--po-border)}.po-timeline__dot{width:29px;height:29px;position:absolute;left:0;top:0;display:grid;place-items:center;border-radius:50%;background:var(--po-muted-surface);color:var(--po-subtle);font-size:8px}.po-timeline__item.is-complete .po-timeline__dot{background:var(--po-green-soft);color:var(--po-green)}.po-timeline__item strong{display:block;padding-top:2px;font-size:9px}.po-timeline__item span:not(.po-timeline__dot){display:block;margin-top:3px;color:var(--po-muted);font-size:8px}
 .po-activity-list{padding:8px 16px}.po-activity{padding:14px 0;display:flex;gap:11px;border-bottom:1px solid var(--po-border-light)}.po-activity:last-child{border-bottom:0}.po-activity__icon{width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;border-radius:10px;background:var(--po-primary-soft);color:var(--po-primary)}.po-activity__body{flex:1;min-width:0}.po-activity__title{display:flex;justify-content:space-between;gap:12px}.po-activity__title strong{font-size:9px}.po-activity__title span{color:var(--po-muted);font-size:8px}.po-activity p{margin:5px 0;color:var(--po-text-2);font-size:9px;line-height:1.55}.po-activity__meta{display:flex;gap:12px;color:var(--po-muted);font-size:7px}.po-security,.po-alert{margin-top:18px;padding:13px 15px;display:flex;align-items:flex-start;gap:10px;border-radius:13px}.po-security{border:1px solid rgba(37,99,235,.13);background:var(--po-primary-soft);color:var(--po-primary)}.po-security strong,.po-alert strong{display:block;color:var(--po-text);font-size:9px}.po-security span,.po-alert span{display:block;margin-top:3px;color:var(--po-muted);font-size:8px;line-height:1.5}.po-alert{margin-bottom:18px;border:1px solid rgba(217,119,6,.18);background:var(--po-orange-soft);color:var(--po-orange)}.po-empty{padding:44px 18px;text-align:center}.po-empty--compact{padding:28px 16px}.po-empty__icon{width:48px;height:48px;margin:0 auto 10px;display:grid;place-items:center;border-radius:14px;background:var(--po-primary-soft);color:var(--po-primary)}.po-empty strong{display:block;font-size:10px}.po-empty span{display:block;max-width:420px;margin:5px auto 0;color:var(--po-muted);font-size:8px;line-height:1.5}
 @media(max-width:1280px){.po-stats--5{grid-template-columns:repeat(3,minmax(0,1fr))}.po-programme-grid,.po-candidate-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:1050px){.po-grid--main{grid-template-columns:1fr}}@media(max-width:920px){.po-main{margin-left:0}.po-sidebar{transform:translateX(-100%);transition:transform .22s ease}.po-sidebar--open{transform:none}.po-sidebar__close,.po-navbar__menu{display:grid;place-items:center}.po-content{padding:20px 16px 32px}}@media(max-width:720px){.po-hero{align-items:flex-start;flex-direction:column;padding:24px 20px}.po-hero__metric{width:100%}.po-stats--5,.po-stats--4{grid-template-columns:repeat(2,minmax(0,1fr))}.po-grid--2{grid-template-columns:1fr}.po-programme-grid,.po-candidate-grid{grid-template-columns:1fr}.po-detail-hero{align-items:flex-start;flex-direction:column}.po-profile-hero{align-items:flex-start}.po-filter{align-items:stretch;flex-direction:column}.po-field,.po-field--grow{width:100%;min-width:0}.po-filter__actions{width:100%}.po-filter__actions .po-btn{flex:1}}@media(max-width:560px){.po-navbar{height:66px;padding:0 12px}.po-navbar__heading span{display:none}.po-navbar__heading h1{font-size:14px}.po-navbar__user-copy{display:none}.po-navbar__user{padding:3px;border:0;background:transparent}.po-dropdown{position:fixed;top:72px;right:12px;width:min(320px,calc(100vw - 24px))}.po-stats--5,.po-stats--4{grid-template-columns:1fr}.po-detail-list{grid-template-columns:1fr}.po-profile-hero{flex-direction:column}.po-activity__title{flex-direction:column;gap:3px}}
+/* ============================================================
+   PROGRAMME OFFICER — PROGRAMME MANAGER TYPOGRAPHY
+   ============================================================ */
+
+body.po-body,
+.po-app,
+.po-main,
+.po-content,
+.ux-navbar,
+#portalSidebar {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif !important;
+
+    font-size: 14px;
+}
+
+/* Main page headings */
+.po-content h1 {
+    font-size: 1.5rem;
+    line-height: 1.25;
+}
+
+.po-content h2,
+.po-hero h2 {
+    font-size: 1.25rem;
+    line-height: 1.3;
+}
+
+.po-content h3,
+.po-card__header h3 {
+    font-size: 1rem;
+    line-height: 1.35;
+}
+
+/* Normal text */
+.po-content p,
+.po-content span,
+.po-content label,
+.po-content input,
+.po-content select,
+.po-content textarea,
+.po-content button,
+.po-content a {
+    font-size: .875rem;
+}
+
+/* Hero */
+.po-hero__eyebrow {
+    font-size: .75rem !important;
+}
+
+.po-hero p {
+    font-size: .875rem !important;
+    line-height: 1.6;
+}
+
+/* Dashboard statistics */
+.po-stat strong {
+    font-size: 1.5rem;
+}
+
+.po-stat > span:last-child {
+    font-size: .8125rem;
+}
+
+/* Cards */
+.po-card__header h3 {
+    font-size: 1rem;
+}
+
+.po-card__header p {
+    font-size: .8125rem;
+}
+
+/* Programme / candidate lists */
+.po-list-item__title strong,
+.po-person-card__identity strong,
+.po-quick-action strong {
+    font-size: .875rem;
+}
+
+.po-list-item__main > span,
+.po-person-card__identity span,
+.po-quick-action span,
+.po-person-card__footer {
+    font-size: .8125rem;
+}
+
+/* Status badges */
+.po-status {
+    font-size: .6875rem !important;
+    font-weight: 700;
+}
+
+/* Buttons */
+.po-btn,
+.po-link {
+    font-size: .8125rem !important;
+}
+
+/* ============================================================
+   SIDEBAR — MATCH PROGRAMME MANAGER
+   ============================================================ */
+
+#portalSidebar .sidebar__section-label {
+    font-size: .6875rem !important;
+}
+
+#portalSidebar .sidebar__link {
+    font-size: .85rem !important;
+}
+
+#portalSidebar .sidebar__link i {
+    font-size: .95rem !important;
+}
+
+#portalSidebar .sidebar__user-name {
+    font-size: .85rem !important;
+}
+
+#portalSidebar .sidebar__user-role {
+    font-size: .75rem !important;
+}
+
+#portalSidebar .sidebar__logout {
+    font-size: .8125rem !important;
+}
+
+/* ============================================================
+   NAVBAR — MATCH PROGRAMME MANAGER
+   ============================================================ */
+
+.ux-navbar__workspace {
+    font-size: .6875rem !important;
+}
+
+.ux-navbar__title,
+.ux-navbar h1 {
+    font-size: 1.125rem !important;
+}
+
+.ux-navbar__user-name {
+    font-size: .85rem !important;
+}
+
+.ux-navbar__user-role {
+    font-size: .75rem !important;
+}
+
+/* ============================================================
+   TABLES
+   ============================================================ */
+
+.po-table {
+    font-size: .8125rem;
+}
+
+.po-table th {
+    font-size: .75rem;
+    font-weight: 700;
+}
+
+.po-table td {
+    font-size: .8125rem;
+}
+
+/* ============================================================
+   FORMS
+   ============================================================ */
+
+.po-form label,
+.po-field label {
+    font-size: .8125rem;
+}
+
+.po-form input,
+.po-form select,
+.po-form textarea,
+.po-field input,
+.po-field select,
+.po-field textarea {
+    font-size: .875rem;
+}
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 767px) {
+
+    body.po-body,
+    .po-app,
+    .po-main,
+    .po-content {
+        font-size: 14px;
+    }
+
+    .po-hero h2 {
+        font-size: 1.125rem;
+    }
+
+    .po-stat strong {
+        font-size: 1.35rem;
+    }
+
+    .ux-navbar__title,
+    .ux-navbar h1 {
+        font-size: .9375rem !important;
+    }
+}
+
+
+/* ========================================================================
+   FINAL TYPOGRAPHY OVERRIDE
+   Programme Officer -> Programme Manager typography
+   Keep this block LAST in the stylesheet.
+   ======================================================================== */
+
+html body.po-body,
+html body.po-body .po-app,
+html body.po-body .po-main,
+html body.po-body .po-content,
+html body.po-body .ux-navbar,
+html body.po-body #portalSidebar {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    font-size: 14px !important;
+}
+
+/* Page headings */
+html body.po-body .po-page-header h2,
+html body.po-body .po-detail-hero h2,
+html body.po-body .po-profile-hero h2 {
+    font-size: 1.5rem !important;
+    line-height: 1.25 !important;
+}
+
+html body.po-body .po-hero h2 {
+    font-size: 1.5rem !important;
+    line-height: 1.25 !important;
+}
+
+html body.po-body .po-page-header__eyebrow,
+html body.po-body .po-detail-hero__eyebrow,
+html body.po-body .po-profile-hero__eyebrow,
+html body.po-body .po-hero__eyebrow {
+    font-size: .75rem !important;
+}
+
+html body.po-body .po-page-header p,
+html body.po-body .po-hero p,
+html body.po-body .po-profile-hero__copy p {
+    font-size: .875rem !important;
+}
+
+/* Dashboard cards */
+html body.po-body .po-stat > strong {
+    font-size: 1.5rem !important;
+}
+
+html body.po-body .po-stat > span:last-child {
+    font-size: .8125rem !important;
+}
+
+html body.po-body .po-card__header h3 {
+    font-size: 1rem !important;
+}
+
+html body.po-body .po-card__header p {
+    font-size: .8125rem !important;
+}
+
+/* Lists / cards / programme cards */
+html body.po-body .po-list-item__title strong,
+html body.po-body .po-person-card__identity strong,
+html body.po-body .po-quick-action strong,
+html body.po-body .po-programme-card h3,
+html body.po-body .po-empty strong,
+html body.po-body .po-security strong,
+html body.po-body .po-alert strong,
+html body.po-body .po-activity__title strong {
+    font-size: .875rem !important;
+}
+
+html body.po-body .po-list-item__main > span,
+html body.po-body .po-person-card__identity span,
+html body.po-body .po-quick-action span,
+html body.po-body .po-programme-card > p,
+html body.po-body .po-programme-card__meta,
+html body.po-body .po-programme-card__dates span,
+html body.po-body .po-person-card__footer,
+html body.po-body .po-empty span,
+html body.po-body .po-security span,
+html body.po-body .po-alert span,
+html body.po-body .po-activity p {
+    font-size: .8125rem !important;
+}
+
+/* Progress */
+html body.po-body .po-progress__labels,
+html body.po-body .po-progress small {
+    font-size: .75rem !important;
+}
+
+/* Status / chips / breadcrumbs */
+html body.po-body .po-status,
+html body.po-body .po-chip,
+html body.po-body .po-breadcrumb {
+    font-size: .6875rem !important;
+}
+
+/* Buttons / links */
+html body.po-body .po-btn,
+html body.po-body .po-link,
+html body.po-body .po-icon-btn,
+html body.po-body .po-table__action a {
+    font-size: .8125rem !important;
+}
+
+/* Tables */
+html body.po-body .po-table {
+    font-size: .8125rem !important;
+}
+
+html body.po-body .po-table th {
+    font-size: .75rem !important;
+}
+
+html body.po-body .po-table td,
+html body.po-body .po-table-title strong,
+html body.po-body .po-person strong {
+    font-size: .8125rem !important;
+}
+
+html body.po-body .po-table-sub,
+html body.po-body .po-table-title span:not(.po-table-title__icon),
+html body.po-body .po-person span {
+    font-size: .75rem !important;
+}
+
+/* Forms */
+html body.po-body .po-field label,
+html body.po-body .po-form label {
+    font-size: .8125rem !important;
+}
+
+html body.po-body .po-field input,
+html body.po-body .po-field select,
+html body.po-body .po-field textarea,
+html body.po-body .po-form input,
+html body.po-body .po-form select,
+html body.po-body .po-form textarea {
+    font-size: .875rem !important;
+}
+
+/* Detail pages / timeline */
+html body.po-body .po-detail-hero__meta,
+html body.po-body .po-detail-list strong,
+html body.po-body .po-timeline__item strong {
+    font-size: .8125rem !important;
+}
+
+html body.po-body .po-detail-list span,
+html body.po-body .po-timeline__item span:not(.po-timeline__dot),
+html body.po-body .po-activity__meta {
+    font-size: .75rem !important;
+}
+
+/* ACTUAL SHARED SIDEBAR MARKUP */
+html body.po-body #portalSidebar.sidebar .sidebar__section-label {
+    font-size: .6875rem !important;
+}
+
+html body.po-body #portalSidebar.sidebar .sidebar__link,
+html body.po-body #portalSidebar.sidebar .sidebar__link-text {
+    font-size: .85rem !important;
+}
+
+html body.po-body #portalSidebar.sidebar .sidebar__link i {
+    font-size: .95rem !important;
+}
+
+html body.po-body #portalSidebar.sidebar .sidebar__user-name {
+    font-size: .85rem !important;
+}
+
+html body.po-body #portalSidebar.sidebar .sidebar__user-role {
+    font-size: .75rem !important;
+}
+
+html body.po-body #portalSidebar.sidebar .sidebar__logout {
+    font-size: .8125rem !important;
+}
+
+/* Legacy PO sidebar markup, if any page still uses it */
+html body.po-body .po-sidebar__brand-copy strong {
+    font-size: .85rem !important;
+}
+
+html body.po-body .po-sidebar__brand-copy span,
+html body.po-body .po-profile__copy span,
+html body.po-body .po-nav__label {
+    font-size: .6875rem !important;
+}
+
+html body.po-body .po-profile__copy strong,
+html body.po-body .po-nav__item,
+html body.po-body .po-theme-control,
+html body.po-body .po-logout {
+    font-size: .85rem !important;
+}
+
+/* ACTUAL SHARED NAVBAR MARKUP */
+html body.po-body .ux-navbar__workspace {
+    font-size: .6875rem !important;
+}
+
+html body.po-body .ux-navbar__title,
+html body.po-body .ux-navbar h1 {
+    font-size: 1.125rem !important;
+}
+
+html body.po-body .ux-navbar__user-name {
+    font-size: .85rem !important;
+}
+
+html body.po-body .ux-navbar__user-role {
+    font-size: .75rem !important;
+}
+
+/* Legacy PO navbar markup */
+html body.po-body .po-navbar__heading span {
+    font-size: .6875rem !important;
+}
+
+html body.po-body .po-navbar__heading h1 {
+    font-size: 1.125rem !important;
+}
+
+html body.po-body .po-navbar__user-copy strong {
+    font-size: .85rem !important;
+}
+
+html body.po-body .po-navbar__user-copy span {
+    font-size: .75rem !important;
+}
+
+html body.po-body .po-dropdown__head strong {
+    font-size: .875rem !important;
+}
+
+html body.po-body .po-dropdown__head span {
+    font-size: .75rem !important;
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+    html body.po-body .ux-navbar__title,
+    html body.po-body .ux-navbar h1,
+    html body.po-body .po-navbar__heading h1 {
+        font-size: .9375rem !important;
+    }
+
+    html body.po-body .po-page-header h2,
+    html body.po-body .po-detail-hero h2,
+    html body.po-body .po-profile-hero h2,
+    html body.po-body .po-hero h2 {
+        font-size: 1.125rem !important;
+    }
+
+    html body.po-body .po-stat > strong {
+        font-size: 1.35rem !important;
+    }
+}

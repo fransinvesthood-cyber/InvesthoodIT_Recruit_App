@@ -1,0 +1,11 @@
+Dashboard table dependencies found in the CURRENT uploaded project:
+
+programme: cohort_participants, cohorts, programmes, the
+programme_officer: cohort_participants, cohorts, one, programmes, users
+supervisor: cohort_participants, cohorts, programmes, users
+assessor: assessment_attempts, assessment_outcomes, users
+recruiter: candidate_consents, candidate_profiles, candidate_skills, recruiter_shortlists, skills
+finance_officer: approved, finance_attendance_approved, stipend_schedules
+commercial_manager: a, commercial_capability_packs, commercial_saved_searches, one, saved
+
+No role scoping was removed. Empty data still requires these tables/assignments to contain matching records.
