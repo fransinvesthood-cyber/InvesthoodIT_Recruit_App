@@ -73,6 +73,52 @@ $candidatesRow = Database::fetchOne(
 );
 $totalCandidates = (int) ($candidatesRow['cnt'] ?? 0);
 
+// -------------------------------------------------------
+// Placement statistics (real data from the placements table)
+// Wrapped in try/catch so the dashboard still loads when the
+// Stage 12 placements tables have not been migrated yet.
+// -------------------------------------------------------
+$placementTotal = 0;
+$placementPending = 0;
+$placementActive = 0;
+$placementCompleted = 0;
+$placementWithdrawn = 0;
+$recentPlacements = [];
+try {
+    $placementStatsRow = Database::fetchOne(
+        "SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN status = 'pending_placement' THEN 1 ELSE 0 END) AS pending,
+            SUM(CASE WHEN status IN ('placed','active','placement_in_progress') THEN 1 ELSE 0 END) AS active,
+            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
+            SUM(CASE WHEN status IN ('cancelled','withdrawn') THEN 1 ELSE 0 END) AS withdrawn
+         FROM placements"
+    );
+    $placementTotal    = (int) ($placementStatsRow['total'] ?? 0);
+    $placementPending  = (int) ($placementStatsRow['pending'] ?? 0);
+    $placementActive   = (int) ($placementStatsRow['active'] ?? 0);
+    $placementCompleted = (int) ($placementStatsRow['completed'] ?? 0);
+    $placementWithdrawn = (int) ($placementStatsRow['withdrawn'] ?? 0);
+
+    // Recent placements (for the placements section listing)
+    $recentPlacements = Database::fetchAll(
+        "SELECT p.id, p.placement_reference, p.status, p.start_date, p.end_date, p.department, p.location,
+                u.first_name, u.last_name, u.email,
+                pr.name AS programme_name,
+                c.name AS cohort_name,
+                CONCAT(COALESCE(sup.first_name,''),' ',COALESCE(sup.last_name,'')) AS supervisor_name
+         FROM placements p
+         INNER JOIN users u ON u.id = p.candidate_id
+         INNER JOIN programmes pr ON pr.id = p.programme_id
+         INNER JOIN cohorts c ON c.id = p.cohort_id
+         LEFT JOIN users sup ON sup.id = p.supervisor_id
+         ORDER BY p.created_at DESC
+         LIMIT 10"
+    );
+} catch (Throwable $ex) {
+    error_log('[PLACEMENTS] Dashboard stats unavailable (run database/placements.sql): ' . $ex->getMessage());
+}
+
 // New candidates registered within the last 30 days
 $newCandidatesRow = Database::fetchOne(
     "SELECT COUNT(*) AS cnt FROM users u
@@ -523,6 +569,118 @@ $appWithdrawn    = (int) ($appStatusCounts['withdrawn'] ?? 0);
 $recentAppsResult = Application::adminList([], 1, 10);
 $recentApplications = $recentAppsResult['records'];
 
+// ------------------------------------------------------------
+// Real dynamic interview statistics & dashboard data (from MySQL)
+// ------------------------------------------------------------
+$interviewRange = strtolower(trim((string) ($_GET['interview_range'] ?? 'week')));
+if (!in_array($interviewRange, ['today', 'week', 'month', 'all'], true)) {
+    $interviewRange = 'week';
+}
+
+$todayDate  = date('Y-m-d');
+$weekStart  = date('Y-m-d', strtotime('monday this week', strtotime($todayDate)));
+$weekEnd    = date('Y-m-d', strtotime($weekStart . ' +6 days'));
+$monthStart = date('Y-m-01');
+$monthEnd   = date('Y-m-t');
+$prevMonthStart = date('Y-m-01', strtotime($monthStart . ' -1 month'));
+$prevMonthEnd   = date('Y-m-t', strtotime($monthStart . ' -1 month'));
+
+$interviewStatusCounts = array_fill_keys(Interview::STATUSES, 0);
+$totalInterviews          = 0;
+$upcomingInterviewsCount  = 0;
+$todayInterviewsTotal     = 0;
+$dashboardUpcomingInterviews = [];
+$dashboardTodayInterviews    = [];
+$dashboardRecentInterviews   = [];
+$interviewWeekCounts         = [];
+$interviewMonth = ['total' => 0, 'completed' => 0, 'upcoming' => 0, 'cancelled' => 0, 'no_show' => 0];
+$interviewPrevMonth = $interviewMonth;
+
+try {
+    $interviewStatusCounts     = Interview::countByStatus();
+    $totalInterviews           = array_sum($interviewStatusCounts);
+    $upcomingInterviewsCount   = Interview::countUpcoming();
+    $todayInterviewsTotal      = Interview::countOnDate($todayDate);
+
+    // Upper date bound for the selected range (null = no limit)
+    $interviewRangeTo = null;
+    if ($interviewRange === 'today') {
+        $interviewRangeTo = $todayDate;
+    } elseif ($interviewRange === 'week') {
+        $interviewRangeTo = $weekEnd;
+    } elseif ($interviewRange === 'month') {
+        $interviewRangeTo = $monthEnd;
+    }
+
+    $dashboardUpcomingInterviews = Interview::dashboardUpcoming($todayDate, $interviewRangeTo, 9);
+    $dashboardTodayInterviews    = Interview::dashboardOnDate($todayDate, 8);
+    $dashboardRecentInterviews   = Interview::recent(6);
+    $interviewWeekCounts         = Interview::countsByDateRange($weekStart, $weekEnd);
+    $interviewMonth              = Interview::rangeSummary($monthStart, $monthEnd);
+    $interviewPrevMonth          = Interview::rangeSummary($prevMonthStart, $prevMonthEnd);
+} catch (Exception $ex) {
+    error_log('[INTERVIEWS] Dashboard data: ' . $ex->getMessage());
+}
+
+// Dynamic "+/- vs last month" badge for the "Interviews This Month" exec card
+$interviewMonthChangeClass = 'up';
+if ($interviewPrevMonth['total'] > 0) {
+    $interviewMonthDelta = (int) round((($interviewMonth['total'] - $interviewPrevMonth['total']) / $interviewPrevMonth['total']) * 100);
+    $interviewMonthChangeClass = $interviewMonthDelta < 0 ? 'down' : 'up';
+    $interviewMonthChangeLabel = ($interviewMonthDelta > 0 ? '+' : '') . $interviewMonthDelta . '%';
+} elseif ($interviewMonth['total'] > 0) {
+    $interviewMonthChangeLabel = 'New';
+} else {
+    $interviewMonthChangeLabel = '0%';
+}
+
+// ------------------------------------------------------------
+// STAGE 11 — SELECTION & OFFER SUMMARY (real database values)
+// Simple counts only — no analytics or reporting.
+// ------------------------------------------------------------
+$selectionStats = [
+    'awaiting_decision' => 0,
+    'selected'          => 0,
+    'waitlisted'        => 0,
+    'not_selected'      => 0,
+    'pending_offers'    => 0,
+    'offers_issued'     => 0,
+    'offers_accepted'   => 0,
+    'offers_declined'   => 0,
+];
+try {
+    $selectionStats = Selection::dashboardStats();
+} catch (Exception $ex) {
+    error_log('[Admin Dashboard] Selection summary unavailable: ' . $ex->getMessage());
+}
+
+$selectedCandidates  = (int) ($selectionStats['selected'] ?? 0);
+$waitlistedCandidates = (int) ($selectionStats['waitlisted'] ?? 0);
+$offersPending      = (int) ($selectionStats['pending_offers'] ?? 0);
+$offersSent         = (int) ($selectionStats['offers_issued'] ?? 0);
+$offersAcceptedVal  = (int) ($selectionStats['offers_accepted'] ?? 0);
+$offersDeclinedVal  = (int) ($selectionStats['offers_declined'] ?? 0);
+
+// Map to the names used in the template below (kept short for readability)
+$pendingOffers       = $offersPending;
+$offersIssued        = $offersSent;
+$offersAccepted      = $offersAcceptedVal;
+$offersDeclined      = $offersDeclinedVal;
+
+// ------------------------------------------------------------
+// STAGE 11 — RECENT SELECTION & OFFER ACTIVITY (real data)
+// Reuse the existing Selection::adminList() which already joins
+// applications → candidate → opportunity → programme → interview
+// → selection_decision → offer in one query. No duplicate API.
+// ------------------------------------------------------------
+$recentSelections = [];
+try {
+    $recentResult = Selection::adminList([], 1, 8);
+    $recentSelections = is_array($recentResult['records'] ?? null) ? $recentResult['records'] : [];
+} catch (Exception $ex) {
+    error_log('[Admin Dashboard] Recent selections unavailable: ' . $ex->getMessage());
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -539,7 +697,8 @@ $recentApplications = $recentAppsResult['records'];
 <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
   <link rel="stylesheet" href="<?= url('css/admin_programmes.css') ?>">
   <link rel="stylesheet" href="<?= url('css/admin_opportunities.css') ?>">
-  <link rel="stylesheet" href="<?= url('css/admin_applications.css') ?>">
+    <link rel="stylesheet" href="<?= url('css/admin_applications.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/admin_selection.css') ?>">
 </head>
 <body class="dashboard-page admin-dashboard">
 
@@ -575,6 +734,7 @@ $recentApplications = $recentAppsResult['records'];
           <li><a href="#admin-applications" class="sidebar__link" data-section="applications"><i class="fas fa-file-alt"></i> Applications</a></li>
           <li><a href="#admin-placements" class="sidebar__link" data-section="placements"><i class="fas fa-handshake"></i> Placements</a></li>
           <li><a href="<?= url('admin/dashboard.php') ?>#admin-interviews" class="sidebar__link"><i class="fas fa-calendar-check"></i> Interviews</a></li>
+          <li><a href="#admin-selection" class="sidebar__link" data-section="selection"><i class="fas fa-user-check"></i> Selection &amp; Offers</a></li>
         </ul>
 
         <div class="sidebar__section-label">Talent</div>
@@ -734,7 +894,7 @@ $recentApplications = $recentAppsResult['records'];
               <span class="admin-exec-card__number" data-count="248">0</span>
               <span class="admin-exec-card__label">Active Placements</span>
               <div class="admin-exec-card__footer">
-                <span class="admin-exec-card__period"><i class="fas fa-arrow-up"></i> 18 new this month</span>
+                <span class="admin-exec-card__period"><i class="fas fa-arrow-up"></i> <?= (int)$placementTotal ?> total placements</span>
                 <a href="#" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
@@ -777,13 +937,13 @@ $recentApplications = $recentAppsResult['records'];
             <div class="admin-exec-card">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--amber"><i class="fas fa-calendar-check"></i></div>
-                <span class="admin-exec-card__change up">+7.6%</span>
+                <span class="admin-exec-card__change <?= e($interviewMonthChangeClass) ?>"><?= e($interviewMonthChangeLabel) ?></span>
               </div>
-              <span class="admin-exec-card__number" data-count="189">0</span>
+              <span class="admin-exec-card__number" data-count="<?= (int) $interviewMonth['total'] ?>">0</span>
               <span class="admin-exec-card__label">Interviews This Month</span>
               <div class="admin-exec-card__footer">
-                <span class="admin-exec-card__period"><i class="fas fa-arrow-up"></i> 68% attendance</span>
-                <a href="#" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
+                <span class="admin-exec-card__period"><i class="fas fa-check"></i> <?= (int) $interviewMonth['completed'] ?> completed &middot; <?= (int) $interviewMonth['upcoming'] ?> upcoming</span>
+                <a href="<?= url('admin/interviews.php') ?>" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
             <div class="admin-exec-card">
@@ -808,37 +968,6 @@ $recentApplications = $recentAppsResult['records'];
               <div class="admin-exec-card__footer">
                 <span class="admin-exec-card__period"><i class="fas fa-user"></i> <?= (int)$completeProfiles ?> complete profiles</span>
                 <a href="#" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
-              </div>
-            </div>
-          </div>
-
-<!-- Mini Charts Row -->
-          <div class="admin-mini-charts">
-            <div class="admin-mini-chart-card">
-              <div class="admin-mini-chart-card__header">
-                <h4>Candidate Growth</h4>
-                <span class="admin-mini-chart-card__period">Last 6 months</span>
-              </div>
-              <div class="admin-mini-chart-container">
-                <canvas id="execCandidateChart"></canvas>
-              </div>
-            </div>
-            <div class="admin-mini-chart-card">
-              <div class="admin-mini-chart-card__header">
-                <h4>Applications Trend</h4>
-                <span class="admin-mini-chart-card__period">Weekly comparison</span>
-              </div>
-              <div class="admin-mini-chart-container">
-                <canvas id="execApplicationChart"></canvas>
-              </div>
-            </div>
-            <div class="admin-mini-chart-card">
-              <div class="admin-mini-chart-card__header">
-                <h4>Placement Success</h4>
-                <span class="admin-mini-chart-card__period">Monthly rate</span>
-              </div>
-              <div class="admin-mini-chart-container">
-                <canvas id="execPlacementChart"></canvas>
               </div>
             </div>
           </div>
@@ -1525,7 +1654,8 @@ $recentApplications = $recentAppsResult['records'];
 
           <div class="admin-toolbar">
             <div class="admin-toolbar__left">
-              <button class="btn btn--primary btn--sm"><i class="fas fa-plus"></i> New Placement</button>
+              <a href="<?= url('admin/create-placement.php') ?>" class="btn btn--primary btn--sm"><i class="fas fa-plus"></i> New Placement</a>
+              <a href="<?= url('admin/placements.php') ?>" class="btn btn--outline btn--sm"><i class="fas fa-th-list"></i> Manage Placements</a>
               <select class="admin-filter-select" id="placementFilterStatus">
                 <option value="all">All Statuses</option>
                 <option value="active">Active</option>
@@ -1542,18 +1672,76 @@ $recentApplications = $recentAppsResult['records'];
             </div>
           </div>
 
-          <!-- Placement Stats -->
+          <!-- Placement Stats (real database data) -->
           <div class="admin-stats-row">
-            <div class="admin-stat-chip"><span class="admin-stat-chip__value">248</span> Active Placements</div>
-            <div class="admin-stat-chip"><span class="admin-stat-chip__value">1,056</span> Completed</div>
-            <div class="admin-stat-chip"><span class="admin-stat-chip__value">64</span> Host Orgs</div>
-            <div class="admin-stat-chip"><span class="admin-stat-chip__value">92%</span> Retention Rate</div>
-            <div class="admin-stat-chip"><span class="admin-stat-chip__value">4.6/5</span> Avg Feedback</div>
+            <div class="admin-stat-chip"><span class="admin-stat-chip__value"><?= (int)$placementTotal ?></span> Total Placements</div>
+            <div class="admin-stat-chip"><span class="admin-stat-chip__value"><?= (int)$placementPending ?></span> Pending</div>
+            <div class="admin-stat-chip"><span class="admin-stat-chip__value"><?= (int)$placementActive ?></span> Active</div>
+            <div class="admin-stat-chip"><span class="admin-stat-chip__value"><?= (int)$placementCompleted ?></span> Completed</div>
+            <div class="admin-stat-chip admin-stat-chip--danger"><span class="admin-stat-chip__value"><?= (int)$placementWithdrawn ?></span> Withdrawn/Cancelled</div>
           </div>
 
-          <div class="admin-placement-grid" id="adminPlacementGrid">
-            <!-- Populated by JS -->
+          <?php if (empty($recentPlacements)): ?>
+            <div class="admin-empty-state">
+              <div class="admin-empty-state__icon"><i class="fas fa-handshake"></i></div>
+              <h3>No placements yet</h3>
+              <p style="color:var(--text-light);margin-bottom:1rem;">Placements appear here once candidates with accepted offers are placed. Run <code>database/placements.sql</code> if the placements tables are missing.</p>
+              <a href="<?= url('admin/placement_create.php') ?>" class="btn btn--primary btn--sm"><i class="fas fa-plus"></i> New Placement</a>
+            </div>
+          <?php else: ?>
+          <div class="app-table-container">
+            <table class="app-table">
+              <thead>
+                <tr>
+                  <th>Candidate</th>
+                  <th>Programme / Cohort</th>
+                  <th>Dept / Location</th>
+                  <th>Supervisor</th>
+                  <th>Dates</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="adminPlacementTableBody">
+                <?php foreach ($recentPlacements as $pl): ?>
+                  <?php
+                    $plName = trim(($pl['first_name'] ?? '') . ' ' . ($pl['last_name'] ?? ''));
+                    $plStatus = $pl['status'] ?? 'pending_placement';
+                    $plTone = match ($plStatus) {
+                        'active', 'placed' => 'success',
+                        'completed' => 'primary',
+                        'cancelled', 'withdrawn' => 'danger',
+                        'placement_in_progress' => 'warning',
+                        default => 'muted',
+                    };
+                  ?>
+                  <tr data-search="<?= e(strtolower($plName . ' ' . ($pl['email'] ?? '') . ' ' . ($pl['placement_reference'] ?? '') . ' ' . ($pl['programme_name'] ?? '') . ' ' . ($pl['cohort_name'] ?? ''))) ?>" data-status="<?= e($plStatus) ?>">
+                    <td>
+                      <div class="app-candidate">
+                        <div class="app-candidate__name"><?= e($plName !== '' ? $plName : '—') ?></div>
+                        <div class="app-candidate__email"><?= e($pl['email'] ?? '') ?> · <?= e($pl['placement_reference'] ?? '') ?></div>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="app-opportunity">
+                        <div class="app-opportunity__title"><?= e($pl['programme_name'] ?? '—') ?></div>
+                        <div class="app-opportunity__programme"><?= e($pl['cohort_name'] ?? '') ?></div>
+                      </div>
+                    </td>
+                    <td><?= e($pl['department'] ?? '—') ?><br><small style="color:var(--text-light);"><?= e($pl['location'] ?? '') ?></small></td>
+                    <td><?= e(trim($pl['supervisor_name'] ?? '') !== '' ? $pl['supervisor_name'] : 'Unassigned') ?></td>
+                    <td class="app-date"><?= e(!empty($pl['start_date']) ? format_date($pl['start_date'], 'd M Y') : '—') ?> &ndash; <?= e(!empty($pl['end_date']) ? format_date($pl['end_date'], 'd M Y') : '—') ?></td>
+                    <td><span class="tag tag--<?= e($plTone) ?>"><?= e(ucwords(str_replace('_', ' ', $plStatus))) ?></span></td>
+                    <td class="app-actions">
+                      <a href="<?= url('admin/view-placement.php?id=' . (int)$pl['id']) ?>" class="btn btn--ghost btn--sm" title="View placement"><i class="fas fa-eye"></i></a>
+                      <a href="<?= url('admin/edit-placement.php?id=' . (int)$pl['id']) ?>" class="btn btn--primary btn--sm" title="Manage"><i class="fas fa-cog"></i></a>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
           </div>
+          <?php endif; ?>
         </section>
 
         <!-- =============================================
@@ -1569,26 +1757,399 @@ $recentApplications = $recentAppsResult['records'];
           <div class="admin-toolbar">
             <div class="admin-toolbar__left">
               <a href="<?= url('admin/interview_schedule.php') ?>" class="btn btn--primary btn--sm"><i class="fas fa-plus"></i> Schedule Interview</a>
-              <button class="btn btn--outline btn--sm"><i class="fas fa-calendar-alt"></i> Calendar View</button>
-              <select class="admin-filter-select" id="interviewFilterDate">
-                <option value="today">Today</option>
-                <option value="week" selected>This Week</option>
-                <option value="month">This Month</option>
-                <option value="all">All</option>
+              <a href="<?= url('admin/interviews.php') ?>" class="btn btn--primary btn--sm"><i class="fas fa-calendar-check"></i> Manage Interviews</a>
+              <a href="<?= url('admin/interviews.php?date_from=' . $weekStart . '&date_to=' . $weekEnd) ?>" class="btn btn--outline btn--sm" title="Open the interview module for this week"><i class="fas fa-calendar-alt"></i> Calendar View</a>
+              <select class="admin-filter-select" id="interviewFilterDate" aria-label="Filter upcoming interviews by date range">
+                <option value="today" <?= $interviewRange === 'today' ? 'selected' : '' ?>>Today</option>
+                <option value="week" <?= $interviewRange === 'week' ? 'selected' : '' ?>>This Week</option>
+                <option value="month" <?= $interviewRange === 'month' ? 'selected' : '' ?>>This Month</option>
+                <option value="all" <?= $interviewRange === 'all' ? 'selected' : '' ?>>All Upcoming</option>
               </select>
             </div>
             <div class="admin-toolbar__right" style="display:flex;align-items:center;gap:0.75rem;">
               <div class="admin-search-bar">
                 <i class="fas fa-search"></i>
-                <input type="text" class="admin-search-input" id="interviewSearch" placeholder="Search interviews...">
+                <input type="text" class="admin-search-input" id="interviewSearch" placeholder="Search upcoming interviews...">
               </div>
-              <a href="<?= url('admin/interviews.php') ?>" class="btn btn--primary btn--sm"><i class="fas fa-calendar-check"></i> Manage Interviews</a>
             </div>
           </div>
 
-          <div class="admin-interview-grid" id="adminInterviewGrid">
-            <!-- Populated by JS -->
+          <!-- Interview statistics — live counts from the interviews table (click to filter) -->
+          <div class="admin-stats-row">
+            <a class="admin-stat-chip admin-stat-chip--lg" href="<?= url('admin/interviews.php') ?>" title="All interviews"><span class="admin-stat-chip__value"><?= (int) $totalInterviews ?></span> Total Interviews</a>
+            <a class="admin-stat-chip admin-stat-chip--lg" href="<?= url('admin/interviews.php?status=upcoming') ?>" title="Interviews still to take place"><span class="admin-stat-chip__value"><?= (int) $upcomingInterviewsCount ?></span> Upcoming</a>
+            <a class="admin-stat-chip admin-stat-chip--lg" href="<?= url('admin/interviews.php?status=scheduled') ?>"><span class="admin-stat-chip__value"><?= (int) ($interviewStatusCounts['scheduled'] ?? 0) ?></span> Scheduled</a>
+            <a class="admin-stat-chip admin-stat-chip--lg" href="<?= url('admin/interviews.php?status=confirmed') ?>"><span class="admin-stat-chip__value"><?= (int) ($interviewStatusCounts['confirmed'] ?? 0) ?></span> Confirmed</a>
+            <a class="admin-stat-chip admin-stat-chip--lg" href="<?= url('admin/interviews.php?status=rescheduled') ?>"><span class="admin-stat-chip__value"><?= (int) ($interviewStatusCounts['rescheduled'] ?? 0) ?></span> Rescheduled</a>
+            <a class="admin-stat-chip admin-stat-chip--lg" href="<?= url('admin/interviews.php?status=completed') ?>"><span class="admin-stat-chip__value"><?= (int) ($interviewStatusCounts['completed'] ?? 0) ?></span> Completed</a>
+            <a class="admin-stat-chip admin-stat-chip--lg admin-stat-chip--danger" href="<?= url('admin/interviews.php?status=cancelled') ?>"><span class="admin-stat-chip__value"><?= (int) ($interviewStatusCounts['cancelled'] ?? 0) ?></span> Cancelled</a>
+            <a class="admin-stat-chip admin-stat-chip--lg admin-stat-chip--danger" href="<?= url('admin/interviews.php?status=no_show') ?>"><span class="admin-stat-chip__value"><?= (int) ($interviewStatusCounts['no_show'] ?? 0) ?></span> No Show</a>
           </div>
+
+          <!-- Interview calendar summary — real bookings for the current week -->
+          <div class="admin-stats-row">
+            <?php for ($dayOffset = 0; $dayOffset < 7; $dayOffset++): ?>
+              <?php
+                $dayDate  = date('Y-m-d', strtotime($weekStart . ' +' . $dayOffset . ' days'));
+                $dayCount = (int) ($interviewWeekCounts[$dayDate] ?? 0);
+              ?>
+              <a class="admin-stat-chip" href="<?= url('admin/interviews.php?date_from=' . $dayDate . '&date_to=' . $dayDate) ?>" title="<?= e(number_format($dayCount) . ' interview(s) booked for ' . format_date($dayDate, 'd M Y')) ?>">
+                <span class="admin-stat-chip__value"><?= $dayCount ?></span>
+                <?= $dayDate === $todayDate ? 'Today' : e(format_date($dayDate, 'D d M')) ?>
+              </a>
+            <?php endfor; ?>
+          </div>
+
+          <!-- Upcoming interviews (nearest first, from the interviews table) -->
+          <h3 class="section__title" style="font-size:1.05rem;text-align:left;margin:0 0 1rem;"><i class="fas fa-hourglass-half" style="color:var(--accent);"></i> Upcoming Interviews <span style="font-size:0.8rem;font-weight:400;color:var(--text-light);">(<?= (int) count($dashboardUpcomingInterviews) ?> shown)</span></h3>
+
+          <?php if (empty($dashboardUpcomingInterviews)): ?>
+            <div class="admin-empty-state">
+              <div class="admin-empty-state__icon"><i class="fas fa-calendar-times"></i></div>
+              <h3>No Upcoming Interviews</h3>
+              <p style="color:var(--text-light);margin-bottom:1rem;">There are currently no upcoming interviews.</p>
+              <a href="<?= url('admin/interview_schedule.php') ?>" class="btn btn--primary btn--sm"><i class="fas fa-plus"></i> Schedule Interview</a>
+            </div>
+          <?php else: ?>
+            <div class="admin-interview-grid" id="adminInterviewGridLive">
+              <?php foreach ($dashboardUpcomingInterviews as $iv): ?>
+                <?php
+                  $ivCandidate   = trim(($iv['candidate_first_name'] ?? '') . ' ' . ($iv['candidate_last_name'] ?? ''));
+                  $ivInterviewer = trim(($iv['interviewer_first_name'] ?? '') . ' ' . ($iv['interviewer_last_name'] ?? ''));
+                  $ivDays        = (int) round((strtotime((string) $iv['interview_date'] . ' 00:00:00') - strtotime($todayDate . ' 00:00:00')) / 86400);
+                  if ($ivDays <= 0) {
+                      $ivCountdown = 'Today';
+                  } elseif ($ivDays === 1) {
+                      $ivCountdown = 'Tomorrow';
+                  } else {
+                      $ivCountdown = 'in ' . $ivDays . ' days';
+                  }
+                  $ivSearch = strtolower(implode(' ', array_filter([
+                      $ivCandidate,
+                      $iv['candidate_email'] ?? '',
+                      $iv['application_reference'] ?? '',
+                      $iv['programme_name'] ?? '',
+                      $iv['cohort_name'] ?? '',
+                      $iv['opportunity_title'] ?? '',
+                      $ivInterviewer,
+                      $iv['interviewer_email'] ?? '',
+                      Interview::typeLabel($iv['interview_type']),
+                      Interview::label($iv['status']),
+                  ])));
+                ?>
+                <div class="interview-card" data-search="<?= e($ivSearch) ?>" data-date="<?= e($iv['interview_date']) ?>" data-id="<?= (int) $iv['id'] ?>">
+                  <div class="interview-card__header">
+                    <h3 class="interview-card__title"><?= e($ivCandidate !== '' ? $ivCandidate : 'Candidate') ?></h3>
+                    <span class="interview-card__type"><?= e(Interview::typeLabel($iv['interview_type'])) ?></span>
+                  </div>
+                  <div class="interview-card__countdown">
+                    <i class="fas fa-clock"></i>
+                    <span class="interview-card__countdown-time"><?= e($ivCountdown) ?></span>
+                    <span class="tag tag--<?= e(Interview::badgeTone($iv['status'])) ?>" style="margin-left:auto;"><?= e(Interview::label($iv['status'])) ?></span>
+                  </div>
+                  <div class="interview-card__details">
+                    <div class="interview-card__detail"><i class="fas fa-id-badge"></i> <?= e($iv['application_reference'] ?? '—') ?></div>
+                    <div class="interview-card__detail"><i class="fas fa-calendar"></i> <?= e(format_date($iv['interview_date'], 'd M Y')) ?> &middot; <?= e(substr((string) $iv['start_time'], 0, 5)) ?>&ndash;<?= e(substr((string) $iv['end_time'], 0, 5)) ?></div>
+                    <div class="interview-card__detail"><i class="fas fa-graduation-cap"></i> <?= e($iv['programme_name'] ?? '—') ?></div>
+                    <div class="interview-card__detail"><i class="fas fa-layer-group"></i> <?= e($iv['cohort_name'] ?? '—') ?></div>
+                    <div class="interview-card__detail"><i class="fas fa-briefcase"></i> <?= e($iv['opportunity_title'] ?? '—') ?></div>
+                    <div class="interview-card__detail"><i class="fas fa-user-tie"></i> <?= $ivInterviewer !== '' ? e($ivInterviewer) : 'Not assigned' ?></div>
+                  </div>
+                  <div class="interview-card__actions">
+                    <?php if (in_array($iv['status'], ['scheduled', 'rescheduled'], true)): ?>
+                      <a href="<?= url('admin/interview.php?id=' . (int) $iv['id']) ?>" class="btn btn--primary btn--sm"><i class="fas fa-check"></i> Confirm</a>
+                    <?php else: ?>
+                      <span class="btn btn--primary btn--sm" style="pointer-events:none;opacity:0.5;"><i class="fas fa-check"></i> Confirmed</span>
+                    <?php endif; ?>
+                    <a href="<?= url('admin/interview_schedule.php?id=' . (int) $iv['id']) ?>" class="btn btn--outline btn--sm"><i class="fas fa-clock"></i> Reschedule</a>
+                    <a href="<?= url('admin/interview.php?id=' . (int) $iv['id']) ?>" class="btn btn--ghost btn--sm">Details</a>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+            </div>
+            <div class="admin-empty-state" id="adminInterviewSearchEmptyLive" style="display:none;">
+              <div class="admin-empty-state__icon"><i class="fas fa-search"></i></div>
+              <h3>No interviews found</h3>
+              <p style="color:var(--text-light);">No upcoming interviews match your search.</p>
+            </div>
+          <?php endif; ?>
+
+          <!-- Today's interviews (current date only) -->
+          <h3 class="section__title" style="font-size:1.05rem;text-align:left;margin:2rem 0 1rem;"><i class="fas fa-sun" style="color:var(--accent);"></i> Today's Interviews <span style="font-size:0.8rem;font-weight:400;color:var(--text-light);">(<?= e(format_date($todayDate, 'd M Y')) ?> &middot; <?= (int) $todayInterviewsTotal ?>)</span></h3>
+
+          <div class="app-table-container">
+            <?php if (empty($dashboardTodayInterviews)): ?>
+              <div class="admin-empty-state" style="border:none;background:transparent;">
+                <div class="admin-empty-state__icon"><i class="fas fa-mug-hot"></i></div>
+                <h3>No interviews scheduled for today.</h3>
+                <p style="color:var(--text-light);">Upcoming interviews for the rest of the week are listed above.</p>
+              </div>
+            <?php else: ?>
+              <table class="app-table">
+                <thead>
+                  <tr>
+                    <th>Candidate</th>
+                    <th>Time</th>
+                    <th>Programme</th>
+                    <th>Opportunity</th>
+                    <th>Interviewer</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($dashboardTodayInterviews as $iv): ?>
+                    <?php
+                      $ivCandidate   = trim(($iv['candidate_first_name'] ?? '') . ' ' . ($iv['candidate_last_name'] ?? ''));
+                      $ivInterviewer = trim(($iv['interviewer_first_name'] ?? '') . ' ' . ($iv['interviewer_last_name'] ?? ''));
+                    ?>
+                    <tr>
+                      <td>
+                        <div class="app-candidate">
+                          <div class="app-candidate__name"><?= e($ivCandidate !== '' ? $ivCandidate : '—') ?></div>
+                          <div class="app-candidate__email"><?= e($iv['application_reference'] ?? '') ?></div>
+                        </div>
+                      </td>
+                      <td class="app-date"><?= e(substr((string) $iv['start_time'], 0, 5)) ?>&ndash;<?= e(substr((string) $iv['end_time'], 0, 5)) ?></td>
+                      <td><?= e($iv['programme_name'] ?? '—') ?><?= !empty($iv['cohort_name']) ? ' <span style="color:var(--text-lighter);font-size:0.75rem;">(' . e($iv['cohort_name']) . ')</span>' : '' ?></td>
+                      <td>
+                        <div class="app-opportunity">
+                          <div class="app-opportunity__title"><?= e($iv['opportunity_title'] ?? '—') ?></div>
+                          <div class="app-opportunity__programme"><?= e(Interview::typeLabel($iv['interview_type'])) ?></div>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="app-candidate">
+                          <div class="app-candidate__name"><?= $ivInterviewer !== '' ? e($ivInterviewer) : 'Not assigned' ?></div>
+                          <div class="app-candidate__email"><?= e($iv['interviewer_email'] ?? '') ?></div>
+                        </div>
+                      </td>
+                      <td><span class="tag tag--<?= e(Interview::badgeTone($iv['status'])) ?>"><?= e(Interview::label($iv['status'])) ?></span></td>
+                      <td class="app-actions">
+                        <a href="<?= url('admin/interview.php?id=' . (int) $iv['id']) ?>" class="btn btn--ghost btn--sm" title="View interview"><i class="fas fa-eye"></i></a>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            <?php endif; ?>
+          </div>
+          <!-- Recent interview activity (most recently updated records) -->
+          <h3 class="section__title" style="font-size:1.05rem;text-align:left;margin:2rem 0 1rem;"><i class="fas fa-history" style="color:var(--primary);"></i> Recent Interviews <span style="font-size:0.8rem;font-weight:400;color:var(--text-light);">(<?= (int) count($dashboardRecentInterviews) ?> latest)</span></h3>
+
+          <div class="app-table-container">
+            <?php if (empty($dashboardRecentInterviews)): ?>
+              <div class="admin-empty-state" style="border:none;background:transparent;">
+                <div class="admin-empty-state__icon"><i class="fas fa-clipboard-list"></i></div>
+                <h3>No Recent Interviews</h3>
+                <p style="color:var(--text-light);">No interview activity has been recorded yet.</p>
+              </div>
+            <?php else: ?>
+              <table class="app-table">
+                <thead>
+                  <tr>
+                    <th>Candidate</th>
+                    <th>Programme</th>
+                    <th>Opportunity</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($dashboardRecentInterviews as $iv): ?>
+                    <?php
+                      $ivCandidate   = trim(($iv['candidate_first_name'] ?? '') . ' ' . ($iv['candidate_last_name'] ?? ''));
+                      $ivInterviewer = trim(($iv['interviewer_first_name'] ?? '') . ' ' . ($iv['interviewer_last_name'] ?? ''));
+                    ?>
+                    <tr>
+                      <td>
+                        <div class="app-candidate">
+                          <div class="app-candidate__name"><?= e($ivCandidate !== '' ? $ivCandidate : '—') ?></div>
+                          <div class="app-candidate__email"><?= e($iv['application_reference'] ?? '') ?></div>
+                        </div>
+                      </td>
+                      <td><?= e($iv['programme_name'] ?? '—') ?><?= !empty($iv['cohort_name']) ? ' <span style="color:var(--text-lighter);font-size:0.75rem;">(' . e($iv['cohort_name']) . ')</span>' : '' ?></td>
+                      <td>
+                        <div class="app-opportunity">
+                          <div class="app-opportunity__title"><?= e($iv['opportunity_title'] ?? '—') ?></div>
+                          <div class="app-opportunity__programme"><?= $ivInterviewer !== '' ? e($ivInterviewer) : 'Interviewer not assigned' ?></div>
+                        </div>
+                      </td>
+                      <td class="app-date"><?= e(format_date($iv['interview_date'], 'd M Y')) ?></td>
+                      <td class="app-date"><?= e(substr((string) $iv['start_time'], 0, 5)) ?>&ndash;<?= e(substr((string) $iv['end_time'], 0, 5)) ?></td>
+                      <td><span class="tag tag--<?= e(Interview::badgeTone($iv['status'])) ?>"><?= e(Interview::label($iv['status'])) ?></span></td>
+                      <td class="app-actions">
+                        <a href="<?= url('admin/interview.php?id=' . (int) $iv['id']) ?>" class="btn btn--ghost btn--sm" title="View interview"><i class="fas fa-eye"></i></a>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            <?php endif; ?>
+          </div>
+
+          <div style="margin-top:1.25rem;text-align:right;">
+            <a href="<?= url('admin/interviews.php') ?>" class="btn btn--primary btn--sm"><i class="fas fa-calendar-check"></i> Manage Interviews</a>
+          </div>
+                </section>
+
+        <!-- =============================================
+             SECTION 8B: SELECTION & OFFERS OVERVIEW
+             Real-time data from selection_decisions, offers
+             and the applications pipeline (Stage 11)
+             ============================================= -->
+        <section class="dash-section admin-section sel-module" id="admin-selection" data-section="selection">
+          <div class="section__header" style="text-align:left;margin-bottom:1.5rem;">
+            <span class="section__badge">Selection &amp; Offers</span>
+            <h2 class="section__title" style="font-size:1.5rem;">Selection <span class="text-gradient">and Offers</span></h2>
+            <p class="section__text" style="font-size:0.9rem;">Candidates progressing through the selection process after interviews, with offer workflow tracking.</p>
+          </div>
+
+          <!-- ===== Selection & Offer Stats Grid ===== -->
+          <div class="sel-stats-grid">
+            <div class="sel-stat-card sel-stat-card--selected">
+              <div class="sel-stat-card__icon"><i class="fas fa-user-check"></i></div>
+              <div class="sel-stat-card__content">
+                <span class="sel-stat-card__value" data-count="<?= (int)$selectedCandidates ?>"><?= (int)$selectedCandidates ?></span>
+                <span class="sel-stat-card__label">Selected</span>
+              </div>
+            </div>
+
+            <div class="sel-stat-card sel-stat-card--pending">
+              <div class="sel-stat-card__icon"><i class="fas fa-hourglass-half"></i></div>
+              <div class="sel-stat-card__content">
+                <span class="sel-stat-card__value" data-count="<?= (int)$pendingOffers ?>"><?= (int)$pendingOffers ?></span>
+                <span class="sel-stat-card__label">Offers Pending</span>
+              </div>
+            </div>
+
+            <div class="sel-stat-card sel-stat-card--sent">
+              <div class="sel-stat-card__icon"><i class="fas fa-paper-plane"></i></div>
+              <div class="sel-stat-card__content">
+                <span class="sel-stat-card__value" data-count="<?= (int)$offersIssued ?>"><?= (int)$offersIssued ?></span>
+                <span class="sel-stat-card__label">Offers Sent</span>
+              </div>
+            </div>
+
+            <div class="sel-stat-card sel-stat-card--accepted">
+              <div class="sel-stat-card__icon"><i class="fas fa-handshake"></i></div>
+              <div class="sel-stat-card__content">
+                <span class="sel-stat-card__value" data-count="<?= (int)$offersAccepted ?>"><?= (int)$offersAccepted ?></span>
+                <span class="sel-stat-card__label">Offers Accepted</span>
+              </div>
+            </div>
+
+            <div class="sel-stat-card sel-stat-card--declined">
+              <div class="sel-stat-card__icon"><i class="fas fa-user-times"></i></div>
+              <div class="sel-stat-card__content">
+                <span class="sel-stat-card__value" data-count="<?= (int)$offersDeclined ?>"><?= (int)$offersDeclined ?></span>
+                <span class="sel-stat-card__label">Offers Declined</span>
+              </div>
+            </div>
+
+            <div class="sel-stat-card sel-stat-card--waitlisted">
+              <div class="sel-stat-card__icon"><i class="fas fa-user-clock"></i></div>
+              <div class="sel-stat-card__content">
+                <span class="sel-stat-card__value" data-count="<?= (int)$waitlistedCandidates ?>"><?= (int)$waitlistedCandidates ?></span>
+                <span class="sel-stat-card__label">Waitlisted</span>
+              </div>
+            </div>
+          </div>
+
+                    <!-- ===== Section Actions ===== -->
+          <div style="margin: 1.5rem 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+            <a href="<?= url('admin/selection.php') ?>" class="btn btn--primary btn--md"><i class="fas fa-user-check"></i> Manage Selection &amp; Offers</a>
+            <div class="admin-search-bar" style="max-width:280px;">
+              <i class="fas fa-search"></i>
+              <input type="text" class="admin-search-input" id="selectionActivitySearch" placeholder="Search candidates…">
+            </div>
+          </div>
+
+          <!-- ===== Recent Selection & Offer Activity ===== -->
+          <h3 class="section__title" style="font-size:1.05rem;text-align:left;margin:1.5rem 0 1rem;">
+            <i class="fas fa-history" style="color:var(--primary);"></i>
+            Recent Selection &amp; Offer Activity
+            <span style="font-size:0.8rem;font-weight:400;color:var(--text-light);">(<?= (int) count($recentSelections) ?> latest)</span>
+          </h3>
+
+                    <?php if (empty($recentSelections)): ?>
+            <div class="admin-empty-state">
+              <div class="admin-empty-state__icon"><i class="fas fa-user-check"></i></div>
+              <h3>No Selection Activity Yet</h3>
+              <p style="color:var(--text-light);">No candidates have entered the selection pipeline. Once interviews are completed and selection decisions are recorded, they will appear here.</p>
+              <a href="<?= url('admin/interviews.php') ?>" class="btn btn--primary btn--sm"><i class="fas fa-calendar-check"></i> Go to Interviews</a>
+            </div>
+          <?php else: ?>
+            <div class="app-table-container">
+              <table class="app-table">
+                <thead>
+                  <tr>
+                    <th>Candidate</th>
+                    <th>Programme / Opportunity</th>
+                    <th>Selection Status</th>
+                    <th>Interview</th>
+                    <th>Date</th>
+                    <th class="app-actions">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($recentSelections as $rec): ?>
+                    <?php
+                      $recStatus        = $rec['status'] ?? 'draft';
+                      $recBadgeTone     = Application::badgeTone($recStatus);
+                      $recStatusLabel   = Application::label($recStatus);
+                      $recDecision      = $rec['decision'] ?? null;
+                      $recInterviewStatus = $rec['interview_status'] ?? null;
+                      $recInterviewLabel  = $recInterviewStatus ? Interview::label($recInterviewStatus) : 'Not interviewed';
+                      $recInterviewTone   = $recInterviewStatus ? Interview::badgeTone($recInterviewStatus) : 'muted';
+                      $activityDate = $rec['decision_at'] ?? $rec['offer_issued_at'] ?? $rec['updated_at'] ?? $rec['created_at'] ?? null;
+                      $actionHref = $rec['offer_id']
+                        ? url('admin/offer.php?id=' . (int) $rec['offer_id'])
+                        : url('admin/selection_decision.php?id=' . (int) $rec['id']);
+                    ?>
+                    <tr>
+                      <td>
+                        <div class="app-candidate">
+                          <div class="app-candidate__name"><?= e($rec['candidate_name'] ?? '—') ?></div>
+                          <div class="app-candidate__email"><?= e($rec['candidate_email'] ?? '') ?></div>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="app-opportunity">
+                          <div class="app-opportunity__title"><?= e($rec['opportunity_title'] ?? '—') ?></div>
+                          <div class="app-opportunity__programme"><?= e($rec['programme_name'] ?? '') ?></div>
+                        </div>
+                      </td>
+                      <td>
+                        <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                          <?php if ($recDecision): ?>
+                            <span class="sel-decision-badge sel-decision-badge--<?= $recDecision === 'selected' ? 'success' : ($recDecision === 'waitlisted' ? 'amber' : 'danger') ?>">
+                              <?= e(Selection::decisionLabel($recDecision)) ?>
+                            </span>
+                          <?php endif; ?>
+                          <span class="app-status-badge app-status-badge--<?= e($recBadgeTone) ?>"><?= e($recStatusLabel) ?></span>
+                        </div>
+                      </td>
+                      <td>
+                        <span class="tag tag--<?= e($recInterviewTone) ?>"><?= e($recInterviewLabel) ?></span>
+                      </td>
+                      <td class="app-date">
+                        <?= $activityDate ? e(format_date($activityDate, 'd M Y')) : '<span class="app-status-badge app-status-badge--muted">—</span>' ?>
+                      </td>
+                      <td class="app-actions">
+                        <a href="<?= $actionHref ?>" class="btn btn--primary btn--sm" title="View / Manage">
+                          <i class="fas fa-eye"></i> View
+                        </a>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
+
         </section>
 
         <!-- =============================================
@@ -2642,126 +3203,6 @@ $talentSkillsCategories = (int) ($talentSkillsCategoriesRow['cnt'] ?? 0);
           </div>
         </section>
 
-        <!-- ===== TALENT INTELLIGENCE HUB SECTION ===== -->
-        <section class="dash-section admin-section" id="admin-talent-hub" data-section="talent" style="margin-top:2rem;">
-          <div class="section__header" style="text-align:left;margin-bottom:1.5rem;">
-            <span class="section__badge">Talent Intelligence</span>
-            <h2 class="section__title" style="font-size:1.5rem;">Talent <span class="text-gradient">Intelligence Hub</span></h2>
-            <p class="section__text" style="font-size:0.9rem;">Search and discover candidates from the complete talent pool.</p>
-          </div>
-
-          <!-- Talent Filters -->
-          <div class="admin-talent-filters" style="background:var(--bg-white);border:1px solid var(--border);border-radius:14px;padding:1.25rem;margin-bottom:1.5rem;">
-            <div class="admin-talent-filters__row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.875rem;margin-bottom:1rem;">
-              <div>
-                <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;display:block;">Qualification Level</label>
-                <select id="talentQualificationFilter" class="admin-filter-select" style="width:100%;">
-                  <option value="">All Levels</option>
-                  <option value="certificate">Certificate</option>
-                  <option value="diploma">Diploma</option>
-                  <option value="degree">Degree</option>
-                  <option value="masters">Masters</option>
-                  <option value="phd">PhD</option>
-                </select>
-              </div>
-              <div>
-                <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;display:block;">Skills</label>
-                <select id="talentSkillsFilter" multiple style="width:100%;min-height:42px;">
-                  <?php foreach ($skills as $s): ?><option value="<?= e($s['name']) ?>"><?= e($s['name']) ?></option><?php endforeach; ?>
-                </select>
-              </div>
-              <div>
-                <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;display:block;">Location</label>
-                <select id="talentLocationFilter" class="admin-filter-select" style="width:100%;">
-                  <option value="">All Locations</option>
-                  <?php foreach ($cityList as $c): ?><option value="<?= e(strtolower(str_replace(' ', '-', trim($c)))) ?>"><?= e(trim($c)) ?></option><?php endforeach; ?>
-                </select>
-              </div>
-              <div>
-                <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;display:block;">Career Interest</label>
-                <select id="talentCareerFilter" class="admin-filter-select" style="width:100%;">
-                  <option value="">All Careers</option>
-                  <option value="software-development">Software Development</option>
-                  <option value="it-support">IT Support</option>
-                  <option value="data-analysis">Data Analysis</option>
-                  <option value="cybersecurity">Cybersecurity</option>
-                  <option value="networking">Networking</option>
-                </select>
-              </div>
-              <div>
-                <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;display:block;">Availability</label>
-                <select id="talentAvailabilityFilter" class="admin-filter-select" style="width:100%;">
-                  <option value="">All Statuses</option>
-                  <option value="unemployed">Unemployed</option>
-                  <option value="employed">Employed</option>
-                  <option value="recent-graduate">Recent Graduate</option>
-                </select>
-              </div>
-              <div>
-                <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;display:block;">Experience</label>
-                <select id="talentExperienceFilter" class="admin-filter-select" style="width:100%;">
-                  <option value="">Any Experience</option>
-                  <option value="none">No Experience</option>
-                  <option value="1-2">1-2 Years</option>
-                  <option value="3+">3+ Years</option>
-                </select>
-              </div>
-            </div>
-            <div class="admin-talent-filters__actions" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;">
-              <button class="btn btn--primary btn--sm" id="talentSearchBtn"><i class="fas fa-search"></i> Search Talent</button>
-              <button class="btn btn--outline btn--sm" id="talentSaveSearchBtn"><i class="fas fa-bookmark"></i> Save Search</button>
-              <button class="btn btn--outline btn--sm" id="talentExportBtn"><i class="fas fa-download"></i> Export</button>
-              <span class="admin-talent-filters__count" id="talentResultCount" style="margin-left:auto;font-size:0.8rem;color:var(--text-muted);">Showing <strong><?= count($initialCandidates) ?></strong> candidate<?= count($initialCandidates) !== 1 ? 's' : '' ?></span>
-            </div>
-          </div>
-
-          <!-- Talent Results Container -->
-          <div class="admin-talent-results" id="talentResultsContainer" style="display:grid;grid-template-columns:repeat(2,1fr);gap:1.25rem;">
-            <?php if (!empty($initialCandidates)): ?>
-              <?php foreach ($initialCandidates as $cand): ?>
-                <?php
-                  $cId = (int) $cand['id'];
-                  $cName = e($cand['first_name'] . ' ' . $cand['last_name']);
-                  $cTitle = e($cand['professional_title'] ?? 'Candidate');
-                  $cEmail = e($cand['email']);
-                  $cCompletion = (int) ($cand['completion_percent'] ?? 0);
-                  $cCity = e(strtolower(str_replace(' ', '-', $cand['city'] ?? '')));
-                  $cInitials = strtoupper(substr($cand['first_name'] ?? '', 0, 1) . substr($cand['last_name'] ?? '', 0, 1));
-                  $completionColor = $cCompletion >= 80 ? 'var(--success)' : ($cCompletion >= 50 ? 'var(--warning)' : 'var(--danger)');
-                ?>
-                <div class="admin-programme-card" style="flex-direction:column;align-items:stretch;gap:0.75rem;" data-city="<?= $cCity ?>" data-title="<?= e(strtolower($cTitle)) ?>" data-name="<?= e(strtolower($cName)) ?>">
-                  <div style="display:flex;align-items:center;gap:0.875rem;">
-                    <div style="width:48px;height:48px;border-radius:50%;background:var(--primary-bg);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;"><?= $cInitials ?></div>
-                    <div style="flex:1;min-width:0;">
-                      <div style="font-weight:700;color:var(--dark);"><?= $cName ?></div>
-                      <div style="font-size:0.8rem;color:var(--text-light);"><?= $cTitle ?></div>
-                      <div style="font-size:0.75rem;color:var(--text-lighter);"><?= $cEmail ?></div>
-                    </div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-light);">
-                    <i class="fas fa-map-marker-alt" style="color:var(--primary);font-size:0.7rem;"></i>
-                    <span><?= e($cand['city'] ?? 'Not specified') ?></span>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:0.5rem;margin-top:auto;">
-                    <div style="flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden;">
-                      <div style="width:<?= $cCompletion ?>%;height:100%;background:<?= $completionColor ?>;border-radius:3px;"></div>
-                    </div>
-                    <span style="font-size:0.75rem;font-weight:600;color:<?= $completionColor ?>;"><?= $cCompletion ?>%</span>
-                  </div>
-                  <a class="btn btn--primary btn--sm" href="<?= url('admin/candidate_profile.php?user_id=' . $cId) ?>" style="width:100%;justify-content:center;"><i class="fas fa-user"></i> View Profile</a>
-                </div>
-              <?php endforeach; ?>
-            <?php else: ?>
-              <div class="admin-empty-state" style="grid-column:1/-1;">
-                <div class="admin-empty-state__icon"><i class="fas fa-users"></i></div>
-                <h3>No candidates yet</h3>
-                <p>Candidates will appear here once they register on the platform.</p>
-              </div>
-            <?php endif; ?>
-          </div>
-        </section>
-
-
       </div><!-- // dash-content -->
 
       <!-- ===== DASHBOARD FOOTER ===== -->
@@ -2814,7 +3255,40 @@ $talentSkillsCategories = (int) ($talentSkillsCategoriesRow['cnt'] ?? 0);
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
 <script src="<?= url('js/script.js') ?>"></script>
-  <script src="<?= url('js/admin_dashboard.js') ?>"></script>
+  <script>
+  /* Live interview search — filters the server-rendered interview cards.
+     Defined here so it runs against the live DB-driven grid regardless of
+     any cached admin_dashboard.js behaviour. */
+  (function () {
+    function liveFilterInterviews(q) {
+      q = (q || '').toLowerCase().trim();
+      var grid = document.getElementById('adminInterviewGridLive');
+      if (!grid) return;
+      var cards = grid.querySelectorAll('.interview-card');
+      var visible = 0;
+      Array.prototype.forEach.call(cards, function (card) {
+        var hay = (card.getAttribute('data-search') || '').toLowerCase();
+        var show = !q || hay.indexOf(q) !== -1;
+        card.style.display = show ? '' : 'none';
+        if (show) visible++;
+      });
+      var emptyBox = document.getElementById('adminInterviewSearchEmptyLive');
+      if (emptyBox) emptyBox.style.display = visible === 0 ? '' : 'none';
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+      var search = document.getElementById('interviewSearch');
+      if (search) search.addEventListener('input', function () { liveFilterInterviews(this.value); });
+      var range = document.getElementById('interviewFilterDate');
+      if (range) range.addEventListener('change', function () {
+        var baseUrl = window.APP_URL || '';
+        window.location.href = baseUrl + '/admin/dashboard.php?interview_range='
+          + encodeURIComponent(this.value) + '#admin-interviews';
+      });
+    });
+    window.liveFilterInterviews = liveFilterInterviews;
+  })();
+  </script>
+  <script src="<?= url('js/admin_dashboard.js?v=20260916') ?>"></script>
   <script src="<?= url('js/admin_programmes.js') ?>"></script>
   <?= $flashes ?>
 </body>

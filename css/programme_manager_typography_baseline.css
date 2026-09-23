@@ -1,0 +1,42 @@
+
+/*
+ * Investhood typography baseline
+ * Source of truth: original Programme Manager visual language.
+ * This stylesheet deliberately changes typography only; layout, dark mode,
+ * notifications and clickable-card behaviour remain untouched.
+ */
+html, body,
+button, input, select, textarea {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Shared dashboard UI: retain role CSS hierarchy while preventing later
+   enhancement components from shrinking below the PM visual baseline. */
+.pm-navbar__heading span,
+.pm-navbar__user-copy strong,
+.pm-navbar__user-copy span,
+.pm-notification__head strong,
+.pm-notification__head span,
+.pm-notification__head a,
+.pm-notification__footer a,
+.pm-notification__copy strong,
+.pm-notification__copy span,
+.pm-notification__copy small,
+.pm-action-button,
+.pm-notification-page-copy strong,
+.pm-notification-page-copy span,
+.pm-notification-page-copy small {
+    font-size: inherit;
+}
+
+/* Mini-modal follows the dashboard's inherited Programme Manager typography. */
+.dashboard-mini-modal,
+.dashboard-mini-modal button,
+.dashboard-mini-modal a {
+    font-family: inherit;
+}
+.dashboard-mini-modal__eyebrow,
+.dashboard-mini-modal__summary,
+.dashboard-mini-modal__button {
+    font-size: inherit;
+}

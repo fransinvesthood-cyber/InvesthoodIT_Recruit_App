@@ -11,7 +11,13 @@ $user = current_user();
 $flashes = render_flashes();
 $conn = Database::getConnection();
 $currentPage = 'reports';
-$managerId = (int) ($user['user_id'] ?? 0);
+$pageTitle = 'Reports';
+$managerId = (int) ($user['id'] ?? $user['user_id'] ?? 0);
+
+if ($managerId <= 0) {
+    http_response_code(403);
+    exit('Invalid Programme Manager account.');
+}
 /*
 |--------------------------------------------------------------------------
 | Programme Statistics
@@ -247,6 +253,7 @@ if ($stmt) {
         rel="stylesheet"
         href="<?= url('css/styles.css') ?>"
     >
+  <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260920">
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
@@ -261,22 +268,7 @@ if ($stmt) {
         <!-- =================================================
              HEADER
         ================================================== -->
-        <header class="dash-header">
-            <div class="dash-header__left">
-                <h1 class="dash-header__title">
-                    Programme Reports
-                </h1>
-            </div>
-            <div class="dash-header__right">
-                <div class="dash-header__user">
-                    <img
-                        src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'PM+User') ?>&background=1a56db&color=fff&size=80"
-                        alt=""
-                        class="dash-header__avatar"
-                    >
-                </div>
-            </div>
-        </header>
+        <?php require __DIR__ . '/navbar.php'; ?>
         <!-- =================================================
              CONTENT
         ================================================== -->
@@ -613,5 +605,6 @@ if ($stmt) {
         </div>
     </main>
 </div>
+<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260920"></script>
 </body>
 </html>

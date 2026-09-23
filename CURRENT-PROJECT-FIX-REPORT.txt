@@ -1,0 +1,13 @@
+This package was rebuilt directly from the user's CURRENT XAMPP project ZIP, not from the previously generated package.
+
+Implemented:
+1. Programme Manager dark mode assets and controls on every actual Programme Manager page.
+2. Theme JS now targets the actual #portalSidebar/.sidebar markup.
+3. Dark mode covers actual PM page classes: dashboard, dash-content/header, overview cards, tables, filters/forms and sidebar.
+4. Dashboard card modal assets load through all six role layouts and PM dashboard.
+5. Finance Officer has responsive current-layout overrides for cards, hero, actions and tables.
+6. Existing role scoping remains intact; ACTUAL-DATA-DEPENDENCIES.txt records dashboard table dependencies.
+
+Validation:
+PHP files: 296; failures: 0
+JS files: 25; failures: 0

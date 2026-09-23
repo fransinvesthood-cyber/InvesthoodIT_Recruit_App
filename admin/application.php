@@ -462,9 +462,17 @@ function format_app_date($date, $format = 'd M Y, H:i') {
               <h2 class="app-section__title"><i class="fas fa-file-alt"></i> Documents</h2>
             </div>
             <?php
-            // Merge application-specific documents with candidate documents
+            // Merge application-specific documents with candidate documents.
+            // Tag each row with its origin table so the View/Download
+            // handlers can fetch from the correct table even when both
+            // tables use overlapping auto-increment IDs.
+            foreach ($documents as &$d) { $d['__source'] = 'application'; }
+            unset($d);
+            foreach ($candidateDocuments as &$d) { $d['__source'] = 'candidate'; }
+            unset($d);
             $allDocuments = array_merge($documents, $candidateDocuments);
-            // Remove duplicates based on stored_filename
+            // Remove duplicates based on stored_filename (reused profile docs
+            // share the same physical file — keep the application copy first).
             $uniqueDocs = [];
             foreach ($allDocuments as $doc) {
                 $key = $doc['stored_filename'] ?? $doc['id'];
@@ -478,11 +486,17 @@ function format_app_date($date, $format = 'd M Y, H:i') {
               <p class="app-empty__text">No documents uploaded.</p>
             </div>
             <?php else: ?>
-              <?php foreach ($uniqueDocs as $doc): ?>
+              <?php foreach ($uniqueDocs as $doc):
+                $docSource = $doc['__source'] ?? 'application';
+                $docId = (int) ($doc['id'] ?? 0);
+                $viewUrl = url('admin/document_view.php?id=' . $docId . '&source=' . $docSource . '&token=' . csrf_token());
+                $downloadUrl = url('admin/document_download.php?id=' . $docId . '&source=' . $docSource . '&token=' . csrf_token());
+                $isPdf = strpos($doc['mime_type'] ?? '', 'pdf') !== false;
+              ?>
               <div class="app-document-row">
                 <div class="app-document-info">
                   <div class="app-document__icon">
-                    <i class="fas fa-file-<?= strpos($doc['mime_type'] ?? '', 'pdf') !== false ? 'pdf' : 'alt' ?>"></i>
+                    <i class="fas fa-file-<?= $isPdf ? 'pdf' : 'alt' ?>"></i>
                   </div>
                   <div class="app-document__details">
                     <div class="app-document__name"><?= e($doc['original_filename'] ?? 'Document') ?></div>
@@ -493,7 +507,13 @@ function format_app_date($date, $format = 'd M Y, H:i') {
                   </div>
                 </div>
                 <div class="app-document__actions">
-                  <a href="<?= url('admin/document_download.php?id=' . (int) $doc['id'] . '&token=' . csrf_token()) ?>" class="btn btn--ghost btn--sm" title="Download">
+                  <button type="button" class="btn btn--ghost btn--sm app-doc-view-btn" title="View document"
+                    data-doc-view="<?= e($viewUrl) ?>"
+                    data-doc-name="<?= e($doc['original_filename'] ?? 'Document') ?>"
+                    data-doc-download="<?= e($downloadUrl) ?>">
+                    <i class="fas fa-eye"></i> View
+                  </button>
+                  <a href="<?= e($downloadUrl) ?>" class="btn btn--ghost btn--sm" title="Download">
                     <i class="fas fa-download"></i> Download
                   </a>
                 </div>
@@ -501,6 +521,32 @@ function format_app_date($date, $format = 'd M Y, H:i') {
               <?php endforeach; ?>
             <?php endif; ?>
           </section>
+
+          <!-- ===== DOCUMENT VIEWER MODAL ===== -->
+          <div class="app-doc-viewer" id="docViewerModal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="docViewerTitle">
+            <div class="app-doc-viewer__overlay" data-doc-viewer-close></div>
+            <div class="app-doc-viewer__panel">
+              <div class="app-doc-viewer__header">
+                <div class="app-doc-viewer__title" id="docViewerTitle">
+                  <i class="fas fa-file-alt"></i> <span id="docViewerName">Document</span>
+                </div>
+                <div class="app-doc-viewer__header-actions">
+                  <a href="#" id="docViewerDownload" class="btn btn--ghost btn--sm" title="Download this document">
+                    <i class="fas fa-download"></i> Download
+                  </a>
+                  <a href="#" id="docViewerNewTab" class="btn btn--ghost btn--sm" title="Open in new tab" target="_blank" rel="noopener noreferrer">
+                    <i class="fas fa-external-link-alt"></i> New Tab
+                  </a>
+                  <button type="button" class="btn btn--ghost btn--sm" data-doc-viewer-close aria-label="Close viewer">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="app-doc-viewer__body">
+                <iframe id="docViewerFrame" title="Document viewer" src="" frameborder="0"></iframe>
+              </div>
+            </div>
+          </div>
 
           <!-- ===== APPLICATION TIMELINE ===== -->
           <section class="app-section">

@@ -10,8 +10,13 @@ require_role('programme_manager');
 $user = current_user();
 $flashes = render_flashes();
 $conn = Database::getConnection();
-$currentPage = 'cohorts';
-$managerId = (int)($user['user_id'] ?? 0);
+$currentPage = 'cohort_candidates';
+$pageTitle = 'Cohort Candidates';
+$managerId = (int)($user['id'] ?? $user['user_id'] ?? 0);
+if ($managerId <= 0) {
+    http_response_code(403);
+    exit('Invalid Programme Manager account.');
+}
 $cohortId  = (int)($_GET['cohort_id'] ?? 0);
 if ($cohortId <= 0) {
     header('Location: ' . url('programme/cohorts.php'));
@@ -141,21 +146,75 @@ $stmt->close();
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260920">
+
+<style>
+/* Cohort Candidates: dedicated record cards; do not inherit overview-card sizing */
+.cohort-candidate-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:14px;
+    margin-top:1rem;
+    width:100%;
+}
+.cohort-candidate-card{
+    min-width:0;
+    padding:16px;
+    border:1px solid #e2e8f0;
+    border-radius:14px;
+    background:#fff;
+    box-shadow:0 2px 8px rgba(15,23,42,.05);
+    box-sizing:border-box;
+    overflow:hidden;
+}
+.cohort-candidate-card__body{min-width:0;width:100%}
+.cohort-candidate-card__identity{
+    display:grid;
+    grid-template-columns:48px minmax(0,1fr);
+    gap:12px;
+    align-items:center;
+    min-width:0;
+}
+.cohort-candidate-card__avatar{
+    width:48px;
+    height:48px;
+    border-radius:50%;
+    object-fit:cover;
+    display:block;
+}
+.cohort-candidate-card__person{min-width:0}
+.cohort-candidate-card__name{
+    font-weight:700;
+    line-height:1.3;
+    overflow-wrap:break-word;
+}
+.cohort-candidate-card__email{
+    margin-top:3px;
+    font-size:.86rem;
+    color:#64748b;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+@media(max-width:1100px){
+    .cohort-candidate-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:650px){
+    .cohort-candidate-grid{grid-template-columns:1fr}
+}
+body.dark-mode .cohort-candidate-card{
+    background:#111827;
+    border-color:#334155;
+}
+body.dark-mode .cohort-candidate-card__email{color:#94a3b8}
+</style>
+
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
 <?php require __DIR__.'/sidebar.php'; ?>
 <main class="dashboard__main">
-<header class="dash-header">
-<div class="dash-header__left">
-<h1 class="dash-header__title">Cohort Candidates</h1>
-</div>
-<div class="dash-header__right">
-<img
-src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname']) ?>&background=1a56db&color=fff&size=80"
-class="dash-header__avatar">
-</div>
-</header>
+<?php require __DIR__ . '/navbar.php'; ?>
 <div class="dash-content">
 <?= $flashes ?>
 <div class="welcome-card">
@@ -299,21 +358,17 @@ Assign Candidates
 </div>
 </div>
 <?php else: ?>
-<div class="overview-grid" style="margin-top:1rem;">
+<div class="cohort-candidate-grid">
 <?php foreach($candidates as $candidate): ?>
-<div class="overview-card">
-<div class="overview-card__info">
-<div style="display:flex;gap:1rem;align-items:center;">
+<div class="cohort-candidate-card">
+<div class="cohort-candidate-card__body">
+<div class="cohort-candidate-card__identity">
 <img
 src="https://ui-avatars.com/api/?name=<?= urlencode($candidate['first_name'].' '.$candidate['last_name']) ?>&background=1a56db&color=fff"
-style="width:50px;height:34px;border-radius:50%;">
-<div>
-<div style="font-weight:700;">
-<?= e($candidate['first_name'].' '.$candidate['last_name']) ?>
-</div>
-<div style="font-size:.9rem;color:#64748b;">
-<?= e($candidate['email']) ?>
-</div>
+class="cohort-candidate-card__avatar" alt="">
+<div class="cohort-candidate-card__person">
+<div class="cohort-candidate-card__name"><?= e(trim($candidate['first_name'].' '.$candidate['last_name'])) ?></div>
+<div class="cohort-candidate-card__email" title="<?= e($candidate['email']) ?>"><?= e($candidate['email']) ?></div>
 </div>
 </div>
 <div style="margin-top:1rem;font-size:.9rem;">
@@ -352,5 +407,6 @@ Update
 </div>
 </main>
 </div>
+<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260920"></script>
 </body>
 </html>

@@ -40,7 +40,8 @@ require_role('programme_manager');
 $user = current_user();
 $flashes = render_flashes();
 $conn = Database::getConnection();
-$currentPage = 'programmes';
+$currentPage = 'assign_supervisor';
+$pageTitle = 'Assign Supervisor';
 /*
 |--------------------------------------------------------------------------
 | Current Programme Manager
@@ -176,7 +177,8 @@ if (!$cohort) {
             href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
             crossorigin="anonymous"
         >
-    </head>
+      <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260920">
+</head>
     <body class="dashboard-page">
     <div class="dashboard">
         <?php require __DIR__ . '/sidebar.php'; ?>
@@ -220,7 +222,8 @@ if (!$cohort) {
             </div>
         </main>
     </div>
-    </body>
+    <script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260920"></script>
+</body>
     </html>
     <?php
     exit;
@@ -231,6 +234,14 @@ if (!$cohort) {
 |--------------------------------------------------------------------------
 */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (function_exists('verify_csrf_token')) {
+        $csrfToken = (string) ($_POST['csrf_token'] ?? '');
+        if ($csrfToken === '' || !verify_csrf_token($csrfToken)) {
+            $_SESSION['flash_error'] = 'Your session has expired. Please try again.';
+            header('Location: ' . url('programme/assign_supervisor.php?cohort_id=' . (int) $cohortId));
+            exit;
+        }
+    }
     /*
     |--------------------------------------------------------------------------
     | Selected Supervisor
@@ -486,6 +497,7 @@ $stmt->close();
         rel="stylesheet"
         href="<?= url('css/styles.css') ?>"
     >
+    <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260920">
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
@@ -500,22 +512,7 @@ $stmt->close();
         <!-- =================================================
              HEADER
         ================================================== -->
-        <header class="dash-header">
-            <div class="dash-header__left">
-                <h1 class="dash-header__title">
-                    Assign Supervisor
-                </h1>
-            </div>
-            <div class="dash-header__right">
-                <div class="dash-header__user">
-                    <img
-                        src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Programme Manager') ?>&background=1a56db&color=fff&size=80"
-                        alt=""
-                        class="dash-header__avatar"
-                    >
-                </div>
-            </div>
-        </header>
+        <?php require __DIR__ . '/navbar.php'; ?>
         <!-- =================================================
              CONTENT
         ================================================== -->
@@ -745,6 +742,9 @@ $stmt->close();
                                 name="cohort_id"
                                 value="<?= (int) $cohort['cohort_id'] ?>"
                             >
+                            <?php if (function_exists('csrf_token')): ?>
+                                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                            <?php endif; ?>
                             <div
                                 style="
                                     max-width:650px;
@@ -874,5 +874,6 @@ $stmt->close();
         </div>
     </main>
 </div>
+<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260920"></script>
 </body>
 </html>

@@ -91,11 +91,12 @@ $flashes = render_flashes();
         <ul class="sidebar__menu">
           <li><a href="<?= url('admin/programmes.php') ?>" class="sidebar__link"><i class="fas fa-graduation-cap"></i> Programmes</a></li>
           <li><a href="<?= url('admin/opportunities.php') ?>" class="sidebar__link"><i class="fas fa-briefcase"></i> Opportunities</a></li>
-          <li><a href="<?= url('admin/applications.php') ?>" class="sidebar__link active"><i class="fas fa-file-alt"></i> Applications</a></li>
-        </ul>
+                                      <li><a href="<?= url('admin/applications.php') ?>" class="sidebar__link active"><i class="fas fa-file-alt"></i> Applications</a></li>
+                  </ul>
         <div class="sidebar__section-label">Operations</div>
         <ul class="sidebar__menu">
-          <li><a href="<?= url('admin/dashboard.php') ?>" class="sidebar__link"><i class="fas fa-history"></i> Audit Log</a></li>
+          <li><a href="<?= url('admin/selection.php') ?>" class="sidebar__link"><i class="fas fa-user-check"></i> Selection &amp; Offers</a></li>
+                    <li><a href="<?= url('admin/dashboard.php') ?>" class="sidebar__link"><i class="fas fa-history"></i> Audit Log</a></li>
         </ul>
       </nav>
       <div class="sidebar__footer">

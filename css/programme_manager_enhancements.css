@@ -1,0 +1,1636 @@
+/* =========================================================
+   PROGRAMME MANAGER
+   DARK MODE + NAVBAR + NOTIFICATIONS + RESPONSIVE SIDEBAR
+   ========================================================= */
+
+/* =========================================================
+   THEME VARIABLES
+   ========================================================= */
+
+:root {
+    --pm-bg: #f5f7fb;
+    --pm-surface: #ffffff;
+    --pm-soft: #f8fafc;
+    --pm-text: #101828;
+    --pm-text-2: #344054;
+    --pm-muted: #667085;
+    --pm-border: #e4e7ec;
+    --pm-primary: #2563eb;
+    --pm-primary-soft: #eff6ff;
+    --pm-shadow: 0 16px 40px rgba(16, 24, 40, .08);
+
+    --pm-sidebar-width: 260px;
+    --pm-sidebar-collapsed-width: 72px;
+}
+
+
+/* =========================================================
+   DARK MODE VARIABLES
+   ========================================================= */
+
+html[data-theme="dark"] {
+    color-scheme: dark;
+
+    --pm-bg: #07101d;
+    --pm-surface: #101828;
+    --pm-soft: #151f2e;
+    --pm-text: #f8fafc;
+    --pm-text-2: #e4e7ec;
+    --pm-muted: #98a2b3;
+    --pm-border: rgba(255, 255, 255, .09);
+    --pm-primary: #60a5fa;
+    --pm-primary-soft: rgba(37, 99, 235, .16);
+    --pm-shadow: 0 18px 48px rgba(0, 0, 0, .28);
+}
+
+
+/* =========================================================
+   GLOBAL PROGRAMME MANAGER LAYOUT
+   ========================================================= */
+
+html,
+body {
+    width: 100%;
+    min-height: 100%;
+}
+
+body.dashboard-page {
+    margin: 0;
+    overflow-x: hidden;
+}
+
+.dashboard {
+    width: 100%;
+    min-height: 100vh;
+}
+
+.dashboard__main {
+    min-width: 0;
+}
+
+.dash-content {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+
+/* =========================================================
+   DARK MODE - PAGE
+   ========================================================= */
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] body.dashboard-page,
+html[data-theme="dark"] .dashboard,
+html[data-theme="dark"] .dashboard__main,
+html[data-theme="dark"] .dash-content,
+html[data-theme="dark"] .pm-main {
+    background: var(--pm-bg) !important;
+    color: var(--pm-text) !important;
+}
+
+
+/* =========================================================
+   DARK MODE - CARDS
+   ========================================================= */
+
+html[data-theme="dark"] .overview-card,
+html[data-theme="dark"] .welcome-card,
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .dashboard-card,
+html[data-theme="dark"] .programme-card,
+html[data-theme="dark"] .cohort-card,
+html[data-theme="dark"] .candidate-card,
+html[data-theme="dark"] .detail-card,
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] .content-card,
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .table-container,
+html[data-theme="dark"] .table-wrapper,
+html[data-theme="dark"] .table-responsive,
+html[data-theme="dark"] .candidate-table-wrapper,
+html[data-theme="dark"] .modal-content,
+html[data-theme="dark"] .pm-notifications-card {
+    background: var(--pm-surface) !important;
+    color: var(--pm-text) !important;
+    border-color: var(--pm-border) !important;
+}
+
+
+/* =========================================================
+   DARK MODE - TEXT
+   ========================================================= */
+
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3,
+html[data-theme="dark"] h4,
+html[data-theme="dark"] h5,
+html[data-theme="dark"] h6,
+html[data-theme="dark"] strong,
+html[data-theme="dark"] label,
+html[data-theme="dark"] .overview-card__value,
+html[data-theme="dark"] .overview-card__label {
+    color: var(--pm-text) !important;
+}
+
+html[data-theme="dark"] p,
+html[data-theme="dark"] small,
+html[data-theme="dark"] .text-muted,
+html[data-theme="dark"] .muted,
+html[data-theme="dark"] .overview-card__subtitle {
+    color: var(--pm-muted) !important;
+}
+
+
+/* =========================================================
+   DARK MODE - TABLES
+   ========================================================= */
+
+html[data-theme="dark"] table,
+html[data-theme="dark"] thead,
+html[data-theme="dark"] tbody,
+html[data-theme="dark"] tr,
+html[data-theme="dark"] th,
+html[data-theme="dark"] td {
+    color: var(--pm-text-2) !important;
+    border-color: var(--pm-border) !important;
+}
+
+html[data-theme="dark"] th,
+html[data-theme="dark"] .candidate-table th {
+    background: #111827 !important;
+    color: #f8fafc !important;
+}
+
+html[data-theme="dark"] td,
+html[data-theme="dark"] .candidate-table td {
+    background: var(--pm-surface) !important;
+}
+
+
+/* =========================================================
+   DARK MODE - FORM CONTROLS
+   ========================================================= */
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] .form-control,
+html[data-theme="dark"] .form-select {
+    background: var(--pm-soft) !important;
+    color: var(--pm-text) !important;
+    border-color: var(--pm-border) !important;
+}
+
+
+/* =========================================================
+   PROGRAMME MANAGER NAVBAR
+   ========================================================= */
+
+.pm-navbar {
+    min-height: 72px;
+    position: sticky;
+    top: 0;
+    z-index: 1050;
+
+    padding: 0 24px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 18px;
+
+    border-bottom: 1px solid var(--pm-border);
+
+    background: rgba(255, 255, 255, .94);
+
+    backdrop-filter: blur(16px);
+}
+
+html[data-theme="dark"] .pm-navbar {
+    background: rgba(16, 24, 40, .94) !important;
+    border-color: var(--pm-border) !important;
+    color: var(--pm-text) !important;
+}
+
+.pm-navbar__left,
+.pm-navbar__right {
+    display: flex;
+    align-items: center;
+}
+
+.pm-navbar__left {
+    gap: 12px;
+    min-width: 0;
+}
+
+.pm-navbar__right {
+    gap: 9px;
+}
+
+
+/* =========================================================
+   NAVBAR MENU BUTTON
+   ========================================================= */
+
+.pm-navbar__menu {
+    width: 40px;
+    height: 40px;
+
+    display: grid;
+    place-items: center;
+
+    border: 1px solid var(--pm-border);
+    border-radius: 11px;
+
+    background: var(--pm-surface);
+    color: var(--pm-muted);
+
+    cursor: pointer;
+}
+
+.pm-navbar__menu:hover {
+    background: var(--pm-primary-soft);
+    color: var(--pm-primary);
+}
+
+
+/* =========================================================
+   NAVBAR HEADING
+   ========================================================= */
+
+.pm-navbar__heading {
+    min-width: 0;
+}
+
+.pm-navbar__heading span {
+    display: block;
+
+    color: var(--pm-muted);
+
+    font-size: 11px;
+    font-weight: 700;
+
+    text-transform: uppercase;
+    letter-spacing: .07em;
+}
+
+.pm-navbar__heading h1 {
+    margin: 2px 0 0;
+
+    color: var(--pm-text);
+
+    font-size: 18px;
+    font-weight: 800;
+}
+
+
+/* =========================================================
+   NAVBAR BUTTONS
+   ========================================================= */
+
+.pm-navbar__button {
+    width: 40px;
+    height: 40px;
+
+    display: grid;
+    place-items: center;
+
+    position: relative;
+
+    border: 1px solid var(--pm-border);
+    border-radius: 11px;
+
+    background: var(--pm-surface);
+    color: var(--pm-muted);
+
+    cursor: pointer;
+}
+
+.pm-navbar__button:hover {
+    background: var(--pm-primary-soft);
+    color: var(--pm-primary);
+}
+
+
+/* =========================================================
+   NAVBAR USER
+   ========================================================= */
+
+.pm-navbar__user {
+    margin-left: 2px;
+    padding: 4px 9px 4px 4px;
+
+    display: flex;
+    align-items: center;
+
+    gap: 9px;
+
+    border: 1px solid var(--pm-border);
+    border-radius: 12px;
+
+    background: var(--pm-surface);
+}
+
+.pm-navbar__avatar {
+    width: 32px;
+    height: 32px;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 9px;
+
+    background: linear-gradient(
+        135deg,
+        #2563eb,
+        #7c3aed
+    );
+
+    color: #fff;
+
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.pm-navbar__user-copy strong {
+    display: block;
+
+    color: var(--pm-text);
+
+    font-size: 11px;
+}
+
+.pm-navbar__user-copy span {
+    display: block;
+
+    margin-top: 2px;
+
+    color: var(--pm-muted);
+
+    font-size: 9px;
+}
+
+
+/* =========================================================
+   NOTIFICATIONS
+   ========================================================= */
+
+.pm-notification {
+    position: relative;
+}
+
+.pm-notification__badge {
+    position: absolute;
+
+    right: -5px;
+    top: -6px;
+
+    min-width: 18px;
+    height: 18px;
+
+    padding: 0 4px;
+
+    display: grid;
+    place-items: center;
+
+    border: 2px solid var(--pm-surface);
+    border-radius: 999px;
+
+    background: #dc2626;
+    color: #fff;
+
+    font-size: 8px;
+    font-weight: 800;
+}
+
+.pm-notification__dropdown {
+    width: 350px;
+
+    position: absolute;
+
+    right: 0;
+    top: calc(100% + 12px);
+
+    visibility: hidden;
+    opacity: 0;
+
+    transform: translateY(-6px);
+
+    pointer-events: none;
+
+    border: 1px solid var(--pm-border);
+    border-radius: 16px;
+
+    background: var(--pm-surface);
+
+    box-shadow: var(--pm-shadow);
+
+    overflow: hidden;
+
+    transition: .18s ease;
+}
+
+.pm-notification__dropdown.is-open {
+    visibility: visible;
+    opacity: 1;
+
+    transform: none;
+
+    pointer-events: auto;
+}
+
+.pm-notification__head {
+    padding: 15px;
+
+    display: flex;
+    justify-content: space-between;
+
+    gap: 12px;
+
+    border-bottom: 1px solid var(--pm-border);
+}
+
+.pm-notification__head strong {
+    display: block;
+
+    color: var(--pm-text);
+
+    font-size: 12px;
+}
+
+.pm-notification__head span {
+    display: block;
+
+    margin-top: 3px;
+
+    color: var(--pm-muted);
+
+    font-size: 10px;
+}
+
+.pm-notification__head a,
+.pm-notification__footer a {
+    color: var(--pm-primary);
+
+    font-size: 10px;
+    font-weight: 800;
+
+    text-decoration: none;
+}
+
+.pm-notification__list {
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.pm-notification__item {
+    padding: 13px 15px;
+
+    display: flex;
+
+    gap: 11px;
+
+    border-bottom: 1px solid var(--pm-border);
+
+    color: var(--pm-text);
+
+    text-decoration: none;
+}
+
+.pm-notification__item:hover {
+    background: var(--pm-soft);
+}
+
+.pm-notification__item.is-unread {
+    background: var(--pm-primary-soft);
+}
+
+.pm-notification__icon,
+.pm-notification-page-icon {
+    width: 36px;
+    height: 36px;
+
+    flex: 0 0 36px;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 10px;
+
+    background: var(--pm-primary-soft);
+    color: var(--pm-primary);
+}
+
+.pm-notification__copy {
+    min-width: 0;
+}
+
+.pm-notification__copy strong,
+.pm-notification__copy span,
+.pm-notification__copy small {
+    display: block;
+}
+
+.pm-notification__copy strong {
+    color: var(--pm-text);
+
+    font-size: 10px;
+}
+
+.pm-notification__copy span {
+    margin-top: 4px;
+
+    color: var(--pm-muted);
+
+    font-size: 9px;
+    line-height: 1.45;
+}
+
+.pm-notification__copy small {
+    margin-top: 5px;
+
+    color: var(--pm-muted);
+
+    font-size: 8px;
+}
+
+.pm-notification__footer {
+    padding: 11px 15px;
+
+    text-align: center;
+}
+
+
+/* =========================================================
+   VIEW ALL NOTIFICATIONS BUTTON
+   ========================================================= */
+
+.pm-notification__view-all {
+    width: 100%;
+
+    padding: 12px 16px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 8px;
+
+    border: 0;
+
+    background: transparent;
+    color: var(--pm-primary);
+
+    cursor: pointer;
+
+    font: inherit;
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   NOTIFICATION MODAL
+   ========================================================= */
+
+.pm-all-notifications {
+    display: none;
+
+    position: fixed;
+    inset: 0;
+
+    z-index: 5000;
+
+    padding: 20px;
+
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(15, 23, 42, .58);
+
+    backdrop-filter: blur(5px);
+}
+
+.pm-all-notifications.is-open {
+    display: flex;
+}
+
+.pm-all-notifications__dialog {
+    width: min(620px, 100%);
+    max-height: min(
+        720px,
+        calc(100vh - 40px)
+    );
+
+    display: flex;
+    flex-direction: column;
+
+    background: var(--pm-surface);
+    color: var(--pm-text);
+
+    border: 1px solid var(--pm-border);
+    border-radius: 20px;
+
+    box-shadow: 0 28px 80px rgba(0, 0, 0, .28);
+
+    overflow: hidden;
+}
+
+.pm-all-notifications__head,
+.pm-all-notifications__footer {
+    padding: 16px 20px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 16px;
+}
+
+.pm-all-notifications__head {
+    border-bottom: 1px solid var(--pm-border);
+}
+
+.pm-all-notifications__head span {
+    color: var(--pm-muted);
+
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.pm-all-notifications__head h2 {
+    margin: 3px 0 0;
+
+    font-size: 20px;
+}
+
+.pm-all-notifications__head button {
+    width: 38px;
+    height: 38px;
+
+    border: 1px solid var(--pm-border);
+    border-radius: 10px;
+
+    background: var(--pm-soft);
+    color: var(--pm-text);
+
+    cursor: pointer;
+}
+
+.pm-all-notifications__body {
+    overflow: auto;
+
+    padding: 8px;
+}
+
+.pm-all-notifications__item {
+    padding: 14px;
+
+    display: flex;
+
+    gap: 12px;
+
+    border-bottom: 1px solid var(--pm-border);
+    border-radius: 10px;
+}
+
+.pm-all-notifications__item.is-unread {
+    background: var(--pm-primary-soft);
+}
+
+.pm-all-notifications__footer {
+    border-top: 1px solid var(--pm-border);
+
+    color: var(--pm-muted);
+
+    font-size: 12px;
+}
+
+.pm-all-notifications__footer button {
+    padding: 9px 16px;
+
+    border: 0;
+    border-radius: 9px;
+
+    background: var(--pm-primary);
+    color: #fff;
+
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+body.pm-modal-open {
+    overflow: hidden;
+}
+
+
+/* =========================================================
+   NOTIFICATIONS PAGE
+   ========================================================= */
+
+.pm-page-content {
+    width: 100%;
+    max-width: 1500px;
+
+    margin: 0 auto;
+    padding: 28px;
+
+    box-sizing: border-box;
+}
+
+.pm-page-heading {
+    margin-bottom: 20px;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+
+    gap: 20px;
+}
+
+.pm-page-heading > div > span {
+    color: var(--pm-primary);
+
+    font-size: 11px;
+    font-weight: 800;
+
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+
+.pm-page-heading h2 {
+    margin: 5px 0;
+
+    color: var(--pm-text);
+}
+
+.pm-page-heading p {
+    margin: 0;
+
+    color: var(--pm-muted);
+}
+
+.pm-action-button {
+    padding: 10px 14px;
+
+    display: inline-flex;
+    align-items: center;
+
+    gap: 7px;
+
+    border-radius: 10px;
+
+    background: var(--pm-primary);
+    color: #fff;
+
+    text-decoration: none;
+
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.pm-notifications-card {
+    border: 1px solid var(--pm-border);
+    border-radius: 16px;
+
+    background: var(--pm-surface);
+
+    box-shadow: var(--pm-shadow);
+
+    overflow: hidden;
+}
+
+.pm-notification-page-item {
+    padding: 15px 18px;
+
+    display: flex;
+
+    gap: 12px;
+
+    border-bottom: 1px solid var(--pm-border);
+
+    color: var(--pm-text);
+
+    text-decoration: none;
+}
+
+.pm-notification-page-item:last-child {
+    border-bottom: 0;
+}
+
+.pm-notification-page-item:hover {
+    background: var(--pm-soft);
+}
+
+.pm-notification-page-item.is-unread {
+    background: var(--pm-primary-soft);
+}
+
+.pm-notification-page-copy strong,
+.pm-notification-page-copy span,
+.pm-notification-page-copy small {
+    display: block;
+}
+
+.pm-notification-page-copy strong {
+    font-size: 12px;
+}
+
+.pm-notification-page-copy span {
+    margin-top: 4px;
+
+    color: var(--pm-muted);
+
+    font-size: 10px;
+    line-height: 1.5;
+}
+
+.pm-notification-page-copy small {
+    margin-top: 6px;
+
+    color: var(--pm-muted);
+
+    font-size: 9px;
+}
+
+
+/* =========================================================
+   PROGRAMME MANAGER ORIGINAL SIDEBAR
+   ========================================================= */
+
+html[data-theme="dark"] .sidebar {
+    background: #111827 !important;
+
+    color: #f8fafc !important;
+
+    border-color: #334155 !important;
+}
+
+html[data-theme="dark"] .sidebar__header,
+html[data-theme="dark"] .sidebar__footer {
+    border-color: #334155 !important;
+}
+
+html[data-theme="dark"] .sidebar__section-label,
+html[data-theme="dark"] .sidebar__user-role {
+    color: #94a3b8 !important;
+}
+
+html[data-theme="dark"] .sidebar__user-name {
+    color: #f8fafc !important;
+}
+
+html[data-theme="dark"] .sidebar__link,
+html[data-theme="dark"] .sidebar__logout {
+    color: #cbd5e1 !important;
+}
+
+html[data-theme="dark"] .sidebar__link:hover,
+html[data-theme="dark"] .sidebar__link.active {
+    background: #1e3a8a !important;
+    color: #fff !important;
+}
+
+
+/* =========================================================
+   INLINE LEGACY CONTROLS
+   ========================================================= */
+
+.pm-inline-control {
+    width: 40px;
+    height: 40px;
+
+    margin-right: 7px;
+
+    border: 1px solid var(--pm-border);
+    border-radius: 10px;
+
+    background: var(--pm-surface);
+    color: var(--pm-text);
+
+    cursor: pointer;
+}
+
+
+/* =========================================================
+   PROGRAMME / COHORT DETAIL PAGES
+   ========================================================= */
+
+html[data-theme="dark"] .welcome-card *,
+html[data-theme="dark"] .programme-card *,
+html[data-theme="dark"] .cohort-card *,
+html[data-theme="dark"] .detail-card * {
+    border-color: var(--pm-border);
+}
+
+html[data-theme="dark"] .dash-content a:not(.btn):not(.sidebar__link) {
+    color: #93c5fd;
+}
+
+html[data-theme="dark"] .dash-content hr {
+    border-color: var(--pm-border);
+}
+
+
+/* =========================================================
+   CONTENT WIDTH FIX
+   ========================================================= */
+
+/*
+ * This is the important fix.
+ *
+ * The old code only changed margin-left when the sidebar
+ * collapsed. The content therefore moved left but could
+ * retain its old width.
+ *
+ * We change BOTH margin-left and width.
+ */
+
+@media (min-width: 1024px) {
+
+    .dashboard__main {
+        margin-left: var(--pm-sidebar-width);
+
+        width: calc(
+            100% - var(--pm-sidebar-width)
+        );
+
+        max-width: none;
+
+        min-width: 0;
+
+        box-sizing: border-box;
+
+        transition:
+            margin-left .25s ease,
+            width .25s ease;
+    }
+
+
+    /* =====================================================
+       SIDEBAR COLLAPSED
+       ===================================================== */
+
+    body.portal-sidebar-collapsed .sidebar {
+        width: var(
+            --pm-sidebar-collapsed-width
+        ) !important;
+    }
+
+    body.portal-sidebar-collapsed .dashboard__main {
+        margin-left:
+            var(--pm-sidebar-collapsed-width)
+            !important;
+
+        width: calc(
+            100% -
+            var(--pm-sidebar-collapsed-width)
+        ) !important;
+
+        max-width: none !important;
+    }
+
+
+    /* =====================================================
+       HIDE SIDEBAR TEXT
+       ===================================================== */
+
+    body.portal-sidebar-collapsed
+    .sidebar__section-label,
+
+    body.portal-sidebar-collapsed
+    .logo__text,
+
+    body.portal-sidebar-collapsed
+    .sidebar__user-info {
+
+        display: none !important;
+    }
+
+
+    body.portal-sidebar-collapsed
+    .sidebar__link {
+
+        justify-content: center !important;
+
+        font-size: 0 !important;
+    }
+
+
+    body.portal-sidebar-collapsed
+    .sidebar__link i {
+
+        margin: 0 !important;
+
+        font-size: .95rem !important;
+    }
+
+
+    body.portal-sidebar-collapsed
+    .sidebar__logout {
+
+        justify-content: center;
+    }
+
+
+    /* =====================================================
+       CONTENT MUST EXPAND
+       ===================================================== */
+
+    body.portal-sidebar-collapsed
+    .dash-content,
+
+    body.portal-sidebar-collapsed
+    .pm-page-content {
+
+        width: 100% !important;
+
+        max-width: none !important;
+    }
+}
+
+
+/* =========================================================
+   DASHBOARD GRIDS
+   ========================================================= */
+
+.overview-grid,
+.programme-grid,
+.cohort-grid,
+.candidate-grid,
+.dashboard-grid {
+    width: 100%;
+    max-width: none;
+
+    box-sizing: border-box;
+}
+
+.overview-card,
+.programme-card,
+.cohort-card,
+.candidate-card {
+    min-width: 0;
+}
+
+
+/* =========================================================
+   RESPONSIVE TABLES
+   ========================================================= */
+
+.table-responsive,
+.table-wrapper,
+.table-container,
+.candidate-table-wrapper {
+    width: 100%;
+    max-width: 100%;
+
+    overflow-x: auto;
+
+    -webkit-overflow-scrolling: touch;
+
+    box-sizing: border-box;
+}
+
+
+/* =========================================================
+   TABLET / MOBILE SIDEBAR
+   ========================================================= */
+
+@media (max-width: 1023px) {
+
+    /*
+     * On mobile the sidebar becomes an overlay.
+     * Main content must always occupy the full viewport.
+     */
+
+    .dashboard__main,
+    body.portal-sidebar-collapsed
+    .dashboard__main {
+
+        margin-left: 0 !important;
+
+        width: 100% !important;
+
+        max-width: 100% !important;
+    }
+
+    .dash-content {
+        width: 100%;
+
+        max-width: 100%;
+
+        box-sizing: border-box;
+    }
+
+    .sidebar {
+        position: fixed;
+
+        top: 0;
+        left: 0;
+        bottom: 0;
+
+        z-index: 1200;
+
+        transform: translateX(-105%);
+
+        transition: transform .25s ease;
+    }
+
+    .sidebar.open,
+    .sidebar.show,
+    .sidebar.is-mobile-open {
+        transform: translateX(0);
+    }
+
+    .sidebar-overlay {
+        position: fixed;
+
+        inset: 0;
+
+        z-index: 1190;
+
+        display: none;
+
+        background: rgba(
+            15,
+            23,
+            42,
+            .52
+        );
+    }
+
+    .sidebar-overlay.open,
+    .sidebar-overlay.is-open {
+        display: block;
+    }
+
+    .pm-navbar__menu {
+        display: grid;
+    }
+}
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (max-width: 768px) {
+
+    .dash-content {
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+
+    .pm-page-content {
+        padding: 20px 18px;
+    }
+
+    .pm-navbar {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .overview-grid,
+    .programme-grid,
+    .cohort-grid,
+    .candidate-grid {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+    }
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 620px) {
+
+    .pm-navbar {
+        padding: 0 12px;
+    }
+
+    .pm-navbar__heading span,
+    .pm-navbar__user-copy {
+        display: none;
+    }
+
+    .pm-navbar__heading h1 {
+        font-size: 15px;
+    }
+
+    .pm-navbar__user {
+        padding: 3px;
+
+        border: 0;
+
+        background: transparent;
+    }
+
+    .pm-notification__dropdown {
+        position: fixed;
+
+        top: 72px;
+        right: 12px;
+
+        width: min(
+            350px,
+            calc(100vw - 24px)
+        );
+    }
+
+    .pm-page-content {
+        padding: 18px 14px;
+    }
+
+    .pm-page-heading {
+        align-items: flex-start;
+
+        flex-direction: column;
+    }
+
+    .dash-content {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    .overview-grid,
+    .programme-grid,
+    .cohort-grid,
+    .candidate-grid,
+    .dashboard-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .overview-card,
+    .programme-card,
+    .cohort-card,
+    .candidate-card {
+        width: 100%;
+
+        max-width: 100%;
+
+        box-sizing: border-box;
+    }
+}
+/* ============================================================
+   PROGRAMME MANAGER
+   GLOBAL SIDEBAR SHOW/HIDE RESPONSIVE FIX
+   ============================================================ */
+
+:root {
+    --pm-sidebar-expanded: 260px;
+    --pm-sidebar-collapsed: 72px;
+}
+
+
+/* ============================================================
+   DESKTOP
+   ============================================================ */
+
+@media (min-width: 1024px) {
+
+    /*
+     * All known Programme Manager content wrappers.
+     * This allows every PM page to respond to the sidebar state.
+     */
+    .dashboard__main,
+    .pm-main,
+    .main-content,
+    main.dashboard__main {
+        margin-left: var(--pm-sidebar-expanded) !important;
+
+        width: calc(
+            100% - var(--pm-sidebar-expanded)
+        ) !important;
+
+        max-width: none !important;
+        min-width: 0 !important;
+
+        box-sizing: border-box !important;
+
+        transition:
+            margin-left .25s ease,
+            width .25s ease !important;
+    }
+
+
+    /* ========================================================
+       COLLAPSED SIDEBAR
+       ======================================================== */
+
+    body.portal-sidebar-collapsed .sidebar {
+        width: var(--pm-sidebar-collapsed) !important;
+        min-width: var(--pm-sidebar-collapsed) !important;
+    }
+
+    body.portal-sidebar-collapsed .dashboard__main,
+    body.portal-sidebar-collapsed .pm-main,
+    body.portal-sidebar-collapsed .main-content,
+    body.portal-sidebar-collapsed main.dashboard__main {
+        margin-left: var(--pm-sidebar-collapsed) !important;
+
+        width: calc(
+            100% - var(--pm-sidebar-collapsed)
+        ) !important;
+
+        max-width: none !important;
+        min-width: 0 !important;
+    }
+
+
+    /* ========================================================
+       ALSO SUPPORT OLD PM CLASS
+       ======================================================== */
+
+    body.pm-sidebar-collapsed .sidebar,
+    body.pm-sidebar-collapsed .pm-sidebar {
+        width: var(--pm-sidebar-collapsed) !important;
+        min-width: var(--pm-sidebar-collapsed) !important;
+    }
+
+    body.pm-sidebar-collapsed .dashboard__main,
+    body.pm-sidebar-collapsed .pm-main,
+    body.pm-sidebar-collapsed .main-content {
+        margin-left: var(--pm-sidebar-collapsed) !important;
+
+        width: calc(
+            100% - var(--pm-sidebar-collapsed)
+        ) !important;
+
+        max-width: none !important;
+    }
+
+
+    /* ========================================================
+       CONTENT INSIDE MAIN
+       ======================================================== */
+
+    .dash-content,
+    .pm-page-content,
+    .content,
+    .content-wrapper,
+    .container-fluid {
+        width: 100% !important;
+        max-width: none !important;
+
+        min-width: 0 !important;
+
+        box-sizing: border-box !important;
+    }
+
+
+    body.portal-sidebar-collapsed .dash-content,
+    body.portal-sidebar-collapsed .pm-page-content,
+    body.portal-sidebar-collapsed .content,
+    body.portal-sidebar-collapsed .content-wrapper,
+    body.portal-sidebar-collapsed .container-fluid,
+
+    body.pm-sidebar-collapsed .dash-content,
+    body.pm-sidebar-collapsed .pm-page-content,
+    body.pm-sidebar-collapsed .content,
+    body.pm-sidebar-collapsed .content-wrapper,
+    body.pm-sidebar-collapsed .container-fluid {
+        width: 100% !important;
+        max-width: none !important;
+    }
+
+
+    /* ========================================================
+       HIDE SIDEBAR TEXT
+       ======================================================== */
+
+    body.portal-sidebar-collapsed .sidebar__section-label,
+    body.portal-sidebar-collapsed .logo__text,
+    body.portal-sidebar-collapsed .sidebar__user-info,
+
+    body.pm-sidebar-collapsed .sidebar__section-label,
+    body.pm-sidebar-collapsed .logo__text,
+    body.pm-sidebar-collapsed .sidebar__user-info {
+        display: none !important;
+    }
+
+
+    body.portal-sidebar-collapsed .sidebar__link,
+    body.pm-sidebar-collapsed .sidebar__link {
+        justify-content: center !important;
+
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+
+        font-size: 0 !important;
+    }
+
+
+    body.portal-sidebar-collapsed .sidebar__link i,
+    body.pm-sidebar-collapsed .sidebar__link i {
+        margin: 0 !important;
+
+        font-size: 16px !important;
+    }
+
+
+    /* ========================================================
+       GRIDS EXPAND WITH AVAILABLE SPACE
+       ======================================================== */
+
+    .overview-grid,
+    .programme-grid,
+    .cohort-grid,
+    .candidate-grid,
+    .dashboard-grid,
+    .stats-grid,
+    .report-grid {
+        width: 100% !important;
+        max-width: none !important;
+
+        min-width: 0 !important;
+
+        box-sizing: border-box !important;
+    }
+
+
+    /* ========================================================
+       CARDS
+       ======================================================== */
+
+    .overview-card,
+    .programme-card,
+    .cohort-card,
+    .candidate-card,
+    .dashboard-card,
+    .content-card,
+    .welcome-card {
+        min-width: 0 !important;
+        max-width: 100% !important;
+
+        box-sizing: border-box !important;
+    }
+
+
+    /* ========================================================
+       TABLES
+       ======================================================== */
+
+    .table-container,
+    .table-responsive,
+    .table-wrapper,
+    .candidate-table-wrapper {
+        width: 100% !important;
+        max-width: 100% !important;
+
+        min-width: 0 !important;
+
+        overflow-x: auto !important;
+
+        box-sizing: border-box !important;
+    }
+}
+
+
+/* ============================================================
+   TABLET + MOBILE
+   ============================================================ */
+
+@media (max-width: 1023px) {
+
+    .dashboard__main,
+    .pm-main,
+    .main-content,
+    main.dashboard__main,
+
+    body.portal-sidebar-collapsed .dashboard__main,
+    body.portal-sidebar-collapsed .pm-main,
+    body.portal-sidebar-collapsed .main-content,
+
+    body.pm-sidebar-collapsed .dashboard__main,
+    body.pm-sidebar-collapsed .pm-main,
+    body.pm-sidebar-collapsed .main-content {
+
+        margin-left: 0 !important;
+
+        width: 100% !important;
+        max-width: 100% !important;
+
+        min-width: 0 !important;
+
+        box-sizing: border-box !important;
+    }
+
+
+    .dash-content,
+    .pm-page-content,
+    .content,
+    .content-wrapper,
+    .container-fluid {
+        width: 100% !important;
+        max-width: 100% !important;
+
+        min-width: 0 !important;
+
+        box-sizing: border-box !important;
+    }
+
+
+    /*
+     * Mobile sidebar becomes off-canvas.
+     */
+    .sidebar,
+    .pm-sidebar {
+        position: fixed !important;
+
+        top: 0;
+        left: 0;
+        bottom: 0;
+
+        z-index: 1200;
+
+        transform: translateX(-105%);
+
+        transition: transform .25s ease;
+    }
+
+
+    .sidebar.open,
+    .sidebar.show,
+    .sidebar.is-mobile-open,
+
+    .pm-sidebar.open,
+    .pm-sidebar.show,
+    .pm-sidebar.is-mobile-open {
+        transform: translateX(0);
+    }
+
+
+    .sidebar-overlay,
+    .pm-sidebar-overlay {
+        position: fixed;
+
+        inset: 0;
+
+        z-index: 1190;
+
+        display: none;
+
+        background: rgba(
+            15,
+            23,
+            42,
+            .52
+        );
+    }
+
+
+    .sidebar-overlay.open,
+    .sidebar-overlay.is-open,
+
+    .pm-sidebar-overlay.open,
+    .pm-sidebar-overlay.is-open {
+        display: block;
+    }
+}
+
+
+/* ============================================================
+   SMALL MOBILE
+   ============================================================ */
+
+@media (max-width: 620px) {
+
+    .dash-content,
+    .pm-page-content,
+    .content,
+    .content-wrapper {
+        padding-left: 14px !important;
+        padding-right: 14px !important;
+    }
+
+
+    .overview-grid,
+    .programme-grid,
+    .cohort-grid,
+    .candidate-grid,
+    .dashboard-grid,
+    .stats-grid,
+    .report-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+
+    .overview-card,
+    .programme-card,
+    .cohort-card,
+    .candidate-card,
+    .dashboard-card,
+    .content-card {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}

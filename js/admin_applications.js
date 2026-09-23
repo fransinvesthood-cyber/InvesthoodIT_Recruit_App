@@ -135,4 +135,58 @@ document.addEventListener('DOMContentLoaded', function () {
     statusMessage.style.display = 'block';
   }
 
+  // ============================================
+  // 3. DOCUMENT VIEWER MODAL (Detail Page)
+  // Opens secure admin/document_view.php URLs inside an
+  // on-page iframe so PDFs/images preview without leaving
+  // the application detail page.
+  // ============================================
+  var docModal = document.getElementById('docViewerModal');
+  var docFrame = document.getElementById('docViewerFrame');
+  var docName = document.getElementById('docViewerName');
+  var docDownload = document.getElementById('docViewerDownload');
+  var docNewTab = document.getElementById('docViewerNewTab');
+
+  function openDocViewer(viewUrl, name, downloadUrl) {
+    if (!docModal || !docFrame) {
+      // Fallback: open in a new tab when modal markup is missing.
+      if (viewUrl) window.open(viewUrl, '_blank', 'noopener');
+      return;
+    }
+    if (docName) docName.textContent = name || 'Document';
+    if (docDownload) docDownload.href = downloadUrl || viewUrl || '#';
+    if (docNewTab) docNewTab.href = viewUrl || '#';
+    docFrame.src = viewUrl || '';
+    docModal.hidden = false;
+    docModal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeDocViewer() {
+    if (!docModal) return;
+    docModal.hidden = true;
+    docModal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    if (docFrame) docFrame.src = '';
+  }
+
+  document.querySelectorAll('.app-doc-view-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      openDocViewer(
+        btn.getAttribute('data-doc-view'),
+        btn.getAttribute('data-doc-name'),
+        btn.getAttribute('data-doc-download')
+      );
+    });
+  });
+
+  if (docModal) {
+    docModal.querySelectorAll('[data-doc-viewer-close]').forEach(function (el) {
+      el.addEventListener('click', closeDocViewer);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !docModal.hidden) closeDocViewer();
+    });
+  }
+
 });

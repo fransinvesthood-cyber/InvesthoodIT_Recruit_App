@@ -10,7 +10,8 @@ require_role('programme_manager');
 $user = current_user();
 $flashes = render_flashes();
 $conn = Database::getConnection();
-$currentPage = 'cohorts';
+$currentPage = 'update_candidate_status';
+$pageTitle = 'Update Candidate Status';
 /*
 |--------------------------------------------------------------------------
 | Current Programme Manager
@@ -118,6 +119,17 @@ if (!$participant) {
 |--------------------------------------------------------------------------
 */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (function_exists('verify_csrf_token')) {
+        $csrfToken = (string) ($_POST['csrf_token'] ?? '');
+        if ($csrfToken === '' || !verify_csrf_token($csrfToken)) {
+            $_SESSION['flash_error'] = 'Your session has expired. Please try again.';
+            header(
+                'Location: ' .
+                url('programme/update_candidate_status.php?participant_id=' . $participantId)
+            );
+            exit;
+        }
+    }
     $newStatus = trim(
         $_POST['status'] ?? ''
     );
@@ -353,6 +365,33 @@ $currentStatus =
         rel="stylesheet"
         href="<?= url('css/styles.css') ?>"
     >
+  <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260920">
+
+    <style>
+        .pm-status-select {
+            width:100%;
+            padding:.8rem;
+            border:1px solid #d1d5db;
+            border-radius:8px;
+            background:#fff;
+            color:#0f172a;
+            box-sizing:border-box;
+        }
+
+        body.dark-mode .pm-status-select {
+            background:#111827;
+            color:#f8fafc;
+            border-color:#475569;
+        }
+
+        @media (max-width:650px) {
+            .dash-content {
+                padding-left:12px;
+                padding-right:12px;
+            }
+        }
+    </style>
+
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
@@ -361,22 +400,7 @@ $currentStatus =
         <!-- =================================================
              HEADER
         ================================================== -->
-        <header class="dash-header">
-            <div class="dash-header__left">
-                <h1 class="dash-header__title">
-                    Update Candidate Status
-                </h1>
-            </div>
-            <div class="dash-header__right">
-                <div class="dash-header__user">
-                    <img
-                        src="https://ui-avatars.com/api/?name=<?= urlencode($candidateName) ?>&background=1a56db&color=fff&size=80"
-                        alt=""
-                        class="dash-header__avatar"
-                    >
-                </div>
-            </div>
-        </header>
+        <?php require __DIR__ . '/navbar.php'; ?>
         <!-- =================================================
              CONTENT
         ================================================== -->
@@ -476,6 +500,9 @@ $currentStatus =
                         method="POST"
                         style="margin-top:1.5rem;"
                     >
+                        <?php if (function_exists('csrf_token')): ?>
+                            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                        <?php endif; ?>
                         <div
                             style="
                                 max-width:500px;
@@ -494,6 +521,7 @@ $currentStatus =
                             <select
                                 id="status"
                                 name="status"
+                                class="pm-status-select"
                                 required
                                 style="
                                     width:100%;
@@ -686,5 +714,6 @@ $currentStatus =
         </div>
     </main>
 </div>
+<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260920"></script>
 </body>
 </html>

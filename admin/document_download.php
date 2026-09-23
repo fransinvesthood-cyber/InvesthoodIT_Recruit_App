@@ -19,27 +19,30 @@ if (!hash_equals(csrf_token(), $token)) {
     exit('Invalid security token.');
 }
 
-// Get document ID
+// Get document ID + source table (application | candidate).
+// The source discriminator prevents ID collisions between the
+// application_documents and documents tables (both use auto-increment IDs).
 $documentId = (int) ($_GET['id'] ?? 0);
+$source = strtolower(trim($_GET['source'] ?? ''));
 
 if ($documentId <= 0) {
     http_response_code(400);
     exit('Invalid document ID.');
 }
 
-// Try to fetch from application_documents first
-$doc = Database::fetchOne(
-    "SELECT ad.*, a.candidate_id, 'application_documents' as source
-     FROM application_documents ad
-     INNER JOIN applications a ON a.id = ad.application_id
-     WHERE ad.id = ?
-     LIMIT 1",
-    'i',
-    [$documentId]
-);
+$doc = null;
 
-// If not found, try candidate documents table
-if (!$doc) {
+if ($source === 'application') {
+    $doc = Database::fetchOne(
+        "SELECT ad.*, a.candidate_id, 'application_documents' as source
+         FROM application_documents ad
+         INNER JOIN applications a ON a.id = ad.application_id
+         WHERE ad.id = ?
+         LIMIT 1",
+        'i',
+        [$documentId]
+    );
+} elseif ($source === 'candidate') {
     $doc = Database::fetchOne(
         "SELECT d.*, d.user_id as candidate_id, 'documents' as source
          FROM documents d
@@ -48,6 +51,29 @@ if (!$doc) {
         'i',
         [$documentId]
     );
+} else {
+    // Backwards-compatible fallback: try application documents first.
+    $doc = Database::fetchOne(
+        "SELECT ad.*, a.candidate_id, 'application_documents' as source
+         FROM application_documents ad
+         INNER JOIN applications a ON a.id = ad.application_id
+         WHERE ad.id = ?
+         LIMIT 1",
+        'i',
+        [$documentId]
+    );
+
+    // If not found, try candidate documents table
+    if (!$doc) {
+        $doc = Database::fetchOne(
+            "SELECT d.*, d.user_id as candidate_id, 'documents' as source
+             FROM documents d
+             WHERE d.id = ?
+             LIMIT 1",
+            'i',
+            [$documentId]
+        );
+    }
 }
 
 if (!$doc) {

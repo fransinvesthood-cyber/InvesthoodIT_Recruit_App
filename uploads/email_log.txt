@@ -2,3 +2,4 @@
 [2026-08-08 14:10:08] TO: candidate@gmail.com | SUBJECT: Verify your email — Investhood IT
 [2026-09-03 23:46:28] TO: bafana.mangena@gmail.com | SUBJECT: Verify your email — Investhood IT
 [2026-09-18 16:05:24] TO: khanyisile.investhood@gmail.com | SUBJECT: Verify your email — Investhood IT
+[2026-09-21 09:31:27] TO: candidate.test@gmail.com | SUBJECT: Verify your email — Investhood IT
