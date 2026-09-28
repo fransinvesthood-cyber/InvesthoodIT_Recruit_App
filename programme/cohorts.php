@@ -7,13 +7,12 @@
  * File: programme/cohorts.php
  * Role: Programme Manager
  *
- * Displays cohorts belonging to programmes assigned to the
- * currently logged-in Programme Manager.
- *
  * Features:
- *   - Cohort cards (clickable → open modal)
- *   - Supervisor Oversight modal (nested)
- *   - Search + status + supervisor filters
+ *   - Cohort cards (clickable → cohort modal)
+ *   - Nested Supervisor Oversight modal
+ *   - Capacity monitoring (places filled, warnings, badges)
+ *   - Search / status / supervisor / capacity filters
+ *   - Read-only; scoped to programmes.programme_manager_id
  * ============================================================
  */
 
@@ -45,11 +44,16 @@ if ($managerId <= 0) {
 $search           = trim((string) ($_GET['search'] ?? ''));
 $status           = trim((string) ($_GET['status'] ?? ''));
 $supervisorFilter = (int)  ($_GET['supervisor_id'] ?? 0);
+$capacityFilter   = trim((string) ($_GET['capacity'] ?? ''));
 
 $allowedStatuses = ['draft', 'open', 'closed', 'active', 'completed', 'archived'];
 
 if ($status !== '' && !in_array($status, $allowedStatuses, true)) {
     $status = '';
+}
+
+if (!in_array($capacityFilter, ['', 'near', 'full'], true)) {
+    $capacityFilter = '';
 }
 
 /* ------------------------------------------------------------------
@@ -73,8 +77,8 @@ $cohortStatusSelect = $cohortHasStatus
 
 $sql = "
     SELECT
-        c.id            AS cohort_id,
-        c.name          AS cohort_name,
+        c.id                 AS cohort_id,
+        c.name               AS cohort_name,
         c.programme_id,
         c.start_date,
         c.end_date,
@@ -82,14 +86,15 @@ $sql = "
         c.province,
         c.delivery_mode,
         c.max_capacity,
+        c.applications_count,
         c.supervisor_id,
-        sup.first_name  AS supervisor_first_name,
-        sup.last_name   AS supervisor_last_name,
-        sup.email       AS supervisor_email,
+        sup.first_name       AS supervisor_first_name,
+        sup.last_name        AS supervisor_last_name,
+        sup.email            AS supervisor_email,
         {$cohortStatusSelect}
-        p.name          AS programme_name,
-        p.type          AS programme_type,
-        p.status        AS programme_status,
+        p.name               AS programme_name,
+        p.type               AS programme_type,
+        p.status             AS programme_status,
         COUNT(DISTINCT CASE WHEN cp.status <> 'withdrawn' THEN cp.user_id END) AS candidate_count,
         COUNT(DISTINCT CASE WHEN cp.status IN ('selected','onboarded','active') THEN cp.user_id END) AS active_candidate_count,
         COUNT(DISTINCT CASE WHEN cp.status = 'completed' THEN cp.user_id END) AS completed_candidate_count,
@@ -129,12 +134,20 @@ $sql .= "
     GROUP BY
         c.id, c.name, c.programme_id, c.start_date, c.end_date,
         c.location, c.province, c.delivery_mode, c.max_capacity,
-        c.supervisor_id, sup.first_name, sup.last_name, sup.email,
+        c.applications_count, c.supervisor_id,
+        sup.first_name, sup.last_name, sup.email,
         p.name, p.type, p.status
 ";
 
 if ($cohortHasStatus) {
     $sql .= ", c.status";
+}
+
+/* Capacity filter (HAVING because it uses c.max_capacity which is grouped) */
+if ($capacityFilter === 'near') {
+    $sql .= " HAVING c.max_capacity > 0 AND (c.applications_count / c.max_capacity) >= 0.70 ";
+} elseif ($capacityFilter === 'full') {
+    $sql .= " HAVING c.max_capacity > 0 AND c.applications_count >= c.max_capacity ";
 }
 
 $sql .= " ORDER BY c.id DESC";
@@ -159,6 +172,41 @@ if ($stmt) {
         if (empty($row['cohort_status'])) {
             $row['cohort_status'] = $row['programme_status'] ?? 'unknown';
         }
+
+        /* ---- Capacity metrics ---- */
+        $maxCapacity  = (int) ($row['max_capacity'] ?? 0);
+        $applications = (int) ($row['applications_count'] ?? 0);
+
+        $placesRemaining = $maxCapacity > 0
+            ? max(0, $maxCapacity - $applications)
+            : 0;
+
+        $capacityPercent = $maxCapacity > 0
+            ? (int) round(($applications / $maxCapacity) * 100)
+            : 0;
+
+        $capacityBarPercent = max(0, min(100, $capacityPercent));
+
+        if ($maxCapacity <= 0) {
+            $capacityStatus = 'unknown';
+        } elseif ($applications > $maxCapacity) {
+            $capacityStatus = 'over_capacity';
+        } elseif ($applications === $maxCapacity) {
+            $capacityStatus = 'full';
+        } elseif ($capacityPercent >= 90) {
+            $capacityStatus = 'nearly_full';
+        } elseif ($capacityPercent >= 70) {
+            $capacityStatus = 'filling_fast';
+        } else {
+            $capacityStatus = 'available';
+        }
+
+        $row['capacity_max']       = $maxCapacity;
+        $row['capacity_filled']    = $applications;
+        $row['capacity_remaining'] = $placesRemaining;
+        $row['capacity_percent']   = $capacityPercent;
+        $row['capacity_bar']       = $capacityBarPercent;
+        $row['capacity_status']    = $capacityStatus;
 
         $cohorts[] = $row;
     }
@@ -197,7 +245,40 @@ $overallProgress = $totalCandidates > 0
 $overallProgress = max(0, min(100, $overallProgress));
 
 /* ------------------------------------------------------------------
- | JSON helper (NO htmlspecialchars — safe for <script type="application/json">)
+ | Capacity aggregates
+ * ------------------------------------------------------------------ */
+
+$totalCapacityMax    = 0;
+$totalCapacityFilled = 0;
+$nearCapacityCount   = 0;
+$fullCount           = 0;
+
+foreach ($cohorts as $cohort) {
+    $cm = (int) ($cohort['capacity_max'] ?? 0);
+    $cf = (int) ($cohort['capacity_filled'] ?? 0);
+    $cs = (string) ($cohort['capacity_status'] ?? 'unknown');
+
+    if ($cm > 0) {
+        $totalCapacityMax    += $cm;
+        $totalCapacityFilled += $cf;
+
+        if ($cs === 'filling_fast' || $cs === 'nearly_full' || $cs === 'full' || $cs === 'over_capacity') {
+            $nearCapacityCount++;
+        }
+        if ($cs === 'full' || $cs === 'over_capacity') {
+            $fullCount++;
+        }
+    }
+}
+
+$totalCapacityPercent = $totalCapacityMax > 0
+    ? (int) round(($totalCapacityFilled / $totalCapacityMax) * 100)
+    : 0;
+
+$totalCapacityBarPercent = max(0, min(100, $totalCapacityPercent));
+
+/* ------------------------------------------------------------------
+ | JSON helper (raw JSON, safe inside <script type="application/json">)
  * ------------------------------------------------------------------ */
 
 function pm_cohorts_json(array $data): string
@@ -228,8 +309,8 @@ $cohortModalData = [];
 foreach ($cohorts as $cohort) {
     $cid = (int) ($cohort['cohort_id'] ?? 0);
 
-    $supervisorId    = (int)    ($cohort['supervisor_id'] ?? 0);
-    $supervisorName  = trim(
+    $supervisorId   = (int) ($cohort['supervisor_id'] ?? 0);
+    $supervisorName = trim(
         (string) ($cohort['supervisor_first_name'] ?? '')
         . ' ' .
         (string) ($cohort['supervisor_last_name'] ?? '')
@@ -254,6 +335,12 @@ foreach ($cohorts as $cohort) {
         'active_candidate_count'    => (int)    ($cohort['active_candidate_count'] ?? 0),
         'completed_candidate_count' => (int)    ($cohort['completed_candidate_count'] ?? 0),
         'withdrawn_candidate_count' => (int)    ($cohort['withdrawn_candidate_count'] ?? 0),
+        'capacity_max'              => (int)    ($cohort['capacity_max'] ?? 0),
+        'capacity_filled'           => (int)    ($cohort['capacity_filled'] ?? 0),
+        'capacity_remaining'        => (int)    ($cohort['capacity_remaining'] ?? 0),
+        'capacity_percent'          => (int)    ($cohort['capacity_percent'] ?? 0),
+        'capacity_bar'              => (int)    ($cohort['capacity_bar'] ?? 0),
+        'capacity_status'           => (string) ($cohort['capacity_status'] ?? 'unknown'),
         'supervisor_id'             => $supervisorId,
         'supervisor_name'           => $supervisorName,
         'supervisor_email'          => (string) ($cohort['supervisor_email'] ?? ''),
@@ -265,11 +352,6 @@ $cohortModalJson = pm_cohorts_json($cohortModalData);
 
 /* ------------------------------------------------------------------
  | Build JSON payload for the Supervisor Oversight modal
- |
- | For every supervisor assigned to at least one of this manager's
- | cohorts, gather their info, their cohorts, and their candidates.
- |
- | All queries scoped by programmes.programme_manager_id.
  * ------------------------------------------------------------------ */
 
 $supervisorOversight = [];
@@ -300,7 +382,7 @@ if ($supStmt) {
     while ($sup = $supRes->fetch_assoc()) {
         $sid = (int) $sup['supervisor_id'];
 
-        /* ---- Cohorts supervised by this supervisor ---- */
+        /* ---- Cohorts for this supervisor ---- */
         $cohortsForSup = [];
 
         $cSql = "
@@ -310,6 +392,8 @@ if ($supStmt) {
                 c.start_date,
                 c.end_date,
                 c.status        AS cohort_status,
+                c.max_capacity,
+                c.applications_count,
                 p.name          AS programme_name,
                 COUNT(DISTINCT CASE WHEN cp.status <> 'withdrawn' THEN cp.user_id END) AS candidate_count,
                 COUNT(DISTINCT CASE WHEN cp.status = 'active'    THEN cp.user_id END) AS active_candidate_count,
@@ -320,7 +404,8 @@ if ($supStmt) {
             LEFT JOIN cohort_participants cp ON cp.cohort_id = c.id
             WHERE c.supervisor_id = ?
               AND p.programme_manager_id = ?
-            GROUP BY c.id, c.name, c.start_date, c.end_date, c.status, p.name
+            GROUP BY c.id, c.name, c.start_date, c.end_date,
+                     c.status, c.max_capacity, c.applications_count, p.name
             ORDER BY c.name ASC
         ";
 
@@ -351,6 +436,8 @@ if ($supStmt) {
                     'active_candidate_count'    => (int) ($cRow['active_candidate_count'] ?? 0),
                     'completed_candidate_count' => $cp,
                     'withdrawn_candidate_count' => (int) ($cRow['withdrawn_candidate_count'] ?? 0),
+                    'capacity_max'              => (int) ($cRow['max_capacity'] ?? 0),
+                    'capacity_filled'           => (int) ($cRow['applications_count'] ?? 0),
                     'view_url'                  => url('programme/cohort_view.php?id=' . (int) $cRow['cohort_id']),
                 ];
             }
@@ -450,7 +537,7 @@ if ($supStmt) {
 $supervisorOversightJson = pm_cohorts_json($supervisorOversight);
 
 /* ------------------------------------------------------------------
- | Supervisors available for the filter dropdown (in-scope)
+ | Supervisors for the filter dropdown
  * ------------------------------------------------------------------ */
 
 $filterSupervisors = [];
@@ -483,6 +570,28 @@ if ($fsStmt) {
     $fsStmt->close();
 }
 
+/* ------------------------------------------------------------------
+ | Capacity status label map (used in HTML)
+ * ------------------------------------------------------------------ */
+
+$capacityStatusLabels = [
+    'available'     => 'Available',
+    'filling_fast'  => 'Filling Fast',
+    'nearly_full'   => 'Nearly Full',
+    'full'          => 'Full',
+    'over_capacity' => 'Over Capacity',
+    'unknown'       => 'No Capacity Set',
+];
+
+$capacityBarClasses = [
+    'available'     => 'pm-cap-bar--ok',
+    'filling_fast'  => 'pm-cap-bar--notice',
+    'nearly_full'   => 'pm-cap-bar--warn',
+    'full'          => 'pm-cap-bar--warn',
+    'over_capacity' => 'pm-cap-bar--danger',
+    'unknown'       => 'pm-cap-bar--ok',
+];
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -497,7 +606,7 @@ if ($fsStmt) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
 
     <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
-    <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260925">
+    <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260927">
 
     <style>
         /* ============================================================
@@ -527,6 +636,79 @@ if ($fsStmt) {
         }
 
         /* ============================================================
+           Capacity monitoring
+           ============================================================ */
+        .pm-cap-track {
+            width: 100%;
+            height: 10px;
+            border-radius: 999px;
+            background: #e5e7eb;
+            overflow: hidden;
+        }
+        .pm-cap-bar {
+            display: block;
+            height: 100%;
+            border-radius: inherit;
+            transition: width .3s ease;
+        }
+        .pm-cap-bar--ok      { background: #16a34a; }
+        .pm-cap-bar--notice  { background: #f59e0b; }
+        .pm-cap-bar--warn    { background: #ea580c; }
+        .pm-cap-bar--danger  { background: #dc2626; }
+
+        .pm-cap-track--sm { height: 6px; }
+
+        .pm-cap-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .pm-cap-badge--available      { background: #ecfdf3; color: #027a48; }
+        .pm-cap-badge--filling_fast   { background: #fffaeb; color: #b45309; }
+        .pm-cap-badge--nearly_full    { background: #fff7ed; color: #c2410c; }
+        .pm-cap-badge--full           { background: #fef2f2; color: #b91c1c; }
+        .pm-cap-badge--over_capacity  { background: #450a0a; color: #fecaca; }
+        .pm-cap-badge--unknown        { background: #f1f5f9; color: #64748b; }
+
+        .pm-cap-row {
+            margin-top: .55rem;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            flex-wrap: wrap;
+        }
+        .pm-cap-text {
+            font-size: .8rem;
+            font-weight: 700;
+            color: #101828;
+        }
+        .pm-cap-warning {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 14px;
+        }
+        .pm-cap-warning--notice {
+            background: #fffaeb; color: #92400e; border: 1px solid #fde68a;
+        }
+        .pm-cap-warning--warn {
+            background: #fff7ed; color: #9a3412; border: 1px solid #fdba74;
+        }
+        .pm-cap-warning--danger {
+            background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5;
+        }
+
+        /* ============================================================
            Modal shared container
            ============================================================ */
         .pm-cohort-modal {
@@ -548,7 +730,6 @@ if ($fsStmt) {
             opacity: 1;
             pointer-events: auto;
         }
-        /* Supervisor modal must sit above the cohort modal */
         #pmSupervisorModal { z-index: 2147483647; }
 
         .pm-cohort-modal__backdrop {
@@ -803,72 +984,41 @@ if ($fsStmt) {
             background: #f8fafc;
         }
         .pm-sup-hero__avatar {
-            width: 56px;
-            height: 56px;
-            flex: 0 0 56px;
-            border-radius: 50%;
-            background: #eef2ff;
-            color: #4f46e5;
-            display: grid;
-            place-items: center;
-            font-weight: 800;
-            font-size: 18px;
+            width: 56px; height: 56px; flex: 0 0 56px;
+            border-radius: 50%; background: #eef2ff; color: #4f46e5;
+            display: grid; place-items: center;
+            font-weight: 800; font-size: 18px;
         }
-        .pm-sup-hero__name {
-            font-size: 16px;
-            font-weight: 800;
-            color: #101828;
-            margin: 0;
-        }
-        .pm-sup-hero__meta {
-            color: #667085;
-            font-size: 12px;
-            margin: 3px 0 0;
-        }
+        .pm-sup-hero__name { font-size: 16px; font-weight: 800; color: #101828; margin: 0; }
+        .pm-sup-hero__meta { color: #667085; font-size: 12px; margin: 3px 0 0; }
 
         .pm-sup-section-title {
             margin: 22px 0 10px;
-            font-size: 13px;
-            font-weight: 800;
-            color: #101828;
-            text-transform: uppercase;
-            letter-spacing: .05em;
+            font-size: 13px; font-weight: 800;
+            color: #101828; text-transform: uppercase; letter-spacing: .05em;
         }
-
         .pm-sup-table-mini {
-            width: 100%;
-            border-collapse: collapse;
-            border: 1px solid #e4e7ec;
-            border-radius: 12px;
-            overflow: hidden;
+            width: 100%; border-collapse: collapse;
+            border: 1px solid #e4e7ec; border-radius: 12px; overflow: hidden;
             font-size: 12px;
         }
         .pm-sup-table-mini th {
-            text-align: left;
-            padding: 9px 12px;
-            background: #f8fafc;
-            color: #475467;
-            font-size: 10px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: .04em;
+            text-align: left; padding: 9px 12px;
+            background: #f8fafc; color: #475467;
+            font-size: 10px; font-weight: 800;
+            text-transform: uppercase; letter-spacing: .04em;
             border-bottom: 1px solid #e4e7ec;
         }
         .pm-sup-table-mini td {
-            padding: 9px 12px;
-            color: #344054;
+            padding: 9px 12px; color: #344054;
             border-bottom: 1px solid #f1f5f9;
         }
         .pm-sup-table-mini tr:last-child td { border-bottom: 0; }
 
         .pm-status-pill {
-            display: inline-flex;
-            align-items: center;
-            padding: 3px 8px;
-            border-radius: 999px;
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: capitalize;
+            display: inline-flex; align-items: center;
+            padding: 3px 8px; border-radius: 999px;
+            font-size: 10px; font-weight: 700; text-transform: capitalize;
         }
         .pm-status-pill--selected  { background:#eff6ff; color:#2563eb; }
         .pm-status-pill--onboarded { background:#ecfeff; color:#0891b2; }
@@ -912,7 +1062,7 @@ if ($fsStmt) {
                 </div>
             </div>
 
-            <!-- Summary -->
+            <!-- Summary: cohorts -->
             <div class="overview-grid" style="margin-top:2rem;">
                 <div class="overview-card">
                     <div class="overview-card__icon overview-card__icon--primary"><i class="fas fa-users"></i></div>
@@ -940,6 +1090,68 @@ if ($fsStmt) {
                     <div class="overview-card__info">
                         <span class="overview-card__number"><?= number_format($totalCandidates) ?></span>
                         <span class="overview-card__label">Candidates</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary: capacity -->
+            <div class="overview-grid" style="margin-top:1rem;">
+                <div class="overview-card">
+                    <div class="overview-card__icon overview-card__icon--primary"><i class="fas fa-chair"></i></div>
+                    <div class="overview-card__info">
+                        <span class="overview-card__number">
+                            <?= number_format($totalCapacityFilled) ?> / <?= number_format($totalCapacityMax) ?>
+                        </span>
+                        <span class="overview-card__label">Places Filled</span>
+                    </div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-card__icon overview-card__icon--cyan"><i class="fas fa-percentage"></i></div>
+                    <div class="overview-card__info">
+                        <span class="overview-card__number"><?= (int) $totalCapacityPercent ?>%</span>
+                        <span class="overview-card__label">Overall Utilisation</span>
+                    </div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-card__icon overview-card__icon--amber"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="overview-card__info">
+                        <span class="overview-card__number"><?= number_format($nearCapacityCount) ?></span>
+                        <span class="overview-card__label">Near Capacity</span>
+                    </div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-card__icon overview-card__icon--primary"><i class="fas fa-ban"></i></div>
+                    <div class="overview-card__info">
+                        <span class="overview-card__number"><?= number_format($fullCount) ?></span>
+                        <span class="overview-card__label">Full Cohorts</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aggregate capacity bar -->
+            <div class="welcome-card" style="margin-top:2rem;">
+                <div class="welcome-card__content">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+                        <div>
+                            <h2 style="margin-bottom:0.35rem;">Capacity Utilisation</h2>
+                            <p style="margin:0;">
+                                <?= number_format($totalCapacityFilled) ?>
+                                of
+                                <?= number_format($totalCapacityMax) ?>
+                                places filled across your programmes.
+                            </p>
+                        </div>
+                        <strong style="font-size:1.5rem;"><?= (int) $totalCapacityPercent ?>%</strong>
+                    </div>
+                    <?php
+                    $aggBarClass = 'pm-cap-bar--ok';
+                    if ($totalCapacityPercent >= 100)     $aggBarClass = 'pm-cap-bar--danger';
+                    elseif ($totalCapacityPercent >= 90)  $aggBarClass = 'pm-cap-bar--warn';
+                    elseif ($totalCapacityPercent >= 70)  $aggBarClass = 'pm-cap-bar--notice';
+                    ?>
+                    <div class="pm-cap-track" style="margin-top:1rem;">
+                        <div class="pm-cap-bar <?= e($aggBarClass) ?>"
+                             style="width:<?= (int) $totalCapacityBarPercent ?>%;"></div>
                     </div>
                 </div>
             </div>
@@ -1006,13 +1218,22 @@ if ($fsStmt) {
                             </div>
                         <?php endif; ?>
 
+                        <div style="min-width:200px;">
+                            <label for="capacity" style="display:block;margin-bottom:0.4rem;font-weight:600;">Capacity</label>
+                            <select id="capacity" name="capacity" style="width:100%;padding:0.75rem;border:1px solid #d1d5db;border-radius:8px;">
+                                <option value="">All</option>
+                                <option value="near" <?= $capacityFilter === 'near' ? 'selected' : '' ?>>Near capacity (≥70%)</option>
+                                <option value="full" <?= $capacityFilter === 'full' ? 'selected' : '' ?>>Full or over</option>
+                            </select>
+                        </div>
+
                         <div>
                             <button type="submit" class="sidebar__link" style="border:0;cursor:pointer;display:inline-flex;align-items:center;gap:0.5rem;">
                                 <i class="fas fa-search"></i> Search
                             </button>
                         </div>
 
-                        <?php if ($search !== '' || $status !== '' || $supervisorFilter > 0): ?>
+                        <?php if ($search !== '' || $status !== '' || $supervisorFilter > 0 || $capacityFilter !== ''): ?>
                             <div>
                                 <a href="<?= url('programme/cohorts.php') ?>" class="sidebar__link" style="display:inline-flex;align-items:center;gap:0.5rem;">
                                     <i class="fas fa-times"></i> Reset
@@ -1035,7 +1256,7 @@ if ($fsStmt) {
                 <div class="welcome-card" style="margin-top:1rem;">
                     <div class="welcome-card__content">
                         <h3><i class="fas fa-users-slash"></i> No Cohorts Found</h3>
-                        <p><?= ($search !== '' || $status !== '' || $supervisorFilter > 0)
+                        <p><?= ($search !== '' || $status !== '' || $supervisorFilter > 0 || $capacityFilter !== '')
                             ? 'No cohorts match the selected search criteria.'
                             : 'There are currently no cohorts associated with your programmes.' ?></p>
                     </div>
@@ -1055,6 +1276,16 @@ if ($fsStmt) {
                         $supFirst = trim((string) ($cohort['supervisor_first_name'] ?? ''));
                         $supLast  = trim((string) ($cohort['supervisor_last_name']  ?? ''));
                         $supName  = trim($supFirst . ' ' . $supLast);
+
+                        $capMax     = (int) ($cohort['capacity_max'] ?? 0);
+                        $capFilled  = (int) ($cohort['capacity_filled'] ?? 0);
+                        $capRemain  = (int) ($cohort['capacity_remaining'] ?? 0);
+                        $capPercent = (int) ($cohort['capacity_percent'] ?? 0);
+                        $capBar     = (int) ($cohort['capacity_bar'] ?? 0);
+                        $capStatus  = (string) ($cohort['capacity_status'] ?? 'unknown');
+
+                        $capStatusLabel = $capacityStatusLabels[$capStatus] ?? 'No Capacity Set';
+                        $capBarClass    = $capacityBarClasses[$capStatus] ?? 'pm-cap-bar--ok';
                         ?>
                         <div
                             class="overview-card pm-cohort-card"
@@ -1093,6 +1324,32 @@ if ($fsStmt) {
                                     <i class="fas fa-circle"></i>
                                     Status: <?= e(ucwords(str_replace('_', ' ', $cohortStatus))) ?>
                                 </span>
+
+                                <?php if ($capMax > 0): ?>
+                                    <div class="pm-cap-row">
+                                        <i class="fas fa-chair" style="color:#2563eb;"></i>
+                                        <span class="pm-cap-text">
+                                            <?= number_format($capFilled) ?> / <?= number_format($capMax) ?> Places Filled
+                                        </span>
+                                        <span class="pm-cap-badge pm-cap-badge--<?= e($capStatus) ?>">
+                                            <?= e($capStatusLabel) ?>
+                                        </span>
+                                    </div>
+
+                                    <div class="pm-cap-track pm-cap-track--sm" style="margin-top:.35rem;">
+                                        <div class="pm-cap-bar <?= e($capBarClass) ?>"
+                                             style="width:<?= (int) $capBar ?>%;"></div>
+                                    </div>
+
+                                    <span class="overview-card__label" style="margin-top:.35rem;">
+                                        <?= number_format($capRemain) ?> place<?= $capRemain === 1 ? '' : 's' ?> remaining
+                                    </span>
+                                <?php else: ?>
+                                    <span class="overview-card__label" style="margin-top:.35rem;">
+                                        <i class="fas fa-chair"></i>
+                                        <em style="color:#94a3b8;">Capacity not set</em>
+                                    </span>
+                                <?php endif; ?>
 
                                 <span class="overview-card__label" style="margin-top:0.6rem;">
                                     <i class="fas fa-user-graduate"></i>
@@ -1177,14 +1434,14 @@ if ($fsStmt) {
     </section>
 </div>
 
-<!-- Data tags (raw JSON, no HTML escaping) -->
+<!-- Data tags -->
 <script type="application/json" id="pmCohortModalData"><?= $cohortModalJson ?></script>
 <script type="application/json" id="pmSupervisorOversightData"><?= $supervisorOversightJson ?></script>
 
-<!-- Programme Manager base script -->
-<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260925"></script>
+<!-- Base scripts -->
+<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260927"></script>
 
-<!-- Cohort + Supervisor modal logic -->
+<!-- Cohort + Supervisor modal logic (no ?. or ?? for browser safety) -->
 <script>
 (function () {
     'use strict';
@@ -1227,9 +1484,9 @@ if ($fsStmt) {
     }
 
     /* =========================================================
-       COHORT MODAL
+       Cohort modal render
        ========================================================= */
-     function renderCohort(c) {
+    function renderCohort(c) {
         var modalTitle = getEl('pmCohortModalTitle');
         var modalBody  = getEl('pmCohortModalBody');
         var detailsBtn = getEl('pmCohortModalDetails');
@@ -1242,7 +1499,7 @@ if ($fsStmt) {
         var withdrawn = Number(c.withdrawn_candidate_count || 0);
         var capacity  = Number(c.max_capacity || 0);
 
-        /* --- Pills --- */
+        /* Pills */
         var pills = '';
         if (c.programme_type) {
             pills += '<span class="pm-cohort-summary__pill">' + escapeHtml(titleCase(c.programme_type)) + '</span>';
@@ -1254,14 +1511,14 @@ if ($fsStmt) {
             pills += '<span class="pm-cohort-summary__pill">' + escapeHtml(titleCase(c.delivery_mode)) + '</span>';
         }
 
-        /* --- Location --- */
-        var locationParts = [];
-        if (c.location) locationParts.push(c.location);
-        if (c.province) locationParts.push(titleCase(c.province));
-        var location = locationParts.join(', ');
+        /* Location */
+        var locParts = [];
+        if (c.location) locParts.push(c.location);
+        if (c.province) locParts.push(titleCase(c.province));
+        var location = locParts.join(', ');
         if (location === '') location = '\u2014';
 
-        /* --- Supervisor name --- */
+        /* Supervisor name */
         var supNameHtml;
         if (c.supervisor_name) {
             supNameHtml = escapeHtml(c.supervisor_name);
@@ -1269,7 +1526,7 @@ if ($fsStmt) {
             supNameHtml = '<em style="color:#94a3b8;">Unassigned</em>';
         }
 
-        /* --- Supervisor email --- */
+        /* Supervisor email */
         var supEmailHtml = '';
         if (c.supervisor_email) {
             supEmailHtml = '<span style="display:block;margin-top:2px;color:#667085;font-size:11px;">'
@@ -1277,7 +1534,7 @@ if ($fsStmt) {
                 + '</span>';
         }
 
-        /* --- Oversight button --- */
+        /* Oversight button */
         var oversightBtnHtml = '';
         if (c.supervisor_id) {
             oversightBtnHtml = '<button type="button" '
@@ -1288,10 +1545,85 @@ if ($fsStmt) {
                 + '</button>';
         }
 
-        /* --- Meta tiles --- */
-        var capacityHtml = '\u2014';
-        if (capacity > 0) capacityHtml = String(capacity);
+        /* Capacity */
+        var capMax     = Number(c.capacity_max || 0);
+        var capFilled  = Number(c.capacity_filled || 0);
+        var capRemain  = Number(c.capacity_remaining || 0);
+        var capPercent = Number(c.capacity_percent || 0);
+        var capBar     = Number(c.capacity_bar || 0);
+        var capStatus  = String(c.capacity_status || 'unknown');
 
+        var capBarClass = 'pm-cap-bar--ok';
+        if (capStatus === 'filling_fast')  capBarClass = 'pm-cap-bar--notice';
+        if (capStatus === 'nearly_full')   capBarClass = 'pm-cap-bar--warn';
+        if (capStatus === 'full')          capBarClass = 'pm-cap-bar--warn';
+        if (capStatus === 'over_capacity') capBarClass = 'pm-cap-bar--danger';
+
+        var capStatusLabel = 'No Capacity Set';
+        if (capStatus === 'available')     capStatusLabel = 'Available';
+        if (capStatus === 'filling_fast')  capStatusLabel = 'Filling Fast';
+        if (capStatus === 'nearly_full')   capStatusLabel = 'Nearly Full';
+        if (capStatus === 'full')          capStatusLabel = 'Full';
+        if (capStatus === 'over_capacity') capStatusLabel = 'Over Capacity';
+
+        var capacityWarningHtml = '';
+        if (capStatus === 'nearly_full') {
+            capacityWarningHtml = '<div class="pm-cap-warning pm-cap-warning--warn">'
+                + '<i class="fas fa-exclamation-triangle"></i>'
+                + '<span>This cohort is nearly full &mdash; only ' + capRemain + ' place' + (capRemain === 1 ? '' : 's') + ' remaining.</span>'
+                + '</div>';
+        } else if (capStatus === 'full') {
+            capacityWarningHtml = '<div class="pm-cap-warning pm-cap-warning--danger">'
+                + '<i class="fas fa-ban"></i>'
+                + '<span>This cohort has reached full capacity (' + capFilled + ' / ' + capMax + ').</span>'
+                + '</div>';
+        } else if (capStatus === 'over_capacity') {
+            var over = capFilled - capMax;
+            capacityWarningHtml = '<div class="pm-cap-warning pm-cap-warning--danger">'
+                + '<i class="fas fa-exclamation-circle"></i>'
+                + '<span>This cohort is over capacity by ' + over + ' place' + (over === 1 ? '' : 's') + ' (' + capFilled + ' / ' + capMax + ').</span>'
+                + '</div>';
+        } else if (capStatus === 'filling_fast') {
+            capacityWarningHtml = '<div class="pm-cap-warning pm-cap-warning--notice">'
+                + '<i class="fas fa-hourglass-half"></i>'
+                + '<span>This cohort is filling fast &mdash; ' + capRemain + ' place' + (capRemain === 1 ? '' : 's') + ' remaining.</span>'
+                + '</div>';
+        }
+
+        var capacityHtml = '';
+        if (capMax > 0) {
+            capacityHtml = ''
+                + capacityWarningHtml
+                + '<div class="pm-cohort-progress" style="margin-bottom:18px;">'
+                +   '<div class="pm-cohort-progress__head">'
+                +     '<div class="pm-cohort-progress__info">'
+                +       '<strong>Capacity: ' + capFilled + ' / ' + capMax + ' Places Filled</strong>'
+                +       '<span>' + capRemain + ' place' + (capRemain === 1 ? '' : 's') + ' remaining</span>'
+                +     '</div>'
+                +     '<strong class="pm-cohort-progress__percentage">' + capPercent + '%</strong>'
+                +   '</div>'
+                +   '<div class="pm-cohort-progress__track">'
+                +     '<span class="pm-cap-bar ' + capBarClass + '" style="width:' + capBar + '%;"></span>'
+                +   '</div>'
+                +   '<div style="margin-top:8px;">'
+                +     '<span class="pm-cap-badge pm-cap-badge--' + capStatus + '">' + capStatusLabel + '</span>'
+                +   '</div>'
+                + '</div>';
+        } else {
+            capacityHtml = ''
+                + '<div class="pm-cohort-progress" style="margin-bottom:18px;">'
+                +   '<div class="pm-cohort-progress__info">'
+                +     '<strong>Capacity</strong>'
+                +     '<span style="color:#94a3b8;">No maximum capacity set for this cohort.</span>'
+                +   '</div>'
+                + '</div>';
+        }
+
+        /* Capacity value */
+        var capacityValHtml = '\u2014';
+        if (capacity > 0) capacityValHtml = String(capacity);
+
+        /* Meta grid */
         var metaHtml = ''
             + '<div class="pm-cohort-meta-grid">'
             +   '<div class="pm-cohort-meta">'
@@ -1307,12 +1639,12 @@ if ($fsStmt) {
             +     '<span class="pm-cohort-meta__value">' + escapeHtml(location) + '</span>'
             +   '</div>'
             +   '<div class="pm-cohort-meta">'
-            +     '<span class="pm-cohort-meta__label">Capacity</span>'
-            +     '<span class="pm-cohort-meta__value">' + escapeHtml(capacityHtml) + '</span>'
+            +     '<span class="pm-cohort-meta__label">Max capacity</span>'
+            +     '<span class="pm-cohort-meta__value">' + escapeHtml(capacityValHtml) + '</span>'
             +   '</div>'
             + '</div>';
 
-        /* --- Supervisor tile --- */
+        /* Supervisor tile */
         var supervisorHtml = ''
             + '<div class="pm-cohort-meta-grid" style="margin-top:-8px;">'
             +   '<div class="pm-cohort-meta" style="grid-column:1 / -1; display:flex; justify-content:space-between; align-items:center; gap:12px;">'
@@ -1325,7 +1657,7 @@ if ($fsStmt) {
             +   '</div>'
             + '</div>';
 
-        /* --- Stats --- */
+        /* Stats */
         var statsHtml = ''
             + '<div class="pm-cohort-stats">'
             +   '<div class="pm-cohort-stat"><span class="pm-cohort-stat__value">' + total     + '</span><span class="pm-cohort-stat__label">Candidates</span></div>'
@@ -1334,7 +1666,7 @@ if ($fsStmt) {
             +   '<div class="pm-cohort-stat"><span class="pm-cohort-stat__value">' + withdrawn + '</span><span class="pm-cohort-stat__label">Withdrawn</span></div>'
             + '</div>';
 
-        /* --- Progress --- */
+        /* Progress */
         var progressHtml = ''
             + '<div class="pm-cohort-progress">'
             +   '<div class="pm-cohort-progress__head">'
@@ -1349,7 +1681,7 @@ if ($fsStmt) {
             +   '</div>'
             + '</div>';
 
-        /* --- Summary card --- */
+        /* Summary */
         var summaryHtml = ''
             + '<div class="pm-cohort-summary">'
             +   '<span class="pm-cohort-summary__label">Programme</span>'
@@ -1357,12 +1689,12 @@ if ($fsStmt) {
             +   '<div class="pm-cohort-summary__meta">' + pills + '</div>'
             + '</div>';
 
-        /* --- Write --- */
         modalTitle.textContent = c.cohort_name || 'Cohort';
 
         modalBody.innerHTML = summaryHtml
             + metaHtml
             + supervisorHtml
+            + capacityHtml
             + statsHtml
             + progressHtml;
 
@@ -1371,16 +1703,10 @@ if ($fsStmt) {
 
     function openCohortModalById(id) {
         var modal = getEl('pmCohortModal');
-        if (!modal) {
-            console.warn('[pm-cohort-modal] cohort modal missing');
-            return;
-        }
+        if (!modal) { console.warn('[pm-cohort-modal] cohort modal missing'); return; }
 
         var c = COHORT_DATA[String(id)];
-        if (!c) {
-            console.warn('[pm-cohort-modal] no data for cohort', id);
-            return;
-        }
+        if (!c) { console.warn('[pm-cohort-modal] no data for cohort', id); return; }
 
         renderCohort(c);
         modal.classList.add('is-open');
@@ -1404,7 +1730,7 @@ if ($fsStmt) {
     }
 
     /* =========================================================
-       SUPERVISOR MODAL
+       Supervisor modal render
        ========================================================= */
     function renderSupervisor(sup) {
         var modal   = getEl('pmSupervisorModal');
@@ -1437,15 +1763,19 @@ if ($fsStmt) {
             cohortsHtml += '<p style="color:#667085;font-size:12px;">No cohorts assigned.</p>';
         } else {
             cohortsHtml += '<table class="pm-sup-table-mini"><thead><tr>'
-                + '<th>Cohort</th><th>Programme</th><th>Candidates</th><th>Completed</th><th>Progress</th>'
+                + '<th>Cohort</th><th>Programme</th><th>Candidates</th><th>Capacity</th><th>Progress</th>'
                 + '</tr></thead><tbody>';
             sup.cohorts.forEach(function (co) {
                 var p = Math.max(0, Math.min(100, Number(co.progress) || 0));
+                var capText = '\u2014';
+                if (Number(co.capacity_max || 0) > 0) {
+                    capText = co.capacity_filled + ' / ' + co.capacity_max;
+                }
                 cohortsHtml += '<tr>'
                     + '<td><strong>' + escapeHtml(co.cohort_name) + '</strong></td>'
                     + '<td>' + escapeHtml(co.programme_name) + '</td>'
                     + '<td>' + co.candidate_count + '</td>'
-                    + '<td>' + co.completed_candidate_count + '</td>'
+                    + '<td>' + escapeHtml(capText) + '</td>'
                     + '<td><div style="display:flex;align-items:center;gap:8px;">'
                     +   '<div style="flex:1;min-width:60px;height:5px;background:#e5e7eb;border-radius:999px;overflow:hidden;">'
                     +     '<div style="width:' + p + '%;height:100%;background:#1a56db;"></div>'
@@ -1485,10 +1815,7 @@ if ($fsStmt) {
 
     function openSupervisorModalById(id) {
         var sup = SUPERVISOR_DATA[String(id)];
-        if (!sup) {
-            console.warn('[pm-cohort-modal] no oversight data for supervisor', id);
-            return;
-        }
+        if (!sup) { console.warn('[pm-cohort-modal] no oversight data for supervisor', id); return; }
         renderSupervisor(sup);
         var supModal = getEl('pmSupervisorModal');
         if (!supModal) return;
@@ -1509,14 +1836,14 @@ if ($fsStmt) {
         }
     }
 
-    /* Expose globally for inline onclick fallback */
+    /* Globals for inline fallback */
     window.pmOpenCohortModal      = openCohortModalById;
     window.pmCloseCohortModal     = closeCohortModal;
     window.pmOpenSupervisorModal  = openSupervisorModalById;
     window.pmCloseSupervisorModal = closeSupervisorModal;
 
     /* =========================================================
-       Attach handlers DIRECTLY to each card
+       Attach handlers
        ========================================================= */
     function attachCardHandlers() {
         var cards = document.querySelectorAll('.pm-cohort-card');
@@ -1527,12 +1854,10 @@ if ($fsStmt) {
             (function (card) {
                 if (card.getAttribute('data-pm-bound') === '1') return;
                 card.setAttribute('data-pm-bound', '1');
-
                 card.style.cursor = 'pointer';
 
                 card.addEventListener('click', function (e) {
                     if (e.target.closest('a, button, input, select, textarea')) return;
-
                     e.preventDefault();
                     e.stopPropagation();
 
@@ -1540,11 +1865,8 @@ if ($fsStmt) {
                     console.log('[pm-cohort-modal] card clicked, cohort id =', cid);
 
                     if (cid > 0) {
-                        try {
-                            openCohortModalById(cid);
-                        } catch (err) {
-                            console.error('[pm-cohort-modal] open failed:', err);
-                        }
+                        try { openCohortModalById(cid); }
+                        catch (err) { console.error('[pm-cohort-modal] open failed:', err); }
                     }
                 }, false);
 
@@ -1559,11 +1881,7 @@ if ($fsStmt) {
         }
     }
 
-    /* =========================================================
-       Attach handlers to close/oversight buttons directly
-       ========================================================= */
     function attachModalHandlers() {
-        /* Close triggers — cohort modal */
         var closeCohortEls = document.querySelectorAll('#pmCohortModal [data-pm-cohort-close]');
         var i;
         for (i = 0; i < closeCohortEls.length; i++) {
@@ -1576,7 +1894,6 @@ if ($fsStmt) {
             })(closeCohortEls[i]);
         }
 
-        /* Close triggers — supervisor modal */
         var closeSupEls = document.querySelectorAll('#pmSupervisorModal [data-pm-sup-close]');
         for (i = 0; i < closeSupEls.length; i++) {
             (function (el) {
@@ -1588,7 +1905,6 @@ if ($fsStmt) {
             })(closeSupEls[i]);
         }
 
-        /* Delegated handler for dynamic "View Oversight" button */
         var cohortBody = getEl('pmCohortModalBody');
         if (cohortBody) {
             cohortBody.addEventListener('click', function (e) {
@@ -1602,67 +1918,40 @@ if ($fsStmt) {
         }
     }
 
-    /* =========================================================
-       Load JSON
-       ========================================================= */
     function loadData() {
         var tag = getEl('pmCohortModalData');
         if (tag) {
-            try {
-                COHORT_DATA = JSON.parse(tag.textContent || '{}') || {};
-            } catch (err) {
-                console.error('[pm-cohort-modal] cohort JSON parse error:', err);
-                COHORT_DATA = {};
-            }
+            try { COHORT_DATA = JSON.parse(tag.textContent || '{}') || {}; }
+            catch (err) { console.error('[pm-cohort-modal] cohort JSON parse error:', err); COHORT_DATA = {}; }
         }
 
         var supTag = getEl('pmSupervisorOversightData');
         if (supTag) {
-            try {
-                SUPERVISOR_DATA = JSON.parse(supTag.textContent || '{}') || {};
-            } catch (err) {
-                console.error('[pm-cohort-modal] supervisor JSON parse error:', err);
-                SUPERVISOR_DATA = {};
-            }
+            try { SUPERVISOR_DATA = JSON.parse(supTag.textContent || '{}') || {}; }
+            catch (err) { console.error('[pm-cohort-modal] supervisor JSON parse error:', err); SUPERVISOR_DATA = {}; }
         }
     }
 
-    /* =========================================================
-       Escape key closes topmost modal
-       ========================================================= */
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;
 
         var supModal = getEl('pmSupervisorModal');
         if (supModal && supModal.classList.contains('is-open')) {
-            e.preventDefault();
-            closeSupervisorModal();
-            return;
+            e.preventDefault(); closeSupervisorModal(); return;
         }
         var modal = getEl('pmCohortModal');
         if (modal && modal.classList.contains('is-open')) {
-            e.preventDefault();
-            closeCohortModal();
+            e.preventDefault(); closeCohortModal();
         }
     });
 
-    /* =========================================================
-       Init
-       ========================================================= */
     function init() {
         try {
             loadData();
-
             console.log('[pm-cohort-modal] Ready. Cards:',
                 document.querySelectorAll('.pm-cohort-card').length,
                 'Cohorts:', Object.keys(COHORT_DATA).length,
                 'Supervisors:', Object.keys(SUPERVISOR_DATA).length);
-
-            if (Object.keys(COHORT_DATA).length > 0) {
-                var sampleId = Object.keys(COHORT_DATA)[0];
-                console.log('[pm-cohort-modal] sample record for id', sampleId, '=', COHORT_DATA[sampleId]);
-            }
-
             attachCardHandlers();
             attachModalHandlers();
         } catch (err) {
