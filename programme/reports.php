@@ -299,7 +299,7 @@ if ($stmt) {
                 class="overview-grid"
                 style="margin-top:2rem;"
             >
-                <div class="overview-card">
+                <button type="button" class="overview-card pm-report-card" data-report-key="total_programmes" aria-label="View details for Total Programmes">
                     <div class="overview-card__icon overview-card__icon--primary">
                         <i class="fas fa-graduation-cap"></i>
                     </div>
@@ -311,8 +311,8 @@ if ($stmt) {
                             Total Programmes
                         </span>
                     </div>
-                </div>
-                <div class="overview-card">
+                </button>
+                <button type="button" class="overview-card pm-report-card" data-report-key="active_programmes" aria-label="View details for Active Programmes">
                     <div class="overview-card__icon overview-card__icon--cyan">
                         <i class="fas fa-play-circle"></i>
                     </div>
@@ -324,8 +324,8 @@ if ($stmt) {
                             Active Programmes
                         </span>
                     </div>
-                </div>
-                <div class="overview-card">
+                </button>
+                <button type="button" class="overview-card pm-report-card" data-report-key="completed_programmes" aria-label="View details for Completed Programmes">
                     <div class="overview-card__icon overview-card__icon--primary">
                         <i class="fas fa-check-circle"></i>
                     </div>
@@ -337,8 +337,8 @@ if ($stmt) {
                             Completed Programmes
                         </span>
                     </div>
-                </div>
-                <div class="overview-card">
+                </button>
+                <button type="button" class="overview-card pm-report-card" data-report-key="paused_programmes" aria-label="View details for Paused Programmes">
                     <div class="overview-card__icon overview-card__icon--amber">
                         <i class="fas fa-pause-circle"></i>
                     </div>
@@ -350,7 +350,7 @@ if ($stmt) {
                             Paused Programmes
                         </span>
                     </div>
-                </div>
+                </button>
             </div>
             <!-- =================================================
                  COHORT / CANDIDATE STATISTICS
@@ -359,7 +359,7 @@ if ($stmt) {
                 class="overview-grid"
                 style="margin-top:1rem;"
             >
-                <div class="overview-card">
+                <button type="button" class="overview-card pm-report-card" data-report-key="total_cohorts" aria-label="View details for Total Cohorts">
                     <div class="overview-card__icon overview-card__icon--primary">
                         <i class="fas fa-layer-group"></i>
                     </div>
@@ -371,8 +371,8 @@ if ($stmt) {
                             Total Cohorts
                         </span>
                     </div>
-                </div>
-                <div class="overview-card">
+                </button>
+                <button type="button" class="overview-card pm-report-card" data-report-key="total_candidates" aria-label="View details for Total Candidates">
                     <div class="overview-card__icon overview-card__icon--cyan">
                         <i class="fas fa-users"></i>
                     </div>
@@ -384,8 +384,8 @@ if ($stmt) {
                             Total Candidates
                         </span>
                     </div>
-                </div>
-                <div class="overview-card">
+                </button>
+                <button type="button" class="overview-card pm-report-card" data-report-key="completed_candidates" aria-label="View details for Completed Candidates">
                     <div class="overview-card__icon overview-card__icon--primary">
                         <i class="fas fa-user-check"></i>
                     </div>
@@ -397,8 +397,8 @@ if ($stmt) {
                             Completed Candidates
                         </span>
                     </div>
-                </div>
-                <div class="overview-card">
+                </button>
+                <button type="button" class="overview-card pm-report-card" data-report-key="completion_rate" aria-label="View details for Completion Rate">
                     <div class="overview-card__icon overview-card__icon--amber">
                         <i class="fas fa-chart-line"></i>
                     </div>
@@ -410,7 +410,7 @@ if ($stmt) {
                             Completion Rate
                         </span>
                     </div>
-                </div>
+                </button>
             </div>
             <!-- =================================================
                  PROGRAMME PERFORMANCE
@@ -567,7 +567,7 @@ if ($stmt) {
                 class="overview-grid"
                 style="margin-top:2rem;"
             >
-                <div class="welcome-card">
+                <button type="button" class="welcome-card pm-report-card pm-report-card--wide" data-report-key="active_candidates" aria-label="View details for Active Candidates">
                     <div class="welcome-card__content">
                         <h3>
                             Active Candidates
@@ -583,8 +583,8 @@ if ($stmt) {
                             <?= number_format($activeCandidates) ?>
                         </span>
                     </div>
-                </div>
-                <div class="welcome-card">
+                </button>
+                <button type="button" class="welcome-card pm-report-card pm-report-card--wide" data-report-key="withdrawn_candidates" aria-label="View details for Withdrawn Candidates">
                     <div class="welcome-card__content">
                         <h3>
                             Withdrawn Candidates
@@ -600,11 +600,54 @@ if ($stmt) {
                             <?= number_format($withdrawnCandidates) ?>
                         </span>
                     </div>
-                </div>
+                </button>
+            </div>
+
+            <!-- =================================================
+                 REPORT DETAILS MODAL
+            ================================================== -->
+            <div
+                class="pm-report-modal-overlay"
+                id="pmReportModal"
+                aria-hidden="true"
+            >
+                <section
+                    class="pm-report-modal"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="pmReportModalTitle"
+                >
+                    <header class="pm-report-modal__header">
+                        <div class="pm-report-modal__heading">
+                            <span class="pm-report-modal__icon" id="pmReportModalIcon">
+                                <i class="fas fa-chart-line"></i>
+                            </span>
+                            <div>
+                                <h2 id="pmReportModalTitle">Report Details</h2>
+                                <p id="pmReportModalSubtitle">Loading report details...</p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            class="pm-report-modal__close"
+                            id="pmReportModalClose"
+                            aria-label="Close report details"
+                        >
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </header>
+                    <div class="pm-report-modal__body" id="pmReportModalBody">
+                        <div class="pm-report-modal__loading">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <span>Loading report details...</span>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
     </main>
 </div>
 <script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260920"></script>
+<script src="<?= url('js/programme_reports.js') ?>?v=20260923"></script>
 </body>
 </html>

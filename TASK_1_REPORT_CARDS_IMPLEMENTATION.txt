@@ -1,0 +1,59 @@
+INVESTHOOD IT - TASK 1 IMPLEMENTATION
+Make Reports Cards Interactive with Detailed Modals
+
+Implemented against the current project supplied by the team.
+
+CHANGED FILES
+1. programme/reports.php
+   - Converted all 10 Programme Manager report summary cards into accessible buttons.
+   - Added report-card identifiers for dynamic loading.
+   - Added responsive report-details modal markup.
+
+2. programme/report_details.php
+   - New authenticated Programme Manager JSON endpoint.
+   - Validates the requested report key.
+   - Uses the logged-in Programme Manager ID from the session.
+   - Every database query is scoped through programmes.programme_manager_id = ?.
+   - Provides details for programmes, cohorts and candidate participation records.
+   - Provides completion-rate breakdown.
+
+3. js/programme_reports.js
+   - New page-specific JavaScript module.
+   - Opens the modal when a report card is clicked.
+   - Retrieves live data using fetch().
+   - Handles loading, empty and error states.
+   - Supports Escape key and backdrop/close-button closing.
+   - Restores focus to the card that opened the modal.
+   - Escapes returned values before inserting them into the modal.
+
+4. css/programme_manager_enhancements.css
+   - Added interactive report-card styling.
+   - Added responsive modal styling.
+   - Added dark-mode-compatible report modal components.
+
+REPORT CARDS COVERED
+- Total Programmes
+- Active Programmes
+- Completed Programmes
+- Paused Programmes
+- Total Cohorts
+- Total Candidates
+- Completed Candidates
+- Completion Rate
+- Active Candidates
+- Withdrawn Candidates
+
+SECURITY
+The browser never supplies a Programme Manager ID. The endpoint obtains the logged-in user from the existing session and scopes every report query to that manager's assigned programmes.
+
+VALIDATION PERFORMED
+- PHP syntax check: programme/reports.php - passed
+- PHP syntax check: programme/report_details.php - passed
+- JavaScript syntax check: programme_manager_enhancements.js - passed
+- JavaScript syntax check: programme_reports.js - passed
+
+LOCAL TEST STILL REQUIRED
+The application must be opened through the team's local XAMPP environment to verify the live MySQL results and browser interaction. The uploaded project cannot be authenticated against the team's local database from this environment.
+
+IMPORTANT
+Do not replace the entire project with an older copy. Copy/merge only the changed files into the team's current working project.

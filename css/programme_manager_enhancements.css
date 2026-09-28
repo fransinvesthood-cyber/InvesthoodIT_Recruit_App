@@ -1634,3 +1634,309 @@ html[data-theme="dark"] .dash-content hr {
         max-width: 100% !important;
     }
 }
+/* ============================================================
+   PROGRAMME MANAGER REPORTS - INTERACTIVE SUMMARY CARDS
+   ============================================================ */
+
+.pm-report-card {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid transparent;
+    transition:
+        transform .2s ease,
+        box-shadow .2s ease,
+        border-color .2s ease;
+}
+
+.pm-report-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--pm-primary);
+    box-shadow: 0 12px 30px rgba(16, 24, 40, .10);
+}
+
+.pm-report-card:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, .25);
+    outline-offset: 3px;
+}
+
+.pm-report-card::after {
+    content: "\f054";
+    position: absolute;
+    right: 1rem;
+    bottom: .9rem;
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    font-size: .72rem;
+    color: var(--pm-muted);
+    transition: transform .2s ease, color .2s ease;
+}
+
+.pm-report-card:hover::after {
+    color: var(--pm-primary);
+    transform: translateX(3px);
+}
+
+.pm-report-card--wide {
+    padding-right: 2.5rem;
+}
+
+html[data-theme="dark"] .pm-report-card {
+    color: var(--pm-text);
+}
+
+html[data-theme="dark"] .pm-report-card:hover {
+    box-shadow: 0 14px 34px rgba(0, 0, 0, .28);
+}
+
+/* ============================================================
+   REPORT DETAILS MODAL
+   ============================================================ */
+
+.pm-report-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(15, 23, 42, .62);
+    backdrop-filter: blur(5px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .2s ease, visibility .2s ease;
+}
+
+.pm-report-modal-overlay.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.pm-report-modal {
+    width: min(860px, 100%);
+    max-height: min(760px, calc(100vh - 2rem));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--pm-surface);
+    color: var(--pm-text);
+    border: 1px solid var(--pm-border);
+    border-radius: 18px;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, .25);
+    transform: translateY(14px) scale(.98);
+    transition: transform .2s ease;
+}
+
+.pm-report-modal-overlay.is-open .pm-report-modal {
+    transform: translateY(0) scale(1);
+}
+
+.pm-report-modal__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.4rem;
+    border-bottom: 1px solid var(--pm-border);
+}
+
+.pm-report-modal__heading {
+    display: flex;
+    align-items: center;
+    gap: .85rem;
+    min-width: 0;
+}
+
+.pm-report-modal__icon {
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    color: var(--pm-primary);
+    background: var(--pm-primary-soft);
+}
+
+.pm-report-modal__header h2 {
+    margin: 0;
+    font-size: 1.15rem;
+}
+
+.pm-report-modal__header p {
+    margin: .2rem 0 0;
+    color: var(--pm-muted);
+    font-size: .84rem;
+}
+
+.pm-report-modal__close {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--pm-muted);
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.pm-report-modal__close:hover {
+    background: var(--pm-soft);
+    color: var(--pm-text);
+}
+
+.pm-report-modal__body {
+    overflow-y: auto;
+    padding: 1.25rem 1.4rem 1.4rem;
+}
+
+.pm-report-modal__loading,
+.pm-report-modal__empty,
+.pm-report-modal__error {
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: .65rem;
+    text-align: center;
+    color: var(--pm-muted);
+}
+
+.pm-report-modal__loading i {
+    color: var(--pm-primary);
+    font-size: 1.35rem;
+}
+
+.pm-report-modal__error i {
+    color: #dc2626;
+    font-size: 1.35rem;
+}
+
+.pm-report-detail-list {
+    display: grid;
+    gap: .7rem;
+}
+
+.pm-report-detail-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: center;
+    padding: .95rem 1rem;
+    border: 1px solid var(--pm-border);
+    border-radius: 12px;
+    background: var(--pm-soft);
+}
+
+.pm-report-detail-item__main {
+    min-width: 0;
+}
+
+.pm-report-detail-item__title {
+    display: block;
+    font-weight: 700;
+    color: var(--pm-text);
+}
+
+.pm-report-detail-item__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem .8rem;
+    margin-top: .3rem;
+    color: var(--pm-muted);
+    font-size: .78rem;
+}
+
+.pm-report-detail-item__value {
+    font-weight: 700;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.pm-report-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: .28rem .55rem;
+    border-radius: 999px;
+    background: var(--pm-primary-soft);
+    color: var(--pm-primary);
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.pm-report-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .8rem;
+    margin-bottom: 1rem;
+}
+
+.pm-report-summary-item {
+    padding: 1rem;
+    border: 1px solid var(--pm-border);
+    border-radius: 12px;
+    background: var(--pm-soft);
+}
+
+.pm-report-summary-item__label {
+    display: block;
+    color: var(--pm-muted);
+    font-size: .76rem;
+}
+
+.pm-report-summary-item__value {
+    display: block;
+    margin-top: .25rem;
+    color: var(--pm-text);
+    font-size: 1.35rem;
+    font-weight: 800;
+}
+
+body.pm-report-modal-open {
+    overflow: hidden;
+}
+
+@media (max-width: 620px) {
+    .pm-report-modal-overlay {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .pm-report-modal {
+        width: 100%;
+        max-height: 92vh;
+        border-radius: 18px 18px 0 0;
+    }
+
+    .pm-report-modal__header,
+    .pm-report-modal__body {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .pm-report-summary-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .pm-report-detail-item {
+        grid-template-columns: 1fr;
+    }
+
+    .pm-report-detail-item__value {
+        text-align: left;
+    }
+}
