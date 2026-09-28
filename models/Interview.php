@@ -554,23 +554,40 @@ class Interview
     // recruitment data (feedback, ratings, cancellation metadata,
     // created_by / cancelled_by) is never exposed here.
 
-    private const CANDIDATE_SELECT = '
-        SELECT i.id, i.application_id, i.interview_date, i.start_time, i.end_time,
-               i.interview_type, i.location, i.status, i.notes, i.reschedule_count,
-               i.previous_date, i.previous_start_time, i.previous_end_time,
-               i.created_at, i.updated_at,
-               a.application_reference, a.status AS application_status,
-               o.id AS opportunity_id, o.title AS opportunity_title,
-               p.id AS programme_id, p.name AS programme_name,
-               c.id AS cohort_id, c.name AS cohort_name,
-               iu.first_name AS interviewer_first_name, iu.last_name AS interviewer_last_name,
-               (SELECT COUNT(*) FROM interview_feedback f WHERE f.interview_id = i.id) AS has_feedback
-        FROM interviews i
-        INNER JOIN applications a ON a.id = i.application_id
-        INNER JOIN opportunities o ON o.id = a.opportunity_id
-        INNER JOIN programmes p ON p.id = o.programme_id
-        LEFT JOIN cohorts c ON c.id = o.cohort_id
-        LEFT JOIN users iu ON iu.id = i.interviewer_id';
+    /**
+     * Build the common candidate-facing SELECT.
+     *
+     * interview_feedback is optional, so the Candidate Portal must not fail
+     * when that table has not yet been created/migrated.
+     */
+    private static function candidateSelect(): string
+    {
+        $fbCols = self::feedbackColumns();
+        $hasFeedbackTable = in_array('interview_id', $fbCols, true);
+
+        $feedbackSelect = $hasFeedbackTable
+            ? "(SELECT COUNT(*) FROM interview_feedback f WHERE f.interview_id = i.id) AS has_feedback"
+            : "0 AS has_feedback";
+
+        return "
+            SELECT i.id, i.application_id, i.interview_date, i.start_time, i.end_time,
+                   i.interview_type, i.location, i.status, i.notes, i.reschedule_count,
+                   i.previous_date, i.previous_start_time, i.previous_end_time,
+                   i.created_at, i.updated_at,
+                   a.application_reference, a.status AS application_status,
+                   o.id AS opportunity_id, o.title AS opportunity_title,
+                   p.id AS programme_id, p.name AS programme_name,
+                   c.id AS cohort_id, c.name AS cohort_name,
+                   iu.first_name AS interviewer_first_name, iu.last_name AS interviewer_last_name,
+                   {$feedbackSelect}
+            FROM interviews i
+            INNER JOIN applications a ON a.id = i.application_id
+            INNER JOIN opportunities o ON o.id = a.opportunity_id
+            INNER JOIN programmes p ON p.id = o.programme_id
+            LEFT JOIN cohorts c ON c.id = o.cohort_id
+            LEFT JOIN users iu ON iu.id = i.interviewer_id
+        ";
+    }
 
     /**
      * Get all interviews for a candidate (via their applications),
@@ -582,7 +599,7 @@ class Interview
     public static function forCandidate(int $candidateId): array
     {
         return Database::fetchAll(
-            self::CANDIDATE_SELECT . '
+            self::candidateSelect() . '
              WHERE a.candidate_id = ?
              ORDER BY i.interview_date DESC, i.start_time DESC, i.id DESC',
             'i', [$candidateId]
@@ -602,7 +619,7 @@ class Interview
     public static function candidateUpcoming(int $candidateId, int $limit = 1): array
     {
         return Database::fetchAll(
-            self::CANDIDATE_SELECT . "
+            self::candidateSelect() . "
              WHERE a.candidate_id = ?
                AND i.status IN ('scheduled', 'confirmed', 'rescheduled')
                AND (i.interview_date > CURDATE()
@@ -676,7 +693,7 @@ class Interview
     public static function findForCandidate(int $interviewId, int $candidateId): ?array
     {
         return Database::fetchOne(
-            self::CANDIDATE_SELECT . '
+            self::candidateSelect() . '
              WHERE i.id = ?
                AND a.candidate_id = ?
              LIMIT 1',
