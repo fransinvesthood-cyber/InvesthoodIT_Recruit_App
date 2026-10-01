@@ -110,7 +110,8 @@ if ($result->num_rows === 0) {
             href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
             crossorigin="anonymous"
         >
-    </head>
+      <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260919">
+</head>
     <body class="dashboard-page">
     <div class="dashboard">
         <?php require __DIR__ . '/sidebar.php'; ?>
@@ -154,7 +155,8 @@ if ($result->num_rows === 0) {
             </div>
         </main>
     </div>
-    </body>
+    <script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260919"></script>
+</body>
     </html>
     <?php
     exit;
@@ -339,6 +341,8 @@ while ($row = $result->fetch_assoc()) {
 }
 $stmt->close();
 ?>
+
+<?php $currentPage = 'programmes'; $pageTitle = 'Programme Details'; ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -373,6 +377,7 @@ $stmt->close();
         rel="stylesheet"
         href="<?= url('css/styles.css') ?>"
     >
+<link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260919b">
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
@@ -387,22 +392,7 @@ $stmt->close();
         <!-- =================================================
              HEADER
         ================================================== -->
-        <header class="dash-header">
-            <div class="dash-header__left">
-                <h1 class="dash-header__title">
-                    Programme Details
-                </h1>
-            </div>
-            <div class="dash-header__right">
-                <div class="dash-header__user">
-                    <img
-                        src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Programme Manager') ?>&background=1a56db&color=fff&size=80"
-                        alt=""
-                        class="dash-header__avatar"
-                    >
-                </div>
-            </div>
-        </header>
+        <?php require __DIR__ . '/navbar.php'; ?>
         <!-- =================================================
              CONTENT
         ================================================== -->
@@ -772,5 +762,6 @@ $stmt->close();
         </div>
     </main>
 </div>
+<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260919b"></script>
 </body>
 </html>

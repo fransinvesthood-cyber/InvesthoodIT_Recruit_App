@@ -1,0 +1,172 @@
+
+/* =========================================================
+   GLOBAL DASHBOARD CLICKABLE CARDS + MINI MODAL
+   Works with all Investhood role dashboards.
+   ========================================================= */
+[data-dashboard-modal-card="1"] {
+    cursor: pointer;
+    position: relative;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    outline: none;
+}
+
+[data-dashboard-modal-card="1"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 34px rgba(16, 24, 40, .12);
+}
+
+[data-dashboard-modal-card="1"]:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, .28);
+    outline-offset: 3px;
+}
+
+.dashboard-mini-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 99990;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(15, 23, 42, .56);
+    backdrop-filter: blur(5px);
+}
+
+.dashboard-mini-modal-backdrop.is-open {
+    display: flex;
+}
+
+.dashboard-mini-modal {
+    width: min(440px, 100%);
+    max-height: min(620px, calc(100vh - 36px));
+    overflow: auto;
+    border: 1px solid var(--pm-border, rgba(148, 163, 184, .28));
+    border-radius: 20px;
+    background: var(--pm-surface, #fff);
+    color: var(--pm-text, #101828);
+    box-shadow: 0 28px 80px rgba(2, 6, 23, .30);
+    animation: dashboardMiniModalIn .18s ease-out;
+}
+
+@keyframes dashboardMiniModalIn {
+    from { opacity: 0; transform: translateY(10px) scale(.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.dashboard-mini-modal__head {
+    padding: 18px 20px 14px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    border-bottom: 1px solid var(--pm-border, #e5e7eb);
+}
+
+.dashboard-mini-modal__eyebrow {
+    display: block;
+    margin-bottom: 5px;
+    color: #2563eb;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.dashboard-mini-modal__title {
+    margin: 0;
+    color: inherit;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.dashboard-mini-modal__close {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--pm-border, #e5e7eb);
+    border-radius: 10px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.dashboard-mini-modal__body {
+    padding: 18px 20px;
+}
+
+.dashboard-mini-modal__metric {
+    margin-bottom: 12px;
+    font-size: 30px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.dashboard-mini-modal__summary {
+    margin: 0;
+    color: var(--pm-muted, #667085);
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: normal;
+}
+
+.dashboard-mini-modal__footer {
+    padding: 14px 20px 18px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 9px;
+    border-top: 1px solid var(--pm-border, #e5e7eb);
+}
+
+.dashboard-mini-modal__button {
+    min-height: 38px;
+    padding: 0 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border: 1px solid var(--pm-border, #d0d5dd);
+    border-radius: 10px;
+    background: transparent;
+    color: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.dashboard-mini-modal__button--primary {
+    border-color: #2563eb;
+    background: #2563eb;
+    color: #fff;
+}
+
+html[data-theme="dark"] .dashboard-mini-modal,
+body.dark-mode .dashboard-mini-modal,
+body.dark .dashboard-mini-modal {
+    --pm-surface: #101828;
+    --pm-text: #f8fafc;
+    --pm-muted: #98a2b3;
+    --pm-border: rgba(255,255,255,.10);
+    background: #101828;
+    color: #f8fafc;
+}
+
+html[data-theme="dark"] [data-dashboard-modal-card="1"]:hover,
+body.dark-mode [data-dashboard-modal-card="1"]:hover,
+body.dark [data-dashboard-modal-card="1"]:hover {
+    box-shadow: 0 16px 38px rgba(0, 0, 0, .32);
+}
+
+body.dashboard-mini-modal-open {
+    overflow: hidden;
+}
+
+@media (max-width: 560px) {
+    .dashboard-mini-modal-backdrop { align-items: flex-end; padding: 10px; }
+    .dashboard-mini-modal { width: 100%; border-radius: 18px; }
+    .dashboard-mini-modal__footer { flex-direction: column-reverse; }
+    .dashboard-mini-modal__button { width: 100%; }
+}

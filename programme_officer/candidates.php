@@ -1,32 +1,6 @@
 <?php
-require_once __DIR__ . '/../includes/bootstrap.php';
-require_role('programme_officer');
-require_once __DIR__ . '/_helpers.php';
-
-$user = current_user();
-$flashes = render_flashes();
-$currentPage = 'candidates';
-$pageTitle = 'Candidates';
-$conn = Database::getConnection();
-
-$programmeOfficerId = (int)($user['id'] ?? $user['user_id'] ?? 0);
-if ($programmeOfficerId <= 0) {
-    http_response_code(403);
-    exit('Invalid Programme Officer account.');
-}
-
-$scope = po_scope($conn, 'p', 'c');
-$scopeCondition = $scope['condition'] ?? '1 = 0';
-$scopeMode = $scope['mode'] ?? 'none';
-
-$mode = trim((string)($_GET['mode'] ?? 'list'));
-$search = trim((string)($_GET['search'] ?? ''));
-$status = trim((string)($_GET['status'] ?? ''));
-$programmeId = (int)($_GET['programme_id'] ?? 0);
-$cohortId = (int)($_GET['cohort_id'] ?? 0);
-
-/*
- * HOTFIX HEADER ONLY:
- * Keep the rest of your existing candidates.php code below this point.
- * Use $scopeMode instead of directly accessing $scope['mode'].
- */
+require_once __DIR__.'/../includes/bootstrap.php';require_role('programme_officer');$user=current_user();$flashes=render_flashes();$currentPage='candidates';$pageTitle='Candidates';require_once __DIR__.'/_helpers.php';$conn=Database::getConnection();$officerId=(int)($user['id']??$user['user_id']??0);if($officerId<=0){http_response_code(403);exit('Invalid Programme Officer account.');}$scope=po_scope($conn,'p','c');$search=trim((string)($_GET['search']??''));$status=trim((string)($_GET['status']??''));$cohortId=(int)($_GET['cohort_id']??0);$where=[po_scope_condition($scope)];$params=[$officerId];$types='i';if($search!==''){$where[]='(u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR c.name LIKE ? OR p.name LIKE ?)';$like='%'.$search.'%';for($i=0;$i<5;$i++)$params[]=$like;$types.='sssss';}if($status!==''){$where[]='cp.status = ?';$params[]=$status;$types.='s';}if($cohortId>0){$where[]='c.id = ?';$params[]=$cohortId;$types.='i';}$sql="SELECT u.id candidate_id,u.first_name,u.last_name,u.email,cp.status participant_status,c.id cohort_id,c.name cohort_name,p.id programme_id,p.name programme_name FROM cohort_participants cp INNER JOIN users u ON u.id=cp.user_id INNER JOIN cohorts c ON c.id=cp.cohort_id INNER JOIN programmes p ON p.id=c.programme_id WHERE ".implode(' AND ',$where)." ORDER BY u.first_name,u.last_name,c.name";$rows=[];if(po_scope_mode($scope)!=='none'){$stmt=$conn->prepare($sql);$stmt->bind_param($types,...$params);$stmt->execute();$r=$stmt->get_result();while($row=$r->fetch_assoc())$rows[]=$row;$stmt->close();}require __DIR__.'/_layout_start.php';?>
+<div class="po-page-header"><div><span class="po-page-header__eyebrow">Candidate Management</span><h2>Candidates</h2><p>Review participants across programmes and cohorts available to your Programme Officer workspace.</p></div></div>
+<form class="po-filter" method="get"><?php if($cohortId>0):?><input type="hidden" name="cohort_id" value="<?= $cohortId ?>"><?php endif;?><div class="po-field po-field--grow"><label>Search</label><div class="po-input-icon"><i class="fas fa-magnifying-glass"></i><input name="search" value="<?= e($search) ?>" placeholder="Name, email, cohort or programme"></div></div><div class="po-field"><label>Status</label><select name="status"><option value="">All statuses</option><?php foreach(['active','completed','withdrawn','selected','onboarded'] as $s):?><option value="<?= e($s) ?>" <?= $status===$s?'selected':'' ?>><?= e(po_status_label($s)) ?></option><?php endforeach;?></select></div><div class="po-filter__actions"><button class="po-btn po-btn--primary"><i class="fas fa-filter"></i> Apply</button><a class="po-btn po-btn--secondary" href="<?= url('programme_officer/candidates.php') ?>">Reset</a></div></form>
+<div class="po-card"><div class="po-card__header"><div><h3>Candidate Directory</h3><p><?= number_format(count($rows)) ?> participation record(s).</p></div></div><?php if(!$rows):?><div class="po-empty"><div class="po-empty__icon"><i class="fas fa-users"></i></div><strong>No candidates found</strong><span>No participant matched the current filters.</span></div><?php else:?><div class="po-table-wrap"><table class="po-table"><thead><tr><th>Candidate</th><th>Programme</th><th>Cohort</th><th>Status</th><th></th></tr></thead><tbody><?php foreach($rows as $c):$fn=trim((string)($c['first_name']??''));$ln=trim((string)($c['last_name']??''));?><tr><td><div class="po-person"><div class="po-avatar"><?= e(po_initials($fn,$ln)) ?></div><div><strong><?= e(trim($fn.' '.$ln)?:'Candidate') ?></strong><span><?= e((string)$c['email']) ?></span></div></div></td><td><strong><?= e($c['programme_name']) ?></strong></td><td><?= e($c['cohort_name']) ?></td><td><span class="po-status po-status--<?= e(po_status_class($c['participant_status'])) ?>"><?= e(po_status_label($c['participant_status'])) ?></span></td><td class="po-table__action"><a class="po-icon-btn" href="<?= url('programme_officer/candidate_view.php?id='.(int)$c['candidate_id'].'&cohort_id='.(int)$c['cohort_id']) ?>"><i class="fas fa-arrow-right"></i></a></td></tr><?php endforeach;?></tbody></table></div><?php endif;?></div>
+<?php require __DIR__.'/_layout_end.php';?>

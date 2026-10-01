@@ -1,18 +1,2 @@
-<?php
-require_once __DIR__ . '/_helpers.php';
-
-$currentPage = $currentPage ?? '';
-if (!isset($user) || !is_array($user)) {
-    $user = current_user();
-}
-
-$firstName = trim((string)($user['first_name'] ?? ''));
-$lastName = trim((string)($user['last_name'] ?? ''));
-$fullName = trim((string)($user['full_name'] ?? $user['fullname'] ?? ($firstName . ' ' . $lastName)));
-if ($fullName === '') $fullName = 'Programme Officer';
-$initials = po_initials($firstName, $lastName);
-
-/*
- * HOTFIX HEADER ONLY:
- * Keep the rest of your existing file markup below this point.
- */
+<?php $currentPage=$currentPage??'';if(!isset($user)||!is_array($user))$user=current_user();$name=trim((string)($user['full_name']??$user['fullname']??trim(($user['first_name']??'').' '.($user['last_name']??''))));if($name==='')$name='Programme Officer';?>
+<aside class="sidebar" id="portalSidebar"><div class="sidebar__header"><a href="<?=url('index.php')?>" class="logo"><span class="logo__icon"><i class="fas fa-code"></i></span><span class="logo__text">Investhood <span class="logo__accent">IT</span></span></a><button class="sidebar__close" id="portalSidebarClose" type="button"><i class="fas fa-times"></i></button></div><nav class="sidebar__nav"><div class="sidebar__section-label">Programme Officer</div><div class="sidebar__section-label">Main</div><ul class="sidebar__menu"><li><a class="sidebar__link <?= in_array($currentPage,['dashboard'],true)?'active':'' ?>" href="<?= url('programme_officer/dashboard.php') ?>"><i class="fas fa-grid-2"></i> Dashboard</a></li></ul><div class="sidebar__section-label">Programme Management</div><ul class="sidebar__menu"><li><a class="sidebar__link <?= in_array($currentPage,['programmes'],true)?'active':'' ?>" href="<?= url('programme_officer/programmes.php') ?>"><i class="fas fa-diagram-project"></i> My Programmes</a></li><li><a class="sidebar__link <?= in_array($currentPage,['cohorts','cohort_view'],true)?'active':'' ?>" href="<?= url('programme_officer/cohorts.php') ?>"><i class="fas fa-layer-group"></i> Cohorts</a></li><li><a class="sidebar__link <?= in_array($currentPage,['candidates','candidate_view','update_candidate_status'],true)?'active':'' ?>" href="<?= url('programme_officer/candidates.php') ?>"><i class="fas fa-users"></i> Candidates</a></li></ul><div class="sidebar__section-label">Insights</div><ul class="sidebar__menu"><li><a class="sidebar__link <?= in_array($currentPage,['reports'],true)?'active':'' ?>" href="<?= url('programme_officer/reports.php') ?>"><i class="fas fa-chart-column"></i> Reports</a></li><li><a class="sidebar__link <?= in_array($currentPage,['activity_log'],true)?'active':'' ?>" href="<?= url('programme_officer/activity_log.php') ?>"><i class="fas fa-clock-rotate-left"></i> Activity Log</a></li></ul></nav><div class="sidebar__footer"><div class="sidebar__user"><div class="sidebar__user-avatar"><img src="https://ui-avatars.com/api/?name=<?=urlencode($name)?>&background=1a56db&color=fff&size=80" alt=""></div><div class="sidebar__user-info"><span class="sidebar__user-name"><?=e($name)?></span><span class="sidebar__user-role">Programme Officer</span></div></div><a href="<?=url('auth/logout.php')?>" class="sidebar__logout"><i class="fas fa-sign-out-alt"></i> Sign Out</a></div></aside><div class="sidebar-overlay" id="portalSidebarOverlay"></div>

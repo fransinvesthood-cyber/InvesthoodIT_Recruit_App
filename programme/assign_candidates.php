@@ -18,13 +18,19 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 require_role('programme_manager');
 $user = current_user();
 $conn = Database::getConnection();
-$currentPage = 'cohorts';
+$currentPage = 'assign_candidates';
+$pageTitle = 'Assign Candidates';
 /*
 |--------------------------------------------------------------------------
 | Programme Manager
 |--------------------------------------------------------------------------
 */
-$managerId = (int) ($user['user_id'] ?? 0);
+$managerId = (int) ($user['id'] ?? $user['user_id'] ?? 0);
+
+if ($managerId <= 0) {
+    http_response_code(403);
+    exit('Invalid Programme Manager account.');
+}
 /*
 |--------------------------------------------------------------------------
 | Helpers
@@ -479,58 +485,6 @@ if ($stmt) {
 */
 $candidates = [];
 $sql = "
-    SELECT
-        u.id,
-        u.first_name,
-        u.last_name,
-        u.email,
-        u.phone,
-        u.status
-    FROM users u
-    WHERE u.role = 9
-";
-$types = '';
-$params = [];
-/*
-|--------------------------------------------------------------------------
-| Search
-|--------------------------------------------------------------------------
-*/
-if ($search !== '') {
-    $sql .= "
-        AND (
-            CONCAT(u.first_name,' ',u.last_name) LIKE ?
-            OR u.email LIKE ?
-        )
-    ";
-    $searchValue = '%' . $search . '%';
-    $types .= 'ss';
-    $params[] = $searchValue;
-    $params[] = $searchValue;
-}
-/*
-|--------------------------------------------------------------------------
-| Exclude Existing Participants
-|--------------------------------------------------------------------------
-*/
-$sql .= "
-    AND NOT EXISTS (
-        SELECT 1
-        FROM cohort_participants cp
-        WHERE cp.cohort_id = ?
-          AND cp.user_id = u.id
-    )
-    ORDER BY u.first_name,u.last_name
-";
-$types .= 'i';
-$params[] = $cohortId;
-/*
-|--------------------------------------------------------------------------
-| Prepare Candidate Query
-|--------------------------------------------------------------------------
-*/
-$candidates = [];
-$sql = "
 SELECT
     u.id,
     u.first_name,
@@ -626,6 +580,273 @@ $candidateCount = count($candidates);
         rel="stylesheet"
         href="<?= url('css/styles.css') ?>"
     >
+  <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260920">
+
+    <style>
+        /* Assign Candidates: prevent candidate data from overflowing/overlapping cards */
+        .candidate-card {
+            min-width: 0;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .candidate-card > label {
+            min-width: 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .candidate-card__row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            width: 100%;
+            min-width: 0;
+        }
+
+        .candidate-card__identity {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+        .candidate-card__avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            flex: 0 0 56px;
+            object-fit: cover;
+        }
+
+        .candidate-card__details {
+            min-width: 0;
+            flex: 1 1 auto;
+            overflow: hidden;
+        }
+
+        .candidate-card__name,
+        .candidate-card__contact {
+            max-width: 100%;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .candidate-card__name {
+            font-weight: 700;
+            color: #1a56db;
+            line-height: 1.35;
+        }
+
+        .candidate-card__contact {
+            margin-top: .25rem;
+            font-size: .9rem;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        .candidate-card .candidate-checkbox {
+            flex: 0 0 24px;
+            width: 24px;
+            height: 24px;
+            margin: 0;
+        }
+
+        /* Keep cards responsive even when an email/name is very long. */
+        .overview-grid .candidate-card {
+            width: 100%;
+            max-width: 100%;
+        }
+
+        @media (max-width: 640px) {
+            .candidate-card__row {
+                gap: .75rem;
+            }
+
+            .candidate-card__identity {
+                gap: .75rem;
+            }
+
+            .candidate-card__avatar {
+                width: 46px;
+                height: 46px;
+                flex-basis: 46px;
+            }
+        }
+
+        body.dark-mode .candidate-card__name {
+            color: #93c5fd;
+        }
+
+        body.dark-mode .candidate-card__contact {
+            color: #94a3b8;
+        }
+    </style>
+
+
+    <style>
+        /* =========================================================
+           AVAILABLE CANDIDATES - COMPACT CARD LAYOUT
+           ========================================================= */
+
+        .candidate-selection-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            width: 100%;
+            margin-top: 1rem;
+            align-items: stretch;
+        }
+
+        .candidate-selection-grid .candidate-card {
+            display: block !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            min-height: 0 !important;
+            height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, .05);
+        }
+
+        .candidate-selection-grid .candidate-card > label {
+            display: block !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            height: 100%;
+            padding: 14px !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+        }
+
+        .candidate-selection-grid .candidate-card__row {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) 24px;
+            gap: 10px;
+            align-items: start;
+            width: 100%;
+            min-width: 0;
+        }
+
+        .candidate-selection-grid .candidate-card__identity {
+            display: grid !important;
+            grid-template-columns: 44px minmax(0, 1fr);
+            gap: 10px;
+            align-items: center;
+            min-width: 0;
+            width: 100%;
+        }
+
+        .candidate-selection-grid .candidate-card__avatar {
+            display: block;
+            width: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+            max-width: 44px !important;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .candidate-selection-grid .candidate-card__details {
+            min-width: 0 !important;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .candidate-selection-grid .candidate-card__name {
+            display: block;
+            width: 100%;
+            margin: 0 0 4px;
+            font-size: .92rem;
+            line-height: 1.25;
+            font-weight: 700;
+            color: #1a56db;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .candidate-selection-grid .candidate-card__contact {
+            display: block;
+            width: 100%;
+            margin: 2px 0 0;
+            font-size: .78rem;
+            line-height: 1.25;
+            color: #64748b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .candidate-selection-grid .candidate-checkbox {
+            width: 22px !important;
+            height: 22px !important;
+            min-width: 22px;
+            margin: 1px 0 0 !important;
+            padding: 0 !important;
+            align-self: start;
+        }
+
+        @media (max-width: 1100px) {
+            .candidate-selection-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 650px) {
+            .candidate-selection-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .candidate-selection-grid .candidate-card > label {
+                padding: 12px !important;
+            }
+        }
+
+        body.dark-mode .candidate-selection-grid .candidate-card {
+            background: #111827;
+            border-color: #334155;
+        }
+
+        body.dark-mode .candidate-selection-grid .candidate-card__name {
+            color: #93c5fd;
+        }
+
+        body.dark-mode .candidate-selection-grid .candidate-card__contact {
+            color: #94a3b8;
+        }
+    </style>
+
+
+    <style>
+        /* Candidate name must always be visible for selection */
+        .candidate-selection-grid .candidate-card__name {
+            white-space: normal !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            word-break: normal !important;
+            overflow-wrap: break-word !important;
+            color: #1a56db !important;
+            font-size: .95rem !important;
+            font-weight: 700 !important;
+            line-height: 1.3 !important;
+            margin: 0 0 5px !important;
+        }
+
+        body.dark-mode .candidate-selection-grid .candidate-card__name {
+            color: #93c5fd !important;
+        }
+    </style>
+
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
@@ -640,22 +861,7 @@ $candidateCount = count($candidates);
         <!-- =================================================
              HEADER
         ================================================== -->
-        <header class="dash-header">
-            <div class="dash-header__left">
-                <h1 class="dash-header__title">
-                    Assign Candidates
-                </h1>
-            </div>
-            <div class="dash-header__right">
-                <div class="dash-header__user">
-                    <img
-                        src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Programme Manager') ?>&background=1a56db&color=fff&size=80"
-                        alt=""
-                        class="dash-header__avatar"
-                    >
-                </div>
-            </div>
-        </header>
+        <?php require __DIR__ . '/navbar.php'; ?>
         <!-- =================================================
              CONTENT
         ================================================== -->
@@ -935,28 +1141,28 @@ $candidateCount = count($candidates);
                             </div>
                         </div>
                         <?php else: ?>
-                        <div class="overview-grid" style="margin-top:1rem;">
+                        <div class="candidate-selection-grid">
                         <?php foreach ($candidates as $candidate): ?>
-                        <div class="overview-card candidate-card">
+                        <div class="candidate-card">
                         <label
                             for="candidate_<?= (int)$candidate['id'] ?>"
                             style="cursor:pointer;display:block;width:100%;"
                         >
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;">
-                            <div style="display:flex;gap:1rem;align-items:center;">
+                        <div class="candidate-card__row">
+                            <div class="candidate-card__identity">
                                 <img
                                     src="https://ui-avatars.com/api/?name=<?= urlencode($candidate['first_name'].' '.$candidate['last_name']) ?>&background=1a56db&color=fff"
-                                    style="width:56px;height:56px;border-radius:50%;"
+                                    alt="<?= e(trim($candidate['first_name'].' '.$candidate['last_name'])) ?>"
+                                    class="candidate-card__avatar"
                                 >
-                                <div>
-                                    <br>
-                                    <div style="font-weight:700; color:blue">
-                                        <?= e($candidate['first_name'].' '.$candidate['last_name']) ?>
+                                <div class="candidate-card__details">
+                                    <div class="candidate-card__name" title="<?= e(trim($candidate['first_name'].' '.$candidate['last_name'])) ?>">
+                                        <?= e(trim($candidate['first_name'].' '.$candidate['last_name'])) ?>
                                     </div>
-                                    <div style="font-size:.9rem;color:#64748b;">
+                                    <div class="candidate-card__contact">
                                         <?= e($candidate['email']) ?>
                                     </div>
-                                    <div style="font-size:.9rem;color:#64748b;">
+                                    <div class="candidate-card__contact">
                                         <?= e($candidate['phone'] ?: 'No phone') ?>
                                     </div>
                                 </div>
@@ -1137,5 +1343,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
+<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260920"></script>
 </body>
 </html>

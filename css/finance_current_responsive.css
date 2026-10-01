@@ -1,0 +1,11 @@
+
+/* Current Finance Officer portal responsive integration */
+.ux-main{min-width:0}.ux-content{min-width:0}
+.fo-stats{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:16px!important}
+.fo-stats>article,.fo-card,.fo-panel{min-width:0!important}
+.fo-hero{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;min-width:0!important}
+.fo-table-wrap,.table-responsive,.fo-table-container{display:block!important;width:100%!important;max-width:100%!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch}
+.fo-table-wrap table,.table-responsive table,.fo-table-container table{min-width:700px}
+@media(max-width:1200px){.fo-stats{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(max-width:920px){.fo-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}.fo-hero{grid-template-columns:1fr!important}.fo-orb{justify-self:start}.ux-content{padding:20px!important}}
+@media(max-width:600px){.fo-stats{grid-template-columns:1fr!important}.fo-hero{padding:20px!important}.fo-hero h2{font-size:1.6rem!important}.fo-hero__actions{display:grid!important;grid-template-columns:1fr!important}.fo-btn{width:100%!important}.ux-content{padding:14px!important}}

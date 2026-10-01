@@ -26,6 +26,7 @@ $user = current_user();
 $flashes = render_flashes();
 $conn = Database::getConnection();
 $currentPage = 'candidates';
+$pageTitle = 'Candidates';
 /*
 |--------------------------------------------------------------------------
 | Current Programme Manager
@@ -581,6 +582,7 @@ $flashes = render_flashes();
             }
         }
     </style>
+  <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260920">
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
@@ -595,22 +597,7 @@ $flashes = render_flashes();
         <!-- =================================================
              HEADER
         ================================================== -->
-        <header class="dash-header">
-            <div class="dash-header__left">
-                <h1 class="dash-header__title">
-                    Candidates
-                </h1>
-            </div>
-            <div class="dash-header__right">
-                <div class="dash-header__user">
-                    <img
-                        src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Programme Manager') ?>&background=1a56db&color=fff&size=80"
-                        alt=""
-                        class="dash-header__avatar"
-                    >
-                </div>
-            </div>
-        </header>
+        <?php require __DIR__ . '/navbar.php'; ?>
         <!-- =================================================
              CONTENT
         ================================================== -->
@@ -1144,5 +1131,6 @@ $flashes = render_flashes();
         </div>
     </main>
 </div>
+<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260920"></script>
 </body>
 </html>

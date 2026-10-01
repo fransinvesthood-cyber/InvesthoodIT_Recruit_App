@@ -1,0 +1,18 @@
+
+/* Finance Officer responsive hardening */
+.fo-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px}
+.fo-card,.fo-stats>article,.fo-panel{min-width:0}
+.fo-table-wrap,.table-responsive{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.fo-table-wrap table,.table-responsive table{min-width:720px}
+.fo-hero{min-width:0}
+@media(max-width:1200px){.fo-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:900px){.fo-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.fo-hero{grid-template-columns:1fr!important}.fo-orb{justify-self:start}}
+@media(max-width:640px){
+ .fo-stats{grid-template-columns:1fr}
+ .fo-hero{padding:22px!important;border-radius:18px!important}
+ .fo-hero h2{font-size:1.55rem!important}
+ .fo-hero__actions{display:grid!important;grid-template-columns:1fr!important}
+ .fo-btn{width:100%;justify-content:center}
+ .fo-card,.fo-panel{padding:16px!important}
+ .ux-content{padding-left:14px!important;padding-right:14px!important}
+}

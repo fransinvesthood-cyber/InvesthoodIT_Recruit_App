@@ -1,18 +1,1 @@
-<?php
-require_once __DIR__ . '/_helpers.php';
-
-$currentPage = $currentPage ?? '';
-if (!isset($user) || !is_array($user)) {
-    $user = current_user();
-}
-
-$firstName = trim((string)($user['first_name'] ?? ''));
-$lastName = trim((string)($user['last_name'] ?? ''));
-$fullName = trim((string)($user['full_name'] ?? $user['fullname'] ?? ($firstName . ' ' . $lastName)));
-if ($fullName === '') $fullName = 'Programme Officer';
-$initials = po_initials($firstName, $lastName);
-
-/*
- * HOTFIX HEADER ONLY:
- * Keep the rest of your existing file markup below this point.
- */
+<?php $currentPage=$currentPage??'';if(!isset($user)||!is_array($user))$user=current_user();$f=trim((string)($user['first_name']??''));$l=trim((string)($user['last_name']??''));$name=trim((string)($user['full_name']??$user['fullname']??($f.' '.$l)));if($name==='')$name='Programme Officer';$initials=po_initials($f,$l);$titles=['dashboard'=>'Dashboard','programmes'=>'My Programmes','cohorts'=>'Cohorts','candidates'=>'Candidates','reports'=>'Reports','activity_log'=>'Activity Log','cohort_view'=>'Cohorts','candidate_view'=>'Candidates','update_candidate_status'=>'Candidates'];$title=$titles[$currentPage]??'Programme Officer Portal';$uid=(int)($user['id']??$user['user_id']??0);$nd=po_notifications($conn,$uid,6);$notifications=$nd['items'];$unread=(int)$nd['unread'];?><header class="ux-navbar"><div class="ux-navbar__left"><button class="ux-navbar__menu" id="uxMenuButton"><i class="fas fa-bars"></i></button><div class="ux-navbar__heading"><span>Programme Officer Workspace</span><h1><?=e($title)?></h1></div></div><div class="ux-navbar__right"><button class="ux-theme-toggle" data-ux-theme-toggle title="Toggle dark mode"><i class="fas fa-moon" data-ux-theme-icon></i></button><div class="ux-navbar__notification"><button class="ux-navbar__icon-button ux-notification-button" id="uxNotificationButton"><i class="fas fa-bell"></i><?php if($unread>0):?><span class="ux-notification-badge"><?=$unread>99?'99+':$unread?></span><?php endif;?></button><div class="ux-dropdown" id="uxNotificationDropdown"><div class="ux-dropdown__head"><strong>Notifications</strong><span><?=$unread?> unread</span></div><div class="ux-dropdown__body"><?php if(!$notifications):?><div class="ux-empty ux-empty--compact"><div class="ux-empty__icon"><i class="fas fa-bell"></i></div><strong>You're all caught up</strong><span>No notifications to display.</span></div><?php else:foreach($notifications as $n):?><div class="ux-notification-item <?=(int)($n['is_read']??1)===0?'ux-notification-item--unread':''?>"><span class="ux-notification-item__icon"><i class="fas fa-bell"></i></span><div><strong><?=e((string)($n['title']??'Notification'))?></strong><span><?=e((string)($n['message']??''))?></span></div></div><?php endforeach;endif;?></div><div class="ux-dropdown__footer"><a href="<?=url('programme_officer/notifications.php')?>">View all notifications</a></div></div></div><div class="ux-navbar__user"><div class="ux-navbar__avatar"><?=e($initials)?></div><div class="ux-navbar__user-copy"><strong><?=e($name)?></strong><span>Programme Officer</span></div></div></div></header>

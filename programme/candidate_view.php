@@ -24,13 +24,18 @@ require_role('programme_manager');
 $user = current_user();
 $flashes = render_flashes();
 $conn = Database::getConnection();
-$currentPage = 'candidates';
+$currentPage = 'candidate_view';
+$pageTitle = 'Candidate Profile';
 /*
 |--------------------------------------------------------------------------
 | Current Programme Manager
 |--------------------------------------------------------------------------
 */
-$managerId = (int) ($user['user_id'] ?? 0);
+$managerId = (int) ($user['id'] ?? $user['user_id'] ?? 0);
+if ($managerId <= 0) {
+    http_response_code(403);
+    exit('Invalid Programme Manager account.');
+}
 /*
 |--------------------------------------------------------------------------
 | Candidate ID
@@ -334,6 +339,36 @@ usort(
         rel="stylesheet"
         href="<?= url('css/styles.css') ?>"
     >
+  <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260920">
+
+    <style>
+        /* Candidate View responsive safeguards */
+        .dashboard__main,
+        .dash-content,
+        .welcome-card,
+        .overview-card,
+        .overview-card__info {
+            min-width: 0;
+        }
+
+        .overview-card__number,
+        .overview-card__label,
+        .welcome-card__content {
+            overflow-wrap: break-word;
+        }
+
+        @media (max-width: 650px) {
+            .dash-content {
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+
+            .overview-grid {
+                grid-template-columns: 1fr !important;
+            }
+        }
+    </style>
+
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
@@ -348,22 +383,7 @@ usort(
         <!-- =================================================
              HEADER
         ================================================== -->
-        <header class="dash-header">
-            <div class="dash-header__left">
-                <h1 class="dash-header__title">
-                    Candidate Profile
-                </h1>
-            </div>
-            <div class="dash-header__right">
-                <div class="dash-header__user">
-                    <img
-                        src="https://ui-avatars.com/api/?name=<?= urlencode($candidateName) ?>&background=1a56db&color=fff&size=80"
-                        alt=""
-                        class="dash-header__avatar"
-                    >
-                </div>
-            </div>
-        </header>
+        <?php require __DIR__ . '/navbar.php'; ?>
         <!-- =================================================
              CONTENT
         ================================================== -->
@@ -998,5 +1018,6 @@ usort(
         </div>
     </main>
 </div>
+<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260920"></script>
 </body>
 </html>
