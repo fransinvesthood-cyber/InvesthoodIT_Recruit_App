@@ -681,6 +681,38 @@ try {
     error_log('[Admin Dashboard] Recent selections unavailable: ' . $ex->getMessage());
 }
 
+// ------------------------------------------------------------
+// SECTION 2 - DASHBOARD ANALYTICS (real, database-driven values)
+// The initial render uses the same Analytics model as the AJAX
+// endpoint (admin/ajax_analytics.php). Filters (period / date /
+// programme / cohort / opportunity / status) are applied server-side
+// on load and then refreshed in place by js/admin_analytics.js.
+// ------------------------------------------------------------
+$analyticsFilters = Analytics::normalizeFilters([
+    'period'         => $_GET['analytics_period'] ?? '30d',
+    'date_from'      => $_GET['analytics_from'] ?? null,
+    'date_to'        => $_GET['analytics_to'] ?? null,
+    'programme_id'   => $_GET['analytics_programme'] ?? 0,
+    'cohort_id'      => $_GET['analytics_cohort'] ?? 0,
+    'opportunity_id' => $_GET['analytics_opportunity'] ?? 0,
+    'status'         => $_GET['analytics_status'] ?? '',
+]);
+
+$analyticsStats = [
+    'active_programmes' => 0, 'total_programmes' => 0, 'total_applications' => 0,
+    'new_applications' => 0, 'active_placements' => 0, 'pending_placements' => 0,
+    'talent_pool' => 0, 'new_candidates' => 0, 'completion_rate' => 0,
+    'profile_completeness' => 0, 'total_cohorts' => 0, 'enrolled' => 0,
+];
+$analyticsOptions = ['programmes' => [], 'cohorts' => [], 'opportunities' => [], 'statuses' => []];
+try {
+    $analyticsData    = Analytics::build($analyticsFilters);
+    $analyticsStats   = $analyticsData['stats'] ?? $analyticsStats;
+    $analyticsOptions = Analytics::filterOptions();
+} catch (Exception $ex) {
+    error_log('[ANALYTICS] Dashboard initial data: ' . $ex->getMessage());
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -1040,11 +1072,12 @@ try {
           <div class="admin-analytics-filters">
             <div class="admin-analytics-filters__left">
               <select class="admin-filter-select" id="analyticsPeriod">
-                <option value="7d">Last 7 Days</option>
-                <option value="30d" selected>Last 30 Days</option>
-                <option value="90d">Last Quarter</option>
-                <option value="12m">Last 12 Months</option>
-                <option value="custom">Custom Range</option>
+                <option value="7d"<?= $analyticsFilters['period'] === '7d' ? ' selected' : '' ?>>Last 7 Days</option>
+                <option value="30d"<?= $analyticsFilters['period'] === '30d' ? ' selected' : '' ?>>Last 30 Days</option>
+                <option value="90d"<?= $analyticsFilters['period'] === '90d' ? ' selected' : '' ?>>Last 3 Months</option>
+                <option value="6m"<?= $analyticsFilters['period'] === '6m' ? ' selected' : '' ?>>Last 6 Months</option>
+                <option value="12m"<?= $analyticsFilters['period'] === '12m' ? ' selected' : '' ?>>Last 12 Months</option>
+                <option value="custom"<?= $analyticsFilters['period'] === 'custom' ? ' selected' : '' ?>>Custom Range</option>
               </select>
               <select class="admin-filter-select" id="analyticsCategory">
                 <option value="all">All Categories</option>
@@ -1054,12 +1087,43 @@ try {
                 <option value="talent">Talent Pool</option>
                 <option value="skills">Skills</option>
               </select>
+              <select class="admin-filter-select" id="analyticsProgrammeFilter">
+                <option value="">All Programmes</option>
+                <?php foreach ($analyticsOptions['programmes'] as $optP): ?>
+                <option value="<?= (int) $optP['id'] ?>"<?= (int) $analyticsFilters['programme_id'] === (int) $optP['id'] ? ' selected' : '' ?>><?= e($optP['name']) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <select class="admin-filter-select" id="analyticsCohortFilter">
+                <option value="">All Cohorts</option>
+                <?php foreach ($analyticsOptions['cohorts'] as $optC): ?>
+                <option value="<?= (int) $optC['id'] ?>"<?= (int) $analyticsFilters['cohort_id'] === (int) $optC['id'] ? ' selected' : '' ?>><?= e($optC['name']) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <select class="admin-filter-select" id="analyticsOpportunityFilter">
+                <option value="">All Opportunities</option>
+                <?php foreach ($analyticsOptions['opportunities'] as $optO): ?>
+                <option value="<?= (int) $optO['id'] ?>"<?= (int) $analyticsFilters['opportunity_id'] === (int) $optO['id'] ? ' selected' : '' ?>><?= e($optO['title']) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <select class="admin-filter-select" id="analyticsStatusFilter">
+                <option value="">All Statuses</option>
+                <?php foreach ($analyticsOptions['statuses'] as $optS): ?>
+                <option value="<?= e($optS['value']) ?>"<?= $analyticsFilters['status'] === $optS['value'] ? ' selected' : '' ?>><?= e($optS['label']) ?> (<?= (int) $optS['count'] ?>)</option>
+                <?php endforeach; ?>
+              </select>
+              <div class="admin-analytics-custom-range" id="analyticsCustomRange" style="display:none;">
+                <input type="date" class="admin-filter-select" id="analyticsDateFrom" value="<?= e($analyticsFilters['date_from']) ?>" aria-label="From date">
+                <input type="date" class="admin-filter-select" id="analyticsDateTo" value="<?= e($analyticsFilters['date_to']) ?>" aria-label="To date">
+              </div>
             </div>
             <div class="admin-analytics-filters__right">
-              <button class="btn btn--ghost btn--sm"><i class="fas fa-download"></i> Export</button>
-              <button class="btn btn--ghost btn--sm"><i class="fas fa-sync-alt"></i> Refresh</button>
+              <button class="btn btn--ghost btn--sm" type="button" id="analyticsExportBtn"><i class="fas fa-download"></i> Export</button>
+              <button class="btn btn--ghost btn--sm" type="button" id="analyticsRefreshBtn"><i class="fas fa-sync-alt"></i> Refresh</button>
             </div>
           </div>
+
+          <!-- Analytics load/error state -->
+          <div class="adm-analytics-status" id="analyticsStatus" style="display:none;"></div>
 
           <!-- Analytics Charts Grid -->
           <div class="admin-analytics-grid">
@@ -1106,10 +1170,56 @@ try {
             </div>
             <div class="admin-analytics-card">
               <div class="admin-analytics-card__header">
-                <h3>Attendance Statistics</h3>
+                <h3>Application Trend</h3>
+                <span class="admin-analytics-card__badge">Time-based</span>
               </div>
               <div class="admin-analytics-chart-container">
-                <canvas id="analyticsAttendanceChart"></canvas>
+                <canvas id="analyticsTrendChart"></canvas>
+              </div>
+            </div>
+            <div class="admin-analytics-card">
+              <div class="admin-analytics-card__header">
+                <h3>Opportunity Activity</h3>
+                <span class="admin-analytics-card__badge">Live</span>
+              </div>
+              <div class="admin-analytics-chart-container">
+                <canvas id="analyticsOpportunityChart"></canvas>
+              </div>
+              <div class="adm-analytics-list" id="analyticsOpportunityList"></div>
+            </div>
+            <div class="admin-analytics-card">
+              <div class="admin-analytics-card__header">
+                <h3>Interview Analytics</h3>
+                <span class="admin-analytics-card__badge">Live</span>
+              </div>
+              <div class="admin-analytics-chart-container">
+                <canvas id="analyticsInterviewChart"></canvas>
+              </div>
+              <div class="adm-analytics-list" id="analyticsInterviewSummary"></div>
+            </div>
+            <div class="admin-analytics-card">
+              <div class="admin-analytics-card__header">
+                <h3>Selection &amp; Offers</h3>
+                <span class="admin-analytics-card__badge">Live</span>
+              </div>
+              <div class="admin-analytics-chart-container">
+                <canvas id="analyticsSelectionChart"></canvas>
+              </div>
+            </div>
+            <div class="admin-analytics-card">
+              <div class="admin-analytics-card__header">
+                <h3>Placements by Programme</h3>
+              </div>
+              <div class="admin-analytics-chart-container">
+                <canvas id="analyticsPlacementProgrammeChart"></canvas>
+              </div>
+            </div>
+            <div class="admin-analytics-card">
+              <div class="admin-analytics-card__header">
+                <h3>Placements by Cohort</h3>
+              </div>
+              <div class="admin-analytics-chart-container">
+                <canvas id="analyticsPlacementCohortChart"></canvas>
               </div>
             </div>
             <div class="admin-analytics-card">
@@ -1147,37 +1257,72 @@ try {
             </div>
           </div>
 
-          <!-- Analytics Stats Summary -->
+          <!-- Analytics Stats Summary (all values from the database) -->
           <div class="admin-analytics-stats">
-<div class="admin-analytics-stat">
-              <span class="admin-analytics-stat__number" data-count="<?= (int)$activeProgrammes ?>">0</span>
+            <div class="admin-analytics-stat">
+              <span class="admin-analytics-stat__number" id="analyticsStatTotalCandidates">0</span>
+              <span class="admin-analytics-stat__label">Total Candidates</span>
+              <span class="admin-analytics-stat__trend up" id="analyticsStatTotalCandidatesTrend"><i class="fas fa-users"></i> loading...</span>
+            </div>
+            <div class="admin-analytics-stat">
+              <span class="admin-analytics-stat__number" id="analyticsStatUnderReview">0</span>
+              <span class="admin-analytics-stat__label">Under Review</span>
+              <span class="admin-analytics-stat__trend up" id="analyticsStatUnderReviewTrend"><i class="fas fa-search"></i> loading...</span>
+            </div>
+            <div class="admin-analytics-stat">
+              <span class="admin-analytics-stat__number" id="analyticsStatShortlisted">0</span>
+              <span class="admin-analytics-stat__label">Shortlisted</span>
+              <span class="admin-analytics-stat__trend up" id="analyticsStatShortlistedTrend"><i class="fas fa-star"></i> loading...</span>
+            </div>
+            <div class="admin-analytics-stat">
+              <span class="admin-analytics-stat__number" id="analyticsStatActiveProgrammes"><?= (int) $analyticsStats['active_programmes'] ?></span>
               <span class="admin-analytics-stat__label">Active Programmes</span>
-              <span class="admin-analytics-stat__trend up"><i class="fas fa-check"></i> <?= (int)$totalProgrammes ?> total</span>
+              <span class="admin-analytics-stat__trend up" id="analyticsStatActiveProgrammesTrend"><i class="fas fa-check"></i> <?= (int) $analyticsStats['total_programmes'] ?> total</span>
             </div>
             <div class="admin-analytics-stat">
-              <span class="admin-analytics-stat__number" data-count="<?= (int)$totalApplications ?>">0</span>
+              <span class="admin-analytics-stat__number" id="analyticsStatSelected">0</span>
+              <span class="admin-analytics-stat__label">Selected</span>
+              <span class="admin-analytics-stat__trend up" id="analyticsStatSelectedTrend"><i class="fas fa-check-circle"></i> loading...</span>
+            </div>
+            <div class="admin-analytics-stat">
+              <span class="admin-analytics-stat__number" id="analyticsStatWaitlisted">0</span>
+              <span class="admin-analytics-stat__label">Waitlisted</span>
+              <span class="admin-analytics-stat__trend up" id="analyticsStatWaitlistedTrend"><i class="fas fa-pause-circle"></i> loading...</span>
+            </div>
+            <div class="admin-analytics-stat">
+              <span class="admin-analytics-stat__number" id="analyticsStatRejected">0</span>
+              <span class="admin-analytics-stat__label">Rejected</span>
+              <span class="admin-analytics-stat__trend up" id="analyticsStatRejectedTrend"><i class="fas fa-times-circle"></i> loading...</span>
+            </div>
+            <div class="admin-analytics-stat">
+              <span class="admin-analytics-stat__number" id="analyticsStatTotalApplications"><?= (int) $analyticsStats['total_applications'] ?></span>
               <span class="admin-analytics-stat__label">Total Applications</span>
-              <span class="admin-analytics-stat__trend up"><i class="fas fa-file-alt"></i> across cohorts</span>
+              <span class="admin-analytics-stat__trend up" id="analyticsStatTotalApplicationsTrend"><i class="fas fa-file-alt"></i> <?= (int) $analyticsStats['new_applications'] ?> this period</span>
             </div>
             <div class="admin-analytics-stat">
-              <span class="admin-analytics-stat__number" data-count="248">0</span>
+              <span class="admin-analytics-stat__number" id="analyticsStatHiredPlaced">0</span>
+              <span class="admin-analytics-stat__label">Hired / Placed</span>
+              <span class="admin-analytics-stat__trend up" id="analyticsStatHiredPlacedTrend"><i class="fas fa-handshake"></i> loading...</span>
+            </div>
+            <div class="admin-analytics-stat">
+              <span class="admin-analytics-stat__number" id="analyticsStatActivePlacements"><?= (int) $analyticsStats['active_placements'] ?></span>
               <span class="admin-analytics-stat__label">Active Placements</span>
-              <span class="admin-analytics-stat__trend up"><i class="fas fa-arrow-up"></i> +6.8%</span>
+              <span class="admin-analytics-stat__trend up" id="analyticsStatActivePlacementsTrend"><i class="fas fa-hourglass-half"></i> <?= (int) $analyticsStats['pending_placements'] ?> pending</span>
             </div>
             <div class="admin-analytics-stat">
-              <span class="admin-analytics-stat__number" data-count="1280">0</span>
+              <span class="admin-analytics-stat__number" id="analyticsStatTalentPool"><?= (int) $analyticsStats['talent_pool'] ?></span>
               <span class="admin-analytics-stat__label">Talent Pool</span>
-              <span class="admin-analytics-stat__trend up"><i class="fas fa-arrow-up"></i> +11.2%</span>
+              <span class="admin-analytics-stat__trend up" id="analyticsStatTalentPoolTrend"><i class="fas fa-user-plus"></i> <?= (int) $analyticsStats['new_candidates'] ?> new</span>
             </div>
             <div class="admin-analytics-stat">
-              <span class="admin-analytics-stat__number">87<span class="admin-analytics-stat__suffix">%</span></span>
+              <span class="admin-analytics-stat__number" id="analyticsStatCompletionRate"><?= (int) $analyticsStats['completion_rate'] ?><span class="admin-analytics-stat__suffix">%</span></span>
               <span class="admin-analytics-stat__label">Completion Rate</span>
-              <span class="admin-analytics-stat__trend up"><i class="fas fa-arrow-up"></i> +4.2%</span>
+              <span class="admin-analytics-stat__trend up" id="analyticsStatCompletionRateTrend"><i class="fas fa-flag-checkered"></i> placements completed</span>
             </div>
             <div class="admin-analytics-stat">
-              <span class="admin-analytics-stat__number">78<span class="admin-analytics-stat__suffix">%</span></span>
+              <span class="admin-analytics-stat__number" id="analyticsStatProfileCompleteness"><?= (int) $analyticsStats['profile_completeness'] ?><span class="admin-analytics-stat__suffix">%</span></span>
               <span class="admin-analytics-stat__label">Profile Completeness</span>
-              <span class="admin-analytics-stat__trend up"><i class="fas fa-arrow-up"></i> +3.4%</span>
+              <span class="admin-analytics-stat__trend up" id="analyticsStatProfileCompletenessTrend"><i class="fas fa-id-card"></i> average completeness</span>
             </div>
           </div>
         </section>
@@ -3289,6 +3434,28 @@ $talentSkillsCategories = (int) ($talentSkillsCategoriesRow['cnt'] ?? 0);
   })();
   </script>
   <script src="<?= url('js/admin_dashboard.js?v=20260916') ?>"></script>
+  <script>
+  /* Analytics filter options used by js/admin_analytics.js to keep the
+     Programme -> Cohort -> Opportunity dropdowns in sync (no extra
+     request needed when a parent filter changes). */
+  window.InvesthoodAnalyticsConfig = {
+    endpoint: '<?= url('admin/ajax_analytics.php') ?>',
+    options: <?= json_encode([
+        'cohorts' => array_map(static function ($c) {
+            return ['id' => (int) $c['id'], 'programme_id' => (int) $c['programme_id'], 'name' => (string) $c['name']];
+        }, $analyticsOptions['cohorts']),
+        'opportunities' => array_map(static function ($o) {
+            return [
+                'id' => (int) $o['id'],
+                'programme_id' => (int) $o['programme_id'],
+                'cohort_id' => $o['cohort_id'] !== null ? (int) $o['cohort_id'] : null,
+                'title' => (string) $o['title'],
+            ];
+        }, $analyticsOptions['opportunities']),
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>
+  };
+  </script>
+  <script src="<?= url('js/admin_analytics.js?v=20261001') ?>"></script>
   <script src="<?= url('js/admin_programmes.js') ?>"></script>
   <?= $flashes ?>
 </body>
