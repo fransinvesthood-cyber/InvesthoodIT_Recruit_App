@@ -1799,8 +1799,8 @@ try {
 
           <div class="admin-toolbar">
             <div class="admin-toolbar__left">
-              <a href="<?= url('admin/create-placement.php') ?>" class="btn btn--primary btn--sm"><i class="fas fa-plus"></i> New Placement</a>
-              <a href="<?= url('admin/placements.php') ?>" class="btn btn--outline btn--sm"><i class="fas fa-th-list"></i> Manage Placements</a>
+              <a href="create-placement.php" class="btn btn--primary btn--sm"><i class="fas fa-plus"></i> New Placement</a>
+              <a href="placements.php" class="btn btn--outline btn--sm"><i class="fas fa-th-list"></i> Manage Placements</a>
               <select class="admin-filter-select" id="placementFilterStatus">
                 <option value="all">All Statuses</option>
                 <option value="active">Active</option>
@@ -1831,7 +1831,7 @@ try {
               <div class="admin-empty-state__icon"><i class="fas fa-handshake"></i></div>
               <h3>No placements yet</h3>
               <p style="color:var(--text-light);margin-bottom:1rem;">Placements appear here once candidates with accepted offers are placed. Run <code>database/placements.sql</code> if the placements tables are missing.</p>
-              <a href="<?= url('admin/placement_create.php') ?>" class="btn btn--primary btn--sm"><i class="fas fa-plus"></i> New Placement</a>
+              <a href="create-placement.php" class="btn btn--primary btn--sm"><i class="fas fa-plus"></i> New Placement</a>
             </div>
           <?php else: ?>
           <div class="app-table-container">
@@ -1878,8 +1878,8 @@ try {
                     <td class="app-date"><?= e(!empty($pl['start_date']) ? format_date($pl['start_date'], 'd M Y') : '—') ?> &ndash; <?= e(!empty($pl['end_date']) ? format_date($pl['end_date'], 'd M Y') : '—') ?></td>
                     <td><span class="tag tag--<?= e($plTone) ?>"><?= e(ucwords(str_replace('_', ' ', $plStatus))) ?></span></td>
                     <td class="app-actions">
-                      <a href="<?= url('admin/view-placement.php?id=' . (int)$pl['id']) ?>" class="btn btn--ghost btn--sm" title="View placement"><i class="fas fa-eye"></i></a>
-                      <a href="<?= url('admin/edit-placement.php?id=' . (int)$pl['id']) ?>" class="btn btn--primary btn--sm" title="Manage"><i class="fas fa-cog"></i></a>
+                      <a href="placements.php?view=<?= (int)$pl['id'] ?>" class="btn btn--ghost btn--sm" title="View placement"><i class="fas fa-eye"></i></a>
+                      <a href="placements.php?manage=<?= (int)$pl['id'] ?>" class="btn btn--primary btn--sm" title="Manage"><i class="fas fa-cog"></i></a>
                     </td>
                   </tr>
                 <?php endforeach; ?>
