@@ -30,7 +30,7 @@ $savedCount = SavedOpportunity::countForCandidate($userId);
 
 // Get candidate profile data for personalized recommendations
 $candidateSkills = array_column(Skill::forUser($userId), 'skill_name');
-$candidateProvince = $profile['province'] ?? null;
+$candidateProvince = $user['province'] ?? ($profile['province'] ?? null);
 $candidateCity = $profile['city'] ?? null;
 $candidateInterests = $profile['career_interests'] ?? null;
 
@@ -58,10 +58,25 @@ $placementStatus = (int) ($appStats['selected'] ?? 0);
 
 // Interviews integration — dynamic data sourced from the interviews table
 // via the candidate's applications (Candidate → Application → Interview).
-$candidateInterviews = Interview::forCandidate($userId);
-$interviewStats      = Interview::candidateStatusCounts($userId);
-$upcomingInterviews  = Interview::candidateUpcoming($userId, 5);
-$nextInterview       = $upcomingInterviews[0] ?? null;
+// Dashboard-safe loading: an interview-module database problem must not prevent
+// an authenticated candidate from opening the rest of the dashboard.
+$candidateInterviews = [];
+$interviewStats = array_fill_keys(Interview::STATUSES, 0);
+$interviewStats['total'] = 0;
+$interviewStats['upcoming'] = 0;
+$upcomingInterviews = [];
+$nextInterview = null;
+$interviewLoadError = null;
+
+try {
+    $candidateInterviews = Interview::forCandidate($userId);
+    $interviewStats = Interview::candidateStatusCounts($userId);
+    $upcomingInterviews = Interview::candidateUpcoming($userId, 5);
+    $nextInterview = $upcomingInterviews[0] ?? null;
+} catch (Throwable $e) {
+    $interviewLoadError = 'Interview information is temporarily unavailable.';
+    error_log('[Candidate Dashboard] Interview load failed for user ' . $userId . ': ' . $e->getMessage());
+}
 
 // Recent interviews preview for the dashboard (most recent 3),
 // excluding the featured "next upcoming" interview so it isn't duplicated.
@@ -926,6 +941,13 @@ $flashes = render_flashes();
               <i class="fas fa-calendar-check"></i> Manage Interviews
             </a>
           </div>
+
+          <?php if ($interviewLoadError !== null): ?>
+            <div class="alert alert--warning" role="alert" style="margin-bottom:1rem;">
+              <i class="fas fa-triangle-exclamation"></i>
+              <?= e($interviewLoadError) ?>
+            </div>
+          <?php endif; ?>
 
           <!-- Dynamic summary cards (real counts from the database) -->
           <div class="interview-summary">
