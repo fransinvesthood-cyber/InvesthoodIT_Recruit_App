@@ -1061,6 +1061,312 @@ if ($displayName === '') {
         'Programme Manager';
 }
 
+/*
+|--------------------------------------------------------------------------
+| ADDED BY: Vincent | DATE: Friday, 2 October 2026
+|--------------------------------------------------------------------------
+| Candidates Requiring Attention (logic)
+|--------------------------------------------------------------------------
+| Thresholds are configurable here.
+*/
+
+$pmTz    = new DateTimeZone('Africa/Johannesburg');
+$pmToday = new DateTimeImmutable('today', $pmTz);
+$todayLabel = (new DateTimeImmutable('now', $pmTz))->format('l, j F Y');
+
+$ATTN = [
+    'stalled_days_warn'       => 14,  // no activity for N days  -> medium
+    'stalled_days_high'       => 30,  // no activity for N days  -> high
+    'onboarding_days_warn'    => 7,   // selected but not onboarded for N days -> medium
+    'onboarding_days_high'    => 14,  // -> high
+    'milestone_end_days'      => 14,  // cohort ends within N days, candidate not completed
+    'milestone_end_days_high' => 7,
+    'milestone_start_days'    => 7,   // cohort starts within N days, candidate not onboarded
+    'max_rows'                => 25,
+];
+
+$attnFlagMeta = [
+    'stalled'    => ['label' => 'No recent progress',   'icon' => 'fa-hourglass-half'],
+    'onboarding' => ['label' => 'Onboarding outstanding', 'icon' => 'fa-user-clock'],
+    'missing'    => ['label' => 'Missing information', 'icon' => 'fa-circle-exclamation'],
+    'assessment' => ['label' => 'Pending assessment',  'icon' => 'fa-clipboard-check'],
+    'interview'  => ['label' => 'Pending interview',   'icon' => 'fa-comments'],
+    'milestone'  => ['label' => 'Milestone approaching', 'icon' => 'fa-flag-checkered'],
+];
+
+$attnCandidates   = [];
+$attnCounts       = array_fill_keys(array_keys($attnFlagMeta), 0);
+$attnTotal        = 0;
+$attnHighCount    = 0;
+$attnUnavailable  = [];   // rules that could not run (missing tables)
+
+function pm_attn_date(?string $value, DateTimeZone $tz): ?DateTimeImmutable
+{
+    $value = trim((string) $value);
+    if ($value === '' || strpos($value, '0000-00-00') === 0) {
+        return null;
+    }
+    try {
+        return (new DateTimeImmutable($value, $tz))->setTime(0, 0);
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+function pm_attn_days_between(DateTimeImmutable $from, DateTimeImmutable $to): int
+{
+    return (int) $from->diff($to)->format('%r%a');
+}
+
+function pm_attn_table_has(mysqli $conn, string $table, array $columns): bool
+{
+    try {
+        $placeholders = implode(',', array_fill(0, count($columns), '?'));
+        $stmt = $conn->prepare(
+            "SELECT COUNT(DISTINCT column_name) AS n
+               FROM information_schema.columns
+              WHERE table_schema = DATABASE()
+                AND table_name = ?
+                AND column_name IN ($placeholders)"
+        );
+        if (!$stmt) {
+            return false;
+        }
+        $types  = 's' . str_repeat('s', count($columns));
+        $params = array_merge([$table], $columns);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return (int) ($row['n'] ?? 0) === count($columns);
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+/**
+ * Returns [user_id => pending_count] from the first matching optional table,
+ * or null when no suitable table exists.
+ */
+function pm_attn_pending_by_user(mysqli $conn, array $tables, array $pendingStatuses): ?array
+{
+    foreach ($tables as $table) {
+        if (!preg_match('/^[a-z_]+$/', $table)
+            || !pm_attn_table_has($conn, $table, ['user_id', 'status'])) {
+            continue;
+        }
+        try {
+            $in = "'" . implode("','", array_map('addslashes', $pendingStatuses)) . "'";
+            $result = $conn->query(
+                "SELECT user_id, COUNT(*) AS n FROM `$table`
+                  WHERE status IN ($in) GROUP BY user_id"
+            );
+            if (!$result) {
+                continue;
+            }
+            $map = [];
+            while ($r = $result->fetch_assoc()) {
+                $map[(int) $r['user_id']] = (int) $r['n'];
+            }
+            return $map;
+        } catch (Throwable $e) {
+            continue;
+        }
+    }
+    return null;
+}
+
+$pendingAssessments = pm_attn_pending_by_user(
+    $conn,
+    ['candidate_assessments', 'assessments'],
+    ['pending', 'assigned', 'not_started', 'in_progress']
+);
+$pendingInterviews = pm_attn_pending_by_user(
+    $conn,
+    ['candidate_interviews', 'interviews'],
+    ['pending', 'scheduled', 'requested', 'awaiting']
+);
+
+if ($pendingAssessments === null) {
+    $attnUnavailable[] = 'pending assessments';
+}
+if ($pendingInterviews === null) {
+    $attnUnavailable[] = 'pending interviews';
+}
+
+$stmt = $conn->prepare("
+    SELECT
+        cp.id AS participant_id,
+        cp.user_id,
+        cp.status AS participant_status,
+        cp.selected_at,
+        cp.onboarded_at,
+        cp.created_at,
+        cp.updated_at,
+        u.first_name,
+        u.last_name,
+        u.email,
+        u.phone,
+        c.id AS cohort_id,
+        c.name AS cohort_name,
+        c.start_date AS cohort_start,
+        c.end_date AS cohort_end,
+        p.id AS programme_id,
+        p.name AS programme_name
+    FROM cohort_participants cp
+    INNER JOIN users u
+        ON u.id = cp.user_id
+    INNER JOIN cohorts c
+        ON c.id = cp.cohort_id
+    INNER JOIN programmes p
+        ON p.id = c.programme_id
+    WHERE p.programme_manager_id = ?
+      AND p.status = 'active'
+      AND cp.status NOT IN ('completed', 'withdrawn')
+");
+
+if ($stmt) {
+    $stmt->bind_param('i', $managerId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $severityRank = ['high' => 3, 'medium' => 2, 'low' => 1];
+
+    while ($row = $result->fetch_assoc()) {
+
+        $flags    = [];   // key => detail text
+        $severity = 'low';
+
+        $raise = function (string $level) use (&$severity, $severityRank): void {
+            if ($severityRank[$level] > $severityRank[$severity]) {
+                $severity = $level;
+            }
+        };
+
+        $status   = strtolower((string) $row['participant_status']);
+        $userId   = (int) $row['user_id'];
+        $selected = pm_attn_date($row['selected_at'], $pmTz);
+        $onboard  = pm_attn_date($row['onboarded_at'], $pmTz);
+        $created  = pm_attn_date($row['created_at'], $pmTz);
+        $updated  = pm_attn_date($row['updated_at'], $pmTz);
+        $cStart   = pm_attn_date($row['cohort_start'], $pmTz);
+        $cEnd     = pm_attn_date($row['cohort_end'], $pmTz);
+
+        /* 1. No recent progress (onboarded / active only) */
+        if (in_array($status, ['onboarded', 'active'], true)) {
+            $dates = array_filter([$updated, $onboard, $selected, $created]);
+            if ($dates) {
+                usort($dates, fn($a, $b) => $b <=> $a);
+                $idle = pm_attn_days_between($dates[0], $pmToday);
+                if ($idle >= $ATTN['stalled_days_warn']) {
+                    $flags['stalled'] = "No activity recorded for {$idle} days";
+                    $raise($idle >= $ATTN['stalled_days_high'] ? 'high' : 'medium');
+                }
+            }
+        }
+
+        /* 2. Outstanding onboarding */
+        if ($status === 'selected') {
+            $since = $selected ?: $created;
+            if ($since) {
+                $wait = pm_attn_days_between($since, $pmToday);
+                if ($wait >= $ATTN['onboarding_days_warn']) {
+                    $flags['onboarding'] = "Selected {$wait} days ago, not yet onboarded";
+                    $raise($wait >= $ATTN['onboarding_days_high'] ? 'high' : 'medium');
+                }
+            }
+            if ($cStart && $cStart <= $pmToday) {
+                $flags['onboarding'] = 'Cohort has started but candidate is not onboarded';
+                $raise('high');
+            }
+        }
+
+        /* 3. Missing information */
+        $missing = [];
+        if (trim((string) $row['first_name']) === '' || trim((string) $row['last_name']) === '') {
+            $missing[] = 'full name';
+        }
+        if (!filter_var(trim((string) $row['email']), FILTER_VALIDATE_EMAIL)) {
+            $missing[] = 'valid email';
+            $raise('medium');
+        }
+        if (trim((string) $row['phone']) === '') {
+            $missing[] = 'phone number';
+        }
+        if ($missing) {
+            $flags['missing'] = 'Missing: ' . implode(', ', $missing);
+        }
+
+        /* 4. Pending assessments */
+        if (!empty($pendingAssessments[$userId])) {
+            $n = $pendingAssessments[$userId];
+            $flags['assessment'] = $n . ' assessment' . ($n === 1 ? '' : 's') . ' awaiting completion';
+            $raise('medium');
+        }
+
+        /* 5. Pending interviews */
+        if (!empty($pendingInterviews[$userId])) {
+            $n = $pendingInterviews[$userId];
+            $flags['interview'] = $n . ' interview' . ($n === 1 ? '' : 's') . ' pending';
+            $raise('medium');
+        }
+
+        /* 6. Approaching programme milestones */
+        if ($cEnd) {
+            $left = pm_attn_days_between($pmToday, $cEnd);
+            if ($left < 0) {
+                $flags['milestone'] = 'Cohort ended ' . abs($left) . ' days ago, not completed';
+                $raise('high');
+            } elseif ($left <= $ATTN['milestone_end_days']) {
+                $flags['milestone'] = $left === 0
+                    ? 'Cohort ends today, not completed'
+                    : "Cohort ends in {$left} day" . ($left === 1 ? '' : 's') . ', not completed';
+                $raise($left <= $ATTN['milestone_end_days_high'] ? 'high' : 'medium');
+            }
+        }
+        if ($cStart && $status === 'selected' && !isset($flags['milestone'])) {
+            $until = pm_attn_days_between($pmToday, $cStart);
+            if ($until >= 0 && $until <= $ATTN['milestone_start_days']) {
+                $flags['milestone'] = $until === 0
+                    ? 'Cohort starts today, onboarding incomplete'
+                    : "Cohort starts in {$until} day" . ($until === 1 ? '' : 's') . ', onboarding incomplete';
+                $raise('medium');
+            }
+        }
+
+        if (!$flags) {
+            continue;
+        }
+
+        $name = trim($row['first_name'] . ' ' . $row['last_name']);
+        $attnCandidates[] = [
+            'participant_id' => (int) $row['participant_id'],
+            'user_id'        => $userId,
+            'cohort_id'      => (int) $row['cohort_id'], /* ADDED BY: Vincent | DATE: Friday, 2 October 2026 - used for cohort links */
+            'name'           => $name !== '' ? $name : 'Unnamed Candidate',
+            'email'          => (string) $row['email'],
+            'programme'      => (string) $row['programme_name'],
+            'cohort'         => (string) $row['cohort_name'],
+            'status'         => ucfirst($status),
+            'flags'          => $flags,
+            'severity'       => $severity,
+            'score'          => $severityRank[$severity] * 10 + count($flags),
+        ];
+
+        foreach (array_keys($flags) as $k) {
+            $attnCounts[$k]++;
+        }
+        if ($severity === 'high') {
+            $attnHighCount++;
+        }
+    }
+    $stmt->close();
+
+    usort($attnCandidates, fn($a, $b) => $b['score'] <=> $a['score'] ?: strcmp($a['name'], $b['name']));
+    $attnTotal = count($attnCandidates);
+}
+
+
 ?>
 <!DOCTYPE html>
 
@@ -2706,6 +3012,334 @@ if ($displayName === '') {
 
             </div>
 
+
+
+            <!-- =================================================
+                 ADDED BY: Vincent | DATE: Friday, 2 October 2026
+                 CANDIDATES REQUIRING ATTENTION
+                 ================================================= -->
+
+            <style>
+            /* ADDED BY: Vincent | DATE: Friday, 2 October 2026 */
+
+        /* ====================================================
+           CANDIDATES REQUIRING ATTENTION
+           ==================================================== */
+
+        .pm-attn { margin-top: 2rem; }
+
+        .pm-attn__head {
+            display: flex; align-items: flex-start;
+            justify-content: space-between; gap: 16px; flex-wrap: wrap;
+        }
+        .pm-attn__head h2 { margin: 0 0 .35rem; }
+        .pm-attn__head p  { margin: 0; }
+
+        .pm-attn__summary {
+            display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px;
+        }
+
+        .pm-attn__chip {
+            padding: 7px 12px;
+            display: inline-flex; align-items: center; gap: 7px;
+            border: 1px solid #e4e7ec; border-radius: 999px;
+            background: #fff; color: #344054;
+            font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+        }
+        .pm-attn__chip b {
+            min-width: 20px; padding: 1px 6px; border-radius: 999px;
+            background: #f2f4f7; font-size: 11px; text-align: center;
+        }
+        .pm-attn__chip:hover { border-color: #2563eb; }
+        .pm-attn__chip.is-active { background: #2563eb; border-color: #2563eb; color: #fff; }
+        .pm-attn__chip.is-active b { background: rgba(255,255,255,.22); color: #fff; }
+        .pm-attn__chip[disabled] { opacity: .45; cursor: default; }
+
+        .pm-attn__list { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+
+        .pm-attn-row {
+            padding: 14px 16px;
+            display: grid;
+            grid-template-columns: 44px minmax(0, 1fr) auto;
+            gap: 14px; align-items: start;
+            border: 1px solid #e4e7ec; border-left-width: 4px;
+            border-radius: 14px; background: #fff;
+        }
+        .pm-attn-row--high   { border-left-color: #d92d20; }
+        .pm-attn-row--medium { border-left-color: #f79009; }
+        .pm-attn-row--low    { border-left-color: #2563eb; }
+        .pm-attn-row[hidden] { display: none; }
+
+        .pm-attn-row__avatar {
+            width: 44px; height: 44px; display: grid; place-items: center;
+            border-radius: 50%; background: #eef2ff; color: #4f46e5;
+            font-size: 14px; font-weight: 800;
+        }
+
+        .pm-attn-row__main { min-width: 0; }
+        .pm-attn-row__name { font-size: 14px; font-weight: 700; color: #101828; }
+        .pm-attn-row__meta {
+            margin-top: 2px; font-size: 12px; color: #667085;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        .pm-attn-row__flags {
+            margin: 10px 0 0; padding: 0; list-style: none;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .pm-attn-row__flags li {
+            display: flex; align-items: flex-start; gap: 8px;
+            font-size: 12px; color: #475467; line-height: 1.45;
+        }
+        .pm-attn-row__flags i { width: 14px; margin-top: 2px; color: #f79009; text-align: center; }
+        .pm-attn-row__flags strong { color: #101828; font-weight: 700; }
+
+        .pm-attn-row__side { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+
+        .pm-attn-badge {
+            padding: 4px 9px; border-radius: 999px;
+            font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
+        }
+        .pm-attn-badge--high   { background: #fef3f2; color: #b42318; }
+        .pm-attn-badge--medium { background: #fffaeb; color: #b54708; }
+        .pm-attn-badge--low    { background: #eff6ff; color: #1d4ed8; }
+
+        .pm-attn-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+        .pm-attn-actions a {
+            min-height: 32px; padding: 0 11px;
+            display: inline-flex; align-items: center; gap: 6px;
+            border: 1px solid #d0d5dd; border-radius: 9px;
+            background: #fff; color: #344054;
+            font-size: 11px; font-weight: 700; text-decoration: none;
+        }
+        .pm-attn-actions a:hover { border-color: #2563eb; color: #2563eb; }
+        .pm-attn-actions a.is-primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+
+        .pm-attn__note {
+            margin-top: 12px; font-size: 12px; color: #667085;
+        }
+        .pm-attn__empty { padding: 28px 12px; text-align: center; }
+        .pm-attn__empty i { font-size: 28px; color: #12b76a; }
+
+        html[data-theme="dark"] .pm-attn__chip,
+        html[data-theme="dark"] .pm-attn-row,
+        html[data-theme="dark"] .pm-attn-actions a { background: #111827; border-color: #334155; color: #e2e8f0; }
+        html[data-theme="dark"] .pm-attn-row--high   { border-left-color: #f04438; }
+        html[data-theme="dark"] .pm-attn-row--medium { border-left-color: #f79009; }
+        html[data-theme="dark"] .pm-attn-row--low    { border-left-color: #2563eb; }
+        html[data-theme="dark"] .pm-attn__chip b { background: #1e293b; }
+        html[data-theme="dark"] .pm-attn__chip.is-active { background: #2563eb; }
+        html[data-theme="dark"] .pm-attn-row__name,
+        html[data-theme="dark"] .pm-attn-row__flags strong { color: #f8fafc; }
+        html[data-theme="dark"] .pm-attn-row__meta,
+        html[data-theme="dark"] .pm-attn-row__flags li,
+        html[data-theme="dark"] .pm-attn__note { color: #94a3b8; }
+        html[data-theme="dark"] .pm-attn-actions a.is-primary { background: #2563eb; color: #fff; }
+
+        @media (max-width: 720px) {
+            .pm-attn-row { grid-template-columns: 44px minmax(0, 1fr); }
+            .pm-attn-row__side { grid-column: 1 / -1; flex-direction: row-reverse; justify-content: space-between; align-items: center; }
+        }
+
+
+            </style>
+
+            <section class="pm-attn" id="pmAttention" aria-labelledby="pmAttentionTitle">
+
+                <div class="welcome-card">
+
+                    <div class="welcome-card__content">
+
+                        <div class="pm-attn__head">
+
+                            <div>
+
+                                <h2 id="pmAttentionTitle">Candidates Requiring Attention</h2>
+
+                                <p>
+                                    Follow-ups and interventions across your active programmes,
+                                    as of <?= e($todayLabel) ?>.
+                                </p>
+
+                            </div>
+
+                            <?php if ($attnTotal > 0): ?>
+                                <span class="pm-modal-summary__count">
+                                    <?= number_format($attnTotal) ?>
+                                    flagged
+                                    <?php if ($attnHighCount > 0): ?>
+                                        · <?= number_format($attnHighCount) ?> high priority
+                                    <?php endif; ?>
+                                </span>
+                            <?php endif; ?>
+
+                        </div>
+
+                        <?php if ($attnTotal > 0): ?>
+
+                            <div class="pm-attn__summary" role="group" aria-label="Filter by reason">
+
+                                <button type="button" class="pm-attn__chip is-active" data-attn-filter="all">
+                                    All <b><?= number_format($attnTotal) ?></b>
+                                </button>
+
+                                <?php foreach ($attnFlagMeta as $flagKey => $meta): ?>
+                                    <button
+                                        type="button"
+                                        class="pm-attn__chip"
+                                        data-attn-filter="<?= e($flagKey) ?>"
+                                        <?= $attnCounts[$flagKey] === 0 ? 'disabled' : '' ?>
+                                    >
+                                        <i class="fas <?= e($meta['icon']) ?>"></i>
+                                        <?= e($meta['label']) ?>
+                                        <b><?= number_format($attnCounts[$flagKey]) ?></b>
+                                    </button>
+                                <?php endforeach; ?>
+
+                            </div>
+
+                        <?php endif; ?>
+
+                    </div>
+
+                </div>
+
+
+                <?php if ($attnTotal === 0): ?>
+
+                    <div class="welcome-card" style="margin-top:1rem;">
+                        <div class="welcome-card__content pm-attn__empty">
+                            <i class="fas fa-circle-check"></i>
+                            <h3>All caught up</h3>
+                            <p>No candidates currently need follow-up.</p>
+                        </div>
+                    </div>
+
+                <?php else: ?>
+
+                    <div class="pm-attn__list" id="pmAttentionList">
+
+                        <?php foreach (array_slice($attnCandidates, 0, $ATTN['max_rows']) as $i => $cand): ?>
+
+                            <?php
+                            $words = preg_split('/\s+/', trim($cand['name']));
+                            $init  = strtoupper(
+                                substr($words[0], 0, 1)
+                                . (count($words) > 1 ? substr(end($words), 0, 1) : substr($words[0], 1, 1))
+                            );
+                            ?>
+
+                            <article
+                                class="pm-attn-row pm-attn-row--<?= e($cand['severity']) ?>"
+                                data-flags="<?= e(implode(' ', array_keys($cand['flags']))) ?>"
+                            >
+
+                                <div class="pm-attn-row__avatar"><?= e($init) ?></div>
+
+                                <div class="pm-attn-row__main">
+
+                                    <div class="pm-attn-row__name"><?= e($cand['name']) ?></div>
+
+                                    <div class="pm-attn-row__meta">
+                                        <?= e($cand['programme']) ?> ·
+                                        <?php /* ADDED BY: Vincent | DATE: Friday, 2 October 2026 - cohort name links to cohort page */ ?>
+                                        <a href="<?= e(url('programme/cohort_view.php?id=' . $cand['cohort_id'])) ?>" style="color:inherit;text-decoration:underline dotted;"><?= e($cand['cohort']) ?></a>
+                                        · <?= e($cand['status']) ?>
+                                    </div>
+
+                                    <ul class="pm-attn-row__flags">
+                                        <?php foreach ($cand['flags'] as $flagKey => $detail): ?>
+                                            <li>
+                                                <i class="fas <?= e($attnFlagMeta[$flagKey]['icon']) ?>"></i>
+                                                <span>
+                                                    <strong><?= e($attnFlagMeta[$flagKey]['label']) ?>:</strong>
+                                                    <?= e($detail) ?>
+                                                </span>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+
+                                </div>
+
+                                <div class="pm-attn-row__side">
+
+                                    <span class="pm-attn-badge pm-attn-badge--<?= e($cand['severity']) ?>">
+                                        <?= e($cand['severity']) ?>
+                                    </span>
+
+                                    <div class="pm-attn-actions">
+
+                                        <a class="is-primary" href="<?= e(url('programme/candidate_view.php?id=' . $cand['user_id'])) ?>">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+
+                                        <a href="<?= e(url('programme/update_candidate_status.php?participant_id=' . $cand['participant_id'])) ?>">
+                                            <i class="fas fa-edit"></i> Update
+                                        </a>
+
+                                        <?php /* ADDED BY: Vincent | DATE: Friday, 2 October 2026 - jump to the cohort's candidate list */ ?>
+                                        <a href="<?= e(url('programme/cohort_candidates.php?cohort_id=' . $cand['cohort_id'])) ?>">
+                                            <i class="fas fa-layer-group"></i> Cohort
+                                        </a>
+
+                                        <?php if (filter_var($cand['email'], FILTER_VALIDATE_EMAIL)): ?>
+                                            <a href="mailto:<?= e($cand['email']) ?>">
+                                                <i class="fas fa-envelope"></i> Email
+                                            </a>
+                                        <?php endif; ?>
+
+                                    </div>
+
+                                </div>
+
+                            </article>
+
+                        <?php endforeach; ?>
+
+                    </div>
+
+                    <?php if ($attnTotal > $ATTN['max_rows']): ?>
+                        <p class="pm-attn__note">
+                            Showing the <?= (int) $ATTN['max_rows'] ?> highest-priority of
+                            <?= number_format($attnTotal) ?> flagged candidates.
+                            <a href="<?= e(url('programme/candidates.php')) ?>">View all candidates</a>
+                        </p>
+                    <?php endif; ?>
+
+                <?php endif; ?>
+
+                <?php if ($attnUnavailable): ?>
+                    <p class="pm-attn__note">
+                        <i class="fas fa-circle-info"></i>
+                        Not yet tracked: <?= e(implode(' and ', $attnUnavailable)) ?>
+                        (no matching table found). These checks activate automatically once available.
+                    </p>
+                <?php endif; ?>
+
+            </section>
+
+            <script>
+            /* ADDED BY: Vincent | DATE: Friday, 2 October 2026 */
+
+(function () {
+    'use strict';
+    var chips = document.querySelectorAll('[data-attn-filter]');
+    var rows  = document.querySelectorAll('#pmAttentionList .pm-attn-row');
+    if (!chips.length) { return; }
+    chips.forEach(function (chip) {
+        chip.addEventListener('click', function () {
+            if (chip.disabled) { return; }
+            var key = chip.getAttribute('data-attn-filter');
+            chips.forEach(function (c) { c.classList.toggle('is-active', c === chip); });
+            rows.forEach(function (row) {
+                var flags = (row.getAttribute('data-flags') || '').split(' ');
+                row.hidden = key !== 'all' && flags.indexOf(key) === -1;
+            });
+        });
+    });
+})();
+
+            </script>
 
             <!-- =================================================
                  RECRUITMENT PIPELINE
