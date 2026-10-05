@@ -5,6 +5,182 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 require_role('programme_manager');
 require_once __DIR__ . '/_helpers.php';
 
+/*
+|--------------------------------------------------------------------------
+| Recruitment Stage Helpers (inline)
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('recruitment_stages')) {
+    function recruitment_stages(): array
+    {
+        return [
+            'submitted' => [
+                'label' => 'Submitted',
+                'short' => 'Submitted',
+                'icon' => 'fa-paper-plane',
+                'colour' => '#6366f1',
+                'description' => 'Application received and awaiting review.',
+            ],
+            'eligibility_review' => [
+                'label' => 'Eligibility Review',
+                'short' => 'Eligibility',
+                'icon' => 'fa-clipboard-check',
+                'colour' => '#0ea5e9',
+                'description' => 'Checking minimum eligibility criteria.',
+            ],
+            'screened' => [
+                'label' => 'Screened',
+                'short' => 'Screened',
+                'icon' => 'fa-filter',
+                'colour' => '#14b8a6',
+                'description' => 'Application screened against programme requirements.',
+            ],
+            'assessment' => [
+                'label' => 'Assessment',
+                'short' => 'Assessment',
+                'icon' => 'fa-file-pen',
+                'colour' => '#f59e0b',
+                'description' => 'Candidate is completing an assessment.',
+            ],
+            'interview' => [
+                'label' => 'Interview',
+                'short' => 'Interview',
+                'icon' => 'fa-comments',
+                'colour' => '#8b5cf6',
+                'description' => 'Interview stage with the selection panel.',
+            ],
+            'waitlisted' => [
+                'label' => 'Waitlisted',
+                'short' => 'Waitlisted',
+                'icon' => 'fa-hourglass-half',
+                'colour' => '#f97316',
+                'description' => 'Held on the waiting list pending capacity.',
+            ],
+            'selected' => [
+                'label' => 'Selected',
+                'short' => 'Selected',
+                'icon' => 'fa-circle-check',
+                'colour' => '#22c55e',
+                'description' => 'Candidate has been selected for the programme.',
+            ],
+            'rejected' => [
+                'label' => 'Rejected',
+                'short' => 'Rejected',
+                'icon' => 'fa-circle-xmark',
+                'colour' => '#ef4444',
+                'description' => 'Application was not successful.',
+            ],
+        ];
+    }
+}
+
+if (!function_exists('recruitment_stage_order')) {
+    function recruitment_stage_order(): array
+    {
+        return array_keys(recruitment_stages());
+    }
+}
+
+if (!function_exists('recruitment_stage_index')) {
+    function recruitment_stage_index(string $stage): int
+    {
+        $index = array_search($stage, recruitment_stage_order(), true);
+
+        return $index === false ? -1 : (int) $index;
+    }
+}
+
+if (!function_exists('normalise_candidate_stage')) {
+    function normalise_candidate_stage(?string $status): string
+    {
+        $status = strtolower(trim((string) $status));
+
+        $map = [
+            'submitted' => 'submitted',
+            'applied' => 'submitted',
+            'pending' => 'submitted',
+
+            'eligibility' => 'eligibility_review',
+            'eligibility_review' => 'eligibility_review',
+            'eligibility review' => 'eligibility_review',
+
+            'screened' => 'screened',
+            'screening' => 'screened',
+
+            'assessment' => 'assessment',
+            'assessed' => 'assessment',
+
+            'interview' => 'interview',
+            'interviewed' => 'interview',
+
+            'waitlisted' => 'waitlisted',
+            'waitlist' => 'waitlisted',
+            'waiting' => 'waitlisted',
+
+            'selected' => 'selected',
+            'onboarded' => 'selected',
+            'active' => 'selected',
+            'completed' => 'selected',
+            'accepted' => 'selected',
+
+            'rejected' => 'rejected',
+            'declined' => 'rejected',
+            'withdrawn' => 'rejected',
+        ];
+
+        return $map[$status] ?? 'submitted';
+    }
+}
+
+if (!function_exists('candidate_stage_label')) {
+    function candidate_stage_label(string $stage): string
+    {
+        $stages = recruitment_stages();
+
+        return $stages[$stage]['label']
+            ?? ucwords(str_replace('_', ' ', $stage));
+    }
+}
+
+if (!function_exists('candidate_stage_icon')) {
+    function candidate_stage_icon(string $stage): string
+    {
+        $stages = recruitment_stages();
+
+        return $stages[$stage]['icon'] ?? 'fa-circle';
+    }
+}
+
+if (!function_exists('candidate_stage_colour')) {
+    function candidate_stage_colour(string $stage): string
+    {
+        $stages = recruitment_stages();
+
+        return $stages[$stage]['colour'] ?? '#6b7280';
+    }
+}
+
+if (!function_exists('candidate_progress_percentage')) {
+    function candidate_progress_percentage(string $stage): int
+    {
+        if ($stage === 'rejected') {
+            return 100;
+        }
+
+        $order = recruitment_stage_order();
+        $total = count($order) - 1;
+
+        $index = recruitment_stage_index($stage);
+
+        if ($index < 0 || $total <= 0) {
+            return 0;
+        }
+
+        return (int) round(($index / $total) * 100);
+    }
+}
+
 $user = current_user();
 $flashes = render_flashes();
 
@@ -321,17 +497,8 @@ if ($stmt) {
 |--------------------------------------------------------------------------
 | Candidate Names
 |--------------------------------------------------------------------------
-|
-| users:
-|   id
-|   first_name
-|   last_name
-|   email
-|
-| cohort_participants:
-|   cohort_id
-|   user_id
-|   status
+| users: id, first_name, last_name, email
+| cohort_participants: cohort_id, user_id, status
 |--------------------------------------------------------------------------
 */
 
@@ -564,6 +731,54 @@ if ($stmt) {
 
     $stmt->close();
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Recruitment Stage Distribution
+|--------------------------------------------------------------------------
+*/
+
+$stageDistribution = [];
+
+foreach (recruitment_stage_order() as $slug) {
+    $stageDistribution[$slug] = 0;
+}
+
+$stmt = $conn->prepare("
+    SELECT
+        cp.status AS participation_status,
+        COUNT(DISTINCT cp.user_id) AS total
+    FROM cohort_participants cp
+    INNER JOIN cohorts c
+        ON c.id = cp.cohort_id
+    INNER JOIN programmes p
+        ON p.id = c.programme_id
+    WHERE p.programme_manager_id = ?
+      AND p.status = 'active'
+    GROUP BY cp.status
+");
+
+if ($stmt) {
+
+    $stmt->bind_param('i', $managerId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    while ($row = $result->fetch_assoc()) {
+        $slug = normalise_candidate_stage(
+            $row['participation_status'] ?? 'submitted'
+        );
+
+        if (isset($stageDistribution[$slug])) {
+            $stageDistribution[$slug] += (int) ($row['total'] ?? 0);
+        }
+    }
+
+    $stmt->close();
+}
+
+$totalPipelineCandidates = array_sum($stageDistribution);
 
 
 /*
@@ -1910,6 +2125,92 @@ if ($displayName === '') {
 
 
         /* ====================================================
+           RECRUITMENT PIPELINE OVERVIEW
+           ==================================================== */
+
+        .pm-pipeline {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .pm-pipeline__step {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .pm-pipeline__icon {
+            width: 34px;
+            height: 34px;
+            flex: 0 0 34px;
+            display: grid;
+            place-items: center;
+            border-radius: 9px;
+            color: #fff;
+            font-size: 0.8rem;
+        }
+
+        .pm-pipeline__info {
+            min-width: 0;
+            flex: 0 0 180px;
+        }
+
+        .pm-pipeline__info strong {
+            display: block;
+            color: #101828;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .pm-pipeline__info span {
+            display: block;
+            margin-top: 2px;
+            color: #667085;
+            font-size: 11px;
+        }
+
+        .pm-pipeline__bar {
+            flex: 1;
+            height: 8px;
+            border-radius: 999px;
+            background: #e5e7eb;
+            overflow: hidden;
+        }
+
+        .pm-pipeline__fill {
+            display: block;
+            height: 100%;
+            border-radius: inherit;
+            transition: width 0.3s ease;
+        }
+
+        .pm-pipeline__count {
+            flex: 0 0 52px;
+            text-align: right;
+            font-size: 13px;
+            font-weight: 800;
+            color: #101828;
+        }
+
+        .pm-pipeline__percentage {
+            display: block;
+            font-size: 10px;
+            font-weight: 600;
+            color: #667085;
+        }
+
+        html[data-theme="dark"] .pm-pipeline__info strong,
+        html[data-theme="dark"] .pm-pipeline__count {
+            color: #f8fafc;
+        }
+
+        html[data-theme="dark"] .pm-pipeline__bar {
+            background: #334155;
+        }
+
+
+        /* ====================================================
            MOBILE
            ==================================================== */
 
@@ -1969,6 +2270,10 @@ if ($displayName === '') {
 
                 box-sizing:
                     border-box;
+            }
+
+            .pm-pipeline__info {
+                flex: 0 0 110px;
             }
         }
 
@@ -2399,6 +2704,76 @@ if ($displayName === '') {
                 </div>
 
 
+            </div>
+
+
+            <!-- =================================================
+                 RECRUITMENT PIPELINE
+                 ================================================= -->
+
+            <div
+                class="welcome-card"
+                style="margin-top:2rem;"
+            >
+                <div class="welcome-card__content">
+                    <h2 style="margin-bottom:.5rem;">
+                        <i class="fas fa-diagram-project"></i>
+                        Recruitment Pipeline
+                    </h2>
+                    <p style="margin-bottom:1.25rem;">
+                        How candidates in your active programmes are distributed
+                        across the recruitment stages.
+                        <?php if ($totalPipelineCandidates > 0): ?>
+                            <strong><?= number_format($totalPipelineCandidates) ?></strong>
+                            candidate(s) in pipeline.
+                        <?php endif; ?>
+                    </p>
+
+                    <?php if ($totalPipelineCandidates === 0): ?>
+                        <div class="pm-modal-empty">
+                            <div class="pm-modal-empty__icon">
+                                <i class="fas fa-inbox"></i>
+                            </div>
+                            <strong>No candidates in the pipeline yet</strong>
+                            <span>
+                                Candidates will appear here once they are
+                                assigned to a cohort.
+                            </span>
+                        </div>
+                    <?php else: ?>
+                        <div class="pm-pipeline">
+                            <?php foreach (recruitment_stages() as $slug => $stage): ?>
+                                <?php
+                                $count = (int) ($stageDistribution[$slug] ?? 0);
+                                $percentage = $totalPipelineCandidates > 0
+                                    ? round(($count / $totalPipelineCandidates) * 100, 1)
+                                    : 0;
+                                ?>
+                                <div class="pm-pipeline__step">
+                                    <div class="pm-pipeline__icon"
+                                         style="background: <?= e($stage['colour']) ?>;">
+                                        <i class="fas <?= e($stage['icon']) ?>"></i>
+                                    </div>
+                                    <div class="pm-pipeline__info">
+                                        <strong><?= e($stage['label']) ?></strong>
+                                        <span><?= e($stage['description']) ?></span>
+                                    </div>
+                                    <div class="pm-pipeline__bar">
+                                        <span class="pm-pipeline__fill"
+                                              style="width: <?= $percentage ?>%;
+                                                     background: <?= e($stage['colour']) ?>;"></span>
+                                    </div>
+                                    <div class="pm-pipeline__count">
+                                        <?= number_format($count) ?>
+                                        <span class="pm-pipeline__percentage">
+                                            <?= $percentage ?>%
+                                        </span>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
 
 
@@ -3309,19 +3684,6 @@ document.addEventListener(
                 function (
                     candidate
                 ) {
-
-                    /*
-                     * IMPORTANT:
-                     *
-                     * We use candidate_name from SQL first.
-                     * It is:
-                     *
-                     * CONCAT(
-                     *   users.first_name,
-                     *   ' ',
-                     *   users.last_name
-                     * )
-                     */
 
                     let candidateName =
                         String(
