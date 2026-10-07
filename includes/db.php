@@ -99,17 +99,27 @@ class Database
 
         $placeholderCount = substr_count($sql, '?');
         if (($types !== '' || $params !== []) && strlen($types) !== $placeholderCount) {
-            throw new RuntimeException('Database prepare error.');
+            throw new RuntimeException(
+                'Database prepare error: ' . $placeholderCount . ' placeholder(s) in SQL but '
+                . strlen($types) . ' type(s) supplied.'
+            );
         }
 
         if ($types !== '' && count($params) > 0 && strlen($types) !== count($params)) {
-            throw new RuntimeException('Database prepare error.');
+            throw new RuntimeException(
+                'Database prepare error: ' . count($params) . ' parameter(s) supplied but '
+                . strlen($types) . ' type(s) declared.'
+            );
         }
 
         $stmt = $conn->prepare($sql);
         if (!$stmt) {
-            error_log('[DB] Prepare failed: ' . $conn->error . ' | SQL: ' . $sql);
-            throw new RuntimeException('Database prepare error.');
+            // Include the real MySQL reason (e.g. unknown column, missing table,
+            // DISTINCT/ORDER BY clash). The previous generic message made every
+            // SQL error indistinguishable in the UI and the log alike.
+            $error = $conn->error;
+            error_log('[DB] Prepare failed: ' . $error . ' | SQL: ' . $sql);
+            throw new RuntimeException('Database prepare error: ' . $error);
         }
 
         if ($types !== '' && $params !== []) {
@@ -127,7 +137,7 @@ class Database
                 $error = $stmt->error;
                 $stmt->close();
                 error_log('[DB] Bind failed: ' . $error . ' | SQL: ' . $sql);
-                throw new RuntimeException('Database prepare error.');
+                throw new RuntimeException('Database prepare error (bind failed): ' . $error);
             }
         }
 
@@ -135,7 +145,7 @@ class Database
             $error = $stmt->error;
             $stmt->close();
             error_log('[DB] Execute failed: ' . $error . ' | SQL: ' . $sql);
-            throw new RuntimeException('Database execute error.');
+            throw new RuntimeException('Database execute error: ' . $error);
         }
 
         return $stmt;

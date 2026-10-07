@@ -8,7 +8,20 @@
 --   placements             - Main placement records
 --   placement_status_history - Audit trail for placement changes
 --   placement_notifications  - Notifications related to placements
+--
+-- HOW TO APPLY (XAMPP / phpMyAdmin):
+--   Select the "investhood_platform" database, then choose
+--   Import -> choose this file -> Go.
+--   Every statement is CREATE TABLE IF NOT EXISTS, so it is safe
+--   to re-run: existing tables and data are left untouched.
 -- ============================================================
+
+-- Select the database up front. These MUST come before the first
+-- CREATE TABLE below; previously they sat after it, so importing
+-- this file with no database selected failed with
+-- "No database selected" on the very first statement.
+SET NAMES utf8mb4;
+USE `investhood_platform`;
 
 -- ------------------------------------------------------------
 -- 1. PLACEMENTS
@@ -51,9 +64,6 @@ CREATE TABLE IF NOT EXISTS `placements` (
   CONSTRAINT `fk_placements_supervisor` FOREIGN KEY (`supervisor_id`) REFERENCES `users` (`id`) ON UPDATE CASCADE ON DELETE SET NULL,
   CONSTRAINT `fk_placements_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-SET NAMES utf8mb4;
-USE `investhood_platform`;
 
 -- ------------------------------------------------------------
 -- 2. PLACEMENT STATUS HISTORY

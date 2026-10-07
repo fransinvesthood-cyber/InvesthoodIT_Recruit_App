@@ -1541,14 +1541,26 @@ class Selection
             self::recordOfferHistory($offerId, $currentStatus, $newStatus, $adminId, $reason);
 
             // ---- 3. Sync the application pipeline status (existing system) ----
+            // These are the application statuses an offer event may legally
+            // move forward from. The list must cover every status that can
+            // still legitimately precede the offer event, otherwise the
+            // offers.status and applications.status values silently
+            // desynchronise (the offer says "accepted" while the application
+            // is still parked on its earlier status). Downstream modules
+            // such as admin/create-placement.php gate eligibility on
+            // applications.status, so a missed entry here hides a genuinely
+            // accepted candidate from the Placements module.
+            // Terminal-negative statuses (offer_declined / rejected /
+            // withdrawn) are deliberately absent: an accepted offer must
+            // never resurrect a rejected or withdrawn application.
             $appNewStatus = self::OFFER_STATUS_TO_APPLICATION_STATUS[$newStatus] ?? null;
             if ($appNewStatus !== null && $applicationPrev !== $appNewStatus) {
                 $syncAllowed = [
-                    'issued'    => ['selected'],
-                    'accepted'  => ['offer_sent', 'selected'],
-                    'declined'  => ['offer_sent', 'selected'],
-                    'expired'   => ['offer_sent'],
-                    'withdrawn' => ['offer_sent', 'selected'],
+                    'issued'    => ['selected', 'interview_completed', 'on_hold', 'waitlisted'],
+                    'accepted'  => ['offer_sent', 'selected', 'interview_completed', 'on_hold', 'waitlisted'],
+                    'declined'  => ['offer_sent', 'selected', 'interview_completed', 'on_hold', 'waitlisted'],
+                    'expired'   => ['offer_sent', 'selected', 'on_hold', 'waitlisted'],
+                    'withdrawn' => ['offer_sent', 'selected', 'on_hold', 'waitlisted'],
                 ][$newStatus] ?? [];
 
                 if (in_array($applicationPrev, $syncAllowed, true)) {
