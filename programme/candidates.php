@@ -23,16 +23,195 @@
 require_once __DIR__ . '/../includes/bootstrap.php';
 require_role('programme_manager');
 $user = current_user();
+
+/*
+|--------------------------------------------------------------------------
+| Recruitment Stage Helpers (inline)
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('recruitment_stages')) {
+    function recruitment_stages(): array
+    {
+        return [
+            'submitted' => [
+                'label' => 'Submitted',
+                'short' => 'Submitted',
+                'icon' => 'fa-paper-plane',
+                'colour' => '#6366f1',
+                'description' => 'Application received and awaiting review.',
+            ],
+            'eligibility_review' => [
+                'label' => 'Eligibility Review',
+                'short' => 'Eligibility',
+                'icon' => 'fa-clipboard-check',
+                'colour' => '#0ea5e9',
+                'description' => 'Checking minimum eligibility criteria.',
+            ],
+            'screened' => [
+                'label' => 'Screened',
+                'short' => 'Screened',
+                'icon' => 'fa-filter',
+                'colour' => '#14b8a6',
+                'description' => 'Application screened against programme requirements.',
+            ],
+            'assessment' => [
+                'label' => 'Assessment',
+                'short' => 'Assessment',
+                'icon' => 'fa-file-pen',
+                'colour' => '#f59e0b',
+                'description' => 'Candidate is completing an assessment.',
+            ],
+            'interview' => [
+                'label' => 'Interview',
+                'short' => 'Interview',
+                'icon' => 'fa-comments',
+                'colour' => '#8b5cf6',
+                'description' => 'Interview stage with the selection panel.',
+            ],
+            'waitlisted' => [
+                'label' => 'Waitlisted',
+                'short' => 'Waitlisted',
+                'icon' => 'fa-hourglass-half',
+                'colour' => '#f97316',
+                'description' => 'Held on the waiting list pending capacity.',
+            ],
+            'selected' => [
+                'label' => 'Selected',
+                'short' => 'Selected',
+                'icon' => 'fa-circle-check',
+                'colour' => '#22c55e',
+                'description' => 'Candidate has been selected for the programme.',
+            ],
+            'rejected' => [
+                'label' => 'Rejected',
+                'short' => 'Rejected',
+                'icon' => 'fa-circle-xmark',
+                'colour' => '#ef4444',
+                'description' => 'Application was not successful.',
+            ],
+        ];
+    }
+}
+
+if (!function_exists('recruitment_stage_order')) {
+    function recruitment_stage_order(): array
+    {
+        return array_keys(recruitment_stages());
+    }
+}
+
+if (!function_exists('recruitment_stage_index')) {
+    function recruitment_stage_index(string $stage): int
+    {
+        $index = array_search($stage, recruitment_stage_order(), true);
+
+        return $index === false ? -1 : (int) $index;
+    }
+}
+
+if (!function_exists('normalise_candidate_stage')) {
+    function normalise_candidate_stage(?string $status): string
+    {
+        $status = strtolower(trim((string) $status));
+
+        $map = [
+            'submitted' => 'submitted',
+            'applied' => 'submitted',
+            'pending' => 'submitted',
+
+            'eligibility' => 'eligibility_review',
+            'eligibility_review' => 'eligibility_review',
+            'eligibility review' => 'eligibility_review',
+
+            'screened' => 'screened',
+            'screening' => 'screened',
+
+            'assessment' => 'assessment',
+            'assessed' => 'assessment',
+
+            'interview' => 'interview',
+            'interviewed' => 'interview',
+
+            'waitlisted' => 'waitlisted',
+            'waitlist' => 'waitlisted',
+            'waiting' => 'waitlisted',
+
+            'selected' => 'selected',
+            'onboarded' => 'selected',
+            'active' => 'selected',
+            'completed' => 'selected',
+            'accepted' => 'selected',
+
+            'rejected' => 'rejected',
+            'declined' => 'rejected',
+            'withdrawn' => 'rejected',
+        ];
+
+        return $map[$status] ?? 'submitted';
+    }
+}
+
+if (!function_exists('candidate_stage_label')) {
+    function candidate_stage_label(string $stage): string
+    {
+        $stages = recruitment_stages();
+
+        return $stages[$stage]['label']
+            ?? ucwords(str_replace('_', ' ', $stage));
+    }
+}
+
+if (!function_exists('candidate_stage_icon')) {
+    function candidate_stage_icon(string $stage): string
+    {
+        $stages = recruitment_stages();
+
+        return $stages[$stage]['icon'] ?? 'fa-circle';
+    }
+}
+
+if (!function_exists('candidate_stage_colour')) {
+    function candidate_stage_colour(string $stage): string
+    {
+        $stages = recruitment_stages();
+
+        return $stages[$stage]['colour'] ?? '#6b7280';
+    }
+}
+
+if (!function_exists('candidate_progress_percentage')) {
+    function candidate_progress_percentage(string $stage): int
+    {
+        if ($stage === 'rejected') {
+            return 100;
+        }
+
+        $order = recruitment_stage_order();
+        $total = count($order) - 1;
+
+        $index = recruitment_stage_index($stage);
+
+        if ($index < 0 || $total <= 0) {
+            return 0;
+        }
+
+        return (int) round(($index / $total) * 100);
+    }
+}
+
 $flashes = render_flashes();
 $conn = Database::getConnection();
 $currentPage = 'candidates';
 $pageTitle = 'Candidates';
+
 /*
 |--------------------------------------------------------------------------
 | Current Programme Manager
 |--------------------------------------------------------------------------
 */
 $managerId = (int) ($user['id'] ?? $user['user_id'] ?? 0);
+
 /*
 |--------------------------------------------------------------------------
 | Filters
@@ -42,12 +221,10 @@ $search = trim($_GET['search'] ?? '');
 $programmeId = (int) ($_GET['programme_id'] ?? 0);
 $cohortId = (int) ($_GET['cohort_id'] ?? 0);
 $status = trim($_GET['status'] ?? '');
+
 /*
 |--------------------------------------------------------------------------
 | Allowed Candidate Statuses
-|--------------------------------------------------------------------------
-|
-| These correspond to the cohort_participants.status field.
 |--------------------------------------------------------------------------
 */
 $allowedStatuses = [
@@ -57,9 +234,11 @@ $allowedStatuses = [
     'completed',
     'withdrawn'
 ];
+
 if ($status !== '' && !in_array($status, $allowedStatuses, true)) {
     $status = '';
 }
+
 /*
 |--------------------------------------------------------------------------
 | Manager's Programmes
@@ -85,6 +264,7 @@ if ($stmt) {
     }
     $stmt->close();
 }
+
 /*
 |--------------------------------------------------------------------------
 | Manager's Cohorts
@@ -114,6 +294,7 @@ if ($stmt) {
     }
     $stmt->close();
 }
+
 /*
 |--------------------------------------------------------------------------
 | Candidate Statistics
@@ -125,6 +306,7 @@ $onboardedCandidates = 0;
 $activeCandidates = 0;
 $completedCandidates = 0;
 $withdrawnCandidates = 0;
+
 /*
 |--------------------------------------------------------------------------
 | Base Statistics Query
@@ -174,47 +356,25 @@ $statsSql = "
 ";
 $statsTypes = 'i';
 $statsParams = [$managerId];
-/*
-|--------------------------------------------------------------------------
-| Programme Filter
-|--------------------------------------------------------------------------
-*/
+
 if ($programmeId > 0) {
-    $statsSql .= "
-        AND p.id = ?
-    ";
+    $statsSql .= " AND p.id = ? ";
     $statsTypes .= 'i';
     $statsParams[] = $programmeId;
 }
-/*
-|--------------------------------------------------------------------------
-| Cohort Filter
-|--------------------------------------------------------------------------
-*/
+
 if ($cohortId > 0) {
-    $statsSql .= "
-        AND c.id = ?
-    ";
+    $statsSql .= " AND c.id = ? ";
     $statsTypes .= 'i';
     $statsParams[] = $cohortId;
 }
-/*
-|--------------------------------------------------------------------------
-| Status Filter
-|--------------------------------------------------------------------------
-*/
+
 if ($status !== '') {
-    $statsSql .= "
-        AND cp.status = ?
-    ";
+    $statsSql .= " AND cp.status = ? ";
     $statsTypes .= 's';
     $statsParams[] = $status;
 }
-/*
-|--------------------------------------------------------------------------
-| Search Filter
-|--------------------------------------------------------------------------
-*/
+
 if ($search !== '') {
     $statsSql .= "
         AND (
@@ -231,11 +391,7 @@ if ($search !== '') {
     $statsParams[] = $searchValue;
     $statsParams[] = $searchValue;
 }
-/*
-|--------------------------------------------------------------------------
-| Execute Statistics
-|--------------------------------------------------------------------------
-*/
+
 $stmt = Database::prepare(
     $statsSql,
     $statsTypes,
@@ -253,6 +409,7 @@ if ($stmt) {
     }
     $stmt->close();
 }
+
 /*
 |--------------------------------------------------------------------------
 | Fetch Candidates
@@ -291,47 +448,25 @@ $sql = "
 ";
 $types = 'i';
 $params = [$managerId];
-/*
-|--------------------------------------------------------------------------
-| Programme Filter
-|--------------------------------------------------------------------------
-*/
+
 if ($programmeId > 0) {
-    $sql .= "
-        AND p.id = ?
-    ";
+    $sql .= " AND p.id = ? ";
     $types .= 'i';
     $params[] = $programmeId;
 }
-/*
-|--------------------------------------------------------------------------
-| Cohort Filter
-|--------------------------------------------------------------------------
-*/
+
 if ($cohortId > 0) {
-    $sql .= "
-        AND c.id = ?
-    ";
+    $sql .= " AND c.id = ? ";
     $types .= 'i';
     $params[] = $cohortId;
 }
-/*
-|--------------------------------------------------------------------------
-| Status Filter
-|--------------------------------------------------------------------------
-*/
+
 if ($status !== '') {
-    $sql .= "
-        AND cp.status = ?
-    ";
+    $sql .= " AND cp.status = ? ";
     $types .= 's';
     $params[] = $status;
 }
-/*
-|--------------------------------------------------------------------------
-| Search Filter
-|--------------------------------------------------------------------------
-*/
+
 if ($search !== '') {
     $sql .= "
         AND (
@@ -348,11 +483,7 @@ if ($search !== '') {
     $params[] = $searchValue;
     $params[] = $searchValue;
 }
-/*
-|--------------------------------------------------------------------------
-| Ordering
-|--------------------------------------------------------------------------
-*/
+
 $sql .= "
     ORDER BY
         u.first_name ASC,
@@ -360,11 +491,7 @@ $sql .= "
         p.name ASC,
         c.name ASC
 ";
-/*
-|--------------------------------------------------------------------------
-| Execute Candidate Query
-|--------------------------------------------------------------------------
-*/
+
 $stmt = Database::prepare(
     $sql,
     $types,
@@ -377,6 +504,43 @@ if ($stmt) {
     }
     $stmt->close();
 }
+
+/*
+|--------------------------------------------------------------------------
+| Decorate Candidates With Recruitment Stage Info
+|--------------------------------------------------------------------------
+*/
+foreach ($candidates as &$candidateRow) {
+    $stage = normalise_candidate_stage(
+        $candidateRow['participation_status'] ?? 'submitted'
+    );
+
+    $candidateRow['recruitment_stage'] = $stage;
+    $candidateRow['stage_label'] = candidate_stage_label($stage);
+    $candidateRow['stage_icon'] = candidate_stage_icon($stage);
+    $candidateRow['stage_colour'] = candidate_stage_colour($stage);
+    $candidateRow['stage_percentage'] = candidate_progress_percentage($stage);
+}
+unset($candidateRow);
+
+/*
+|--------------------------------------------------------------------------
+| Recruitment Stage Statistics
+|--------------------------------------------------------------------------
+*/
+$stageStats = [];
+
+foreach (recruitment_stage_order() as $stageSlug) {
+    $stageStats[$stageSlug] = 0;
+}
+
+foreach ($candidates as $candidateRow) {
+    $slug = $candidateRow['recruitment_stage'] ?? 'submitted';
+    if (isset($stageStats[$slug])) {
+        $stageStats[$slug]++;
+    }
+}
+
 /*
 |--------------------------------------------------------------------------
 | Helper - Status Label
@@ -392,6 +556,7 @@ function candidate_status_label($status)
         )
     );
 }
+
 /*
 |--------------------------------------------------------------------------
 | Helper - Status Class
@@ -414,12 +579,6 @@ function candidate_status_class($status)
             return 'status-default';
     }
 }
-/*
-|--------------------------------------------------------------------------
-| Flash Messages
-|--------------------------------------------------------------------------
-*/
-$flashes = render_flashes();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -489,7 +648,7 @@ $flashes = render_flashes();
         .candidate-table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 950px;
+            min-width: 1150px;
         }
         .candidate-table th {
             text-align: left;
@@ -581,28 +740,463 @@ $flashes = render_flashes();
                 grid-template-columns: 1fr;
             }
         }
+
+        /* ============================================================
+           RECRUITMENT PROGRESS TRACKING
+           ============================================================ */
+
+        .stage-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .stage-summary__item {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.75rem 0.85rem;
+            border-radius: 10px;
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+        }
+
+        .stage-summary__icon {
+            width: 34px;
+            height: 34px;
+            flex: 0 0 34px;
+            display: grid;
+            place-items: center;
+            border-radius: 9px;
+            color: #fff;
+            font-size: 0.8rem;
+        }
+
+        .stage-summary__info {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .stage-summary__count {
+            display: block;
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #111827;
+            line-height: 1.1;
+        }
+
+        .stage-summary__label {
+            display: block;
+            margin-top: 2px;
+            font-size: 0.7rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-weight: 600;
+        }
+
+        .candidate-stage-cell {
+            min-width: 200px;
+        }
+
+        .candidate-stage-cell__head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .candidate-stage-cell__label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
+        .candidate-stage-cell__bar {
+            width: 100%;
+            height: 6px;
+            border-radius: 999px;
+            background: #e5e7eb;
+            overflow: hidden;
+        }
+
+        .candidate-stage-cell__fill {
+            display: block;
+            height: 100%;
+            border-radius: inherit;
+            transition: width 0.3s ease;
+        }
+
+        .candidate-stage-cell__percentage {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #6b7280;
+        }
+
+        /* Modal */
+        .candidate-progress-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 2147483647;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            visibility: hidden;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+
+        .candidate-progress-modal.is-open {
+            visibility: visible;
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .candidate-progress-modal__backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.72);
+            backdrop-filter: blur(5px);
+        }
+
+        .candidate-progress-modal__dialog {
+            position: relative;
+            z-index: 2;
+            width: min(760px, 100%);
+            max-height: calc(100vh - 40px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: #fff;
+            border: 1px solid #e4e7ec;
+            border-radius: 20px;
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35);
+            transform: translateY(15px) scale(0.98);
+            transition: transform 0.2s ease;
+        }
+
+        .candidate-progress-modal.is-open .candidate-progress-modal__dialog {
+            transform: translateY(0) scale(1);
+        }
+
+        .candidate-progress-modal__header {
+            padding: 20px 22px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 20px;
+            border-bottom: 1px solid #e4e7ec;
+        }
+
+        .candidate-progress-modal__eyebrow {
+            display: block;
+            margin-bottom: 4px;
+            color: #2563eb;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .candidate-progress-modal__title {
+            margin: 0;
+            color: #101828;
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        .candidate-progress-modal__close {
+            width: 38px;
+            height: 38px;
+            flex: 0 0 38px;
+            display: grid;
+            place-items: center;
+            border: 1px solid #e4e7ec;
+            border-radius: 10px;
+            background: #f8fafc;
+            color: #475467;
+            cursor: pointer;
+        }
+
+        .candidate-progress-modal__close:hover {
+            background: #eff6ff;
+            color: #2563eb;
+        }
+
+        .candidate-progress-modal__body {
+            padding: 22px;
+            overflow-y: auto;
+        }
+
+        .candidate-progress-modal__footer {
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            border-top: 1px solid #e4e7ec;
+        }
+
+        .candidate-progress-summary {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px;
+            border-radius: 14px;
+            background: #f8fafc;
+            border: 1px solid #e4e7ec;
+            margin-bottom: 20px;
+        }
+
+        .candidate-progress-summary__avatar {
+            width: 52px;
+            height: 52px;
+            flex: 0 0 52px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: #eef2ff;
+            color: #4f46e5;
+            font-size: 1rem;
+            font-weight: 800;
+        }
+
+        .candidate-progress-summary__info {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .candidate-progress-summary__info strong {
+            display: block;
+            color: #101828;
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .candidate-progress-summary__info span {
+            display: block;
+            margin-top: 3px;
+            color: #667085;
+            font-size: 12px;
+        }
+
+        .candidate-progress-summary__badge {
+            flex: 0 0 auto;
+            padding: 6px 12px;
+            border-radius: 999px;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .candidate-progress-timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            margin-top: 4px;
+        }
+
+        .candidate-progress-timeline__item {
+            position: relative;
+            display: flex;
+            gap: 16px;
+            padding-bottom: 22px;
+        }
+
+        .candidate-progress-timeline__item:last-child {
+            padding-bottom: 0;
+        }
+
+        .candidate-progress-timeline__item::before {
+            content: '';
+            position: absolute;
+            left: 19px;
+            top: 40px;
+            bottom: 0;
+            width: 2px;
+            background: #e5e7eb;
+        }
+
+        .candidate-progress-timeline__item:last-child::before {
+            display: none;
+        }
+
+        .candidate-progress-timeline__item.is-complete::before {
+            background: var(--stage-colour, #2563eb);
+        }
+
+        .candidate-progress-timeline__marker {
+            position: relative;
+            z-index: 1;
+            width: 40px;
+            height: 40px;
+            flex: 0 0 40px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: #f3f4f6;
+            color: #9ca3af;
+            border: 3px solid #fff;
+            box-shadow: 0 0 0 1px #e5e7eb;
+            font-size: 0.85rem;
+        }
+
+        .candidate-progress-timeline__item.is-complete
+            .candidate-progress-timeline__marker {
+            background: var(--stage-colour, #2563eb);
+            color: #fff;
+            box-shadow: 0 0 0 1px var(--stage-colour, #2563eb);
+        }
+
+        .candidate-progress-timeline__item.is-current
+            .candidate-progress-timeline__marker {
+            background: var(--stage-colour, #2563eb);
+            color: #fff;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18);
+        }
+
+        .candidate-progress-timeline__item.is-rejected
+            .candidate-progress-timeline__marker {
+            background: #ef4444;
+            color: #fff;
+            box-shadow: 0 0 0 1px #ef4444;
+        }
+
+        .candidate-progress-timeline__content {
+            flex: 1;
+            min-width: 0;
+            padding-top: 6px;
+        }
+
+        .candidate-progress-timeline__content strong {
+            display: block;
+            color: #101828;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .candidate-progress-timeline__content span {
+            display: block;
+            margin-top: 3px;
+            color: #667085;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .candidate-progress-timeline__status {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: #ecfdf3;
+            color: #027a48;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .candidate-progress-timeline__status--current {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+
+        .candidate-progress-timeline__status--rejected {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        /* Dark mode */
+        html[data-theme="dark"] .candidate-progress-modal__dialog {
+            background: #1e293b;
+            border-color: #334155;
+        }
+
+        html[data-theme="dark"] .candidate-progress-modal__header,
+        html[data-theme="dark"] .candidate-progress-modal__footer {
+            border-color: #334155;
+        }
+
+        html[data-theme="dark"] .candidate-progress-modal__title,
+        html[data-theme="dark"] .candidate-progress-summary__info strong,
+        html[data-theme="dark"] .candidate-progress-timeline__content strong {
+            color: #f8fafc;
+        }
+
+        html[data-theme="dark"] .candidate-progress-summary {
+            background: #111827;
+            border-color: #334155;
+        }
+
+        html[data-theme="dark"] .stage-summary__item {
+            background: #111827;
+            border-color: #334155;
+        }
+
+        html[data-theme="dark"] .stage-summary__count {
+            color: #f8fafc;
+        }
+
+        html[data-theme="dark"] .candidate-progress-modal__close {
+            background: #111827;
+            color: #e2e8f0;
+            border-color: #475569;
+        }
+
+        body.candidate-progress-modal-open {
+            overflow: hidden !important;
+        }
+
+        @media (max-width: 620px) {
+            .candidate-progress-modal {
+                padding: 12px;
+            }
+
+            .candidate-progress-modal__dialog {
+                max-height: calc(100vh - 24px);
+                border-radius: 16px;
+            }
+
+            .candidate-progress-summary {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
     </style>
-  <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260920">
+    <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260920">
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
+
     <!-- =====================================================
          SIDEBAR
     ====================================================== -->
     <?php require __DIR__ . '/sidebar.php'; ?>
+
     <!-- =====================================================
          MAIN CONTENT
     ====================================================== -->
     <main class="dashboard__main">
+
         <!-- =================================================
              HEADER
         ================================================== -->
         <?php require __DIR__ . '/navbar.php'; ?>
+
         <!-- =================================================
              CONTENT
         ================================================== -->
         <div class="dash-content">
+
             <?= $flashes ?>
+
             <!-- =================================================
                  WELCOME
             ================================================== -->
@@ -621,6 +1215,7 @@ $flashes = render_flashes();
                     </p>
                 </div>
             </div>
+
             <!-- =================================================
                  STATISTICS
             ================================================== -->
@@ -713,6 +1308,43 @@ $flashes = render_flashes();
                     </div>
                 </div>
             </div>
+
+            <!-- =================================================
+                 RECRUITMENT PIPELINE
+            ================================================== -->
+            <div
+                class="welcome-card"
+                style="margin-top:2rem;"
+            >
+                <div class="welcome-card__content">
+                    <h2 style="margin-bottom:1rem;">
+                        <i class="fas fa-diagram-project"></i>
+                        Recruitment Pipeline
+                    </h2>
+
+                    <div class="stage-summary">
+                        <?php foreach (recruitment_stages() as $slug => $stage): ?>
+                            <div class="stage-summary__item">
+                                <div
+                                    class="stage-summary__icon"
+                                    style="background: <?= e($stage['colour']) ?>;"
+                                >
+                                    <i class="fas <?= e($stage['icon']) ?>"></i>
+                                </div>
+                                <div class="stage-summary__info">
+                                    <span class="stage-summary__count">
+                                        <?= number_format($stageStats[$slug] ?? 0) ?>
+                                    </span>
+                                    <span class="stage-summary__label">
+                                        <?= e($stage['short']) ?>
+                                    </span>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+
             <!-- =================================================
                  FILTERS
             ================================================== -->
@@ -859,6 +1491,7 @@ $flashes = render_flashes();
                     <?php endif; ?>
                 </div>
             </div>
+
             <!-- =================================================
                  CANDIDATE LIST HEADER
             ================================================== -->
@@ -877,6 +1510,7 @@ $flashes = render_flashes();
                     </p>
                 </div>
             </div>
+
             <!-- =================================================
                  EMPTY STATE
             ================================================== -->
@@ -933,30 +1567,15 @@ $flashes = render_flashes();
                     <table class="candidate-table">
                         <thead>
                             <tr>
-                                <th>
-                                    Candidate
-                                </th>
-                                <th>
-                                    Programme
-                                </th>
-                                <th>
-                                    Cohort
-                                </th>
-                                <th>
-                                    Status
-                                </th>
-                                <th>
-                                    Selected
-                                </th>
-                                <th>
-                                    Onboarded
-                                </th>
-                                <th>
-                                    Completed
-                                </th>
-                                <th style="text-align:left;padding:1rem;">
-                                    Actions
-                                </th>
+                                <th>Candidate</th>
+                                <th>Programme</th>
+                                <th>Cohort</th>
+                                <th>Recruitment Stage</th>
+                                <th>Status</th>
+                                <th>Selected</th>
+                                <th>Onboarded</th>
+                                <th>Completed</th>
+                                <th style="text-align:left;padding:1rem;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1020,6 +1639,32 @@ $flashes = render_flashes();
                                         <?= e(
                                             $candidate['cohort_name']
                                         ) ?>
+                                    </td>
+                                    <!-- Recruitment Stage -->
+                                    <td class="candidate-stage-cell">
+                                        <?php
+                                        $stageSlug = $candidate['recruitment_stage'] ?? 'submitted';
+                                        $stageColour = $candidate['stage_colour'] ?? '#2563eb';
+                                        $stagePercentage = (int) ($candidate['stage_percentage'] ?? 0);
+                                        ?>
+                                        <div class="candidate-stage-cell__head">
+                                            <span class="candidate-stage-cell__label">
+                                                <i
+                                                    class="fas <?= e($candidate['stage_icon'] ?? 'fa-circle') ?>"
+                                                    style="color: <?= e($stageColour) ?>;"
+                                                ></i>
+                                                <?= e($candidate['stage_label'] ?? 'Submitted') ?>
+                                            </span>
+                                            <span class="candidate-stage-cell__percentage">
+                                                <?= $stagePercentage ?>%
+                                            </span>
+                                        </div>
+                                        <div class="candidate-stage-cell__bar">
+                                            <span
+                                                class="candidate-stage-cell__fill"
+                                                style="width: <?= $stagePercentage ?>%; background: <?= e($stageColour) ?>;"
+                                            ></span>
+                                        </div>
                                     </td>
                                     <!-- Status -->
                                     <td>
@@ -1104,23 +1749,50 @@ $flashes = render_flashes();
                                             —
                                         <?php endif; ?>
                                     </td>
-                                    <!-- Action -->
+                                    <!-- Actions -->
                                     <td style="padding:1rem;">
-                                        <a
-                                            href="<?= url(
-                                                'programme/candidate_view.php?id=' .
-                                                (int) $candidate['user_id']
-                                            ) ?>"
-                                            class="sidebar__link"
-                                            style="
-                                                display:inline-flex;
-                                                align-items:center;
-                                                gap:0.5rem;
-                                            "
-                                        >
-                                            <i class="fas fa-eye"></i>
-                                            View Candidate
-                                        </a>
+                                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                                            <button
+                                                type="button"
+                                                class="sidebar__link candidate-progress-trigger"
+                                                style="
+                                                    border:0;
+                                                    cursor:pointer;
+                                                    display:inline-flex;
+                                                    align-items:center;
+                                                    gap:0.5rem;
+                                                "
+                                                data-candidate-name="<?= e(
+                                                    trim(
+                                                        ($candidate['first_name'] ?? '')
+                                                        . ' '
+                                                        . ($candidate['last_name'] ?? '')
+                                                    )
+                                                ) ?>"
+                                                data-candidate-email="<?= e($candidate['email'] ?? '') ?>"
+                                                data-candidate-programme="<?= e($candidate['programme_name'] ?? '') ?>"
+                                                data-candidate-cohort="<?= e($candidate['cohort_name'] ?? '') ?>"
+                                                data-candidate-stage="<?= e($candidate['recruitment_stage'] ?? 'submitted') ?>"
+                                            >
+                                                <i class="fas fa-chart-simple"></i>
+                                                Track Progress
+                                            </button>
+                                            <a
+                                                href="<?= url(
+                                                    'programme/candidate_view.php?id=' .
+                                                    (int) $candidate['user_id']
+                                                ) ?>"
+                                                class="sidebar__link"
+                                                style="
+                                                    display:inline-flex;
+                                                    align-items:center;
+                                                    gap:0.5rem;
+                                                "
+                                            >
+                                                <i class="fas fa-eye"></i>
+                                                View
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -1131,6 +1803,215 @@ $flashes = render_flashes();
         </div>
     </main>
 </div>
+
+<!-- =========================================================
+     CANDIDATE PROGRESS MODAL
+     ========================================================= -->
+<div
+    id="candidateProgressModal"
+    class="candidate-progress-modal"
+    aria-hidden="true"
+>
+    <div
+        class="candidate-progress-modal__backdrop"
+        data-progress-close
+    ></div>
+
+    <section
+        class="candidate-progress-modal__dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="candidateProgressModalTitle"
+    >
+        <header class="candidate-progress-modal__header">
+            <div>
+                <span class="candidate-progress-modal__eyebrow">
+                    Candidate Progress
+                </span>
+                <h2
+                    id="candidateProgressModalTitle"
+                    class="candidate-progress-modal__title"
+                >
+                    Recruitment Journey
+                </h2>
+            </div>
+
+            <button
+                type="button"
+                class="candidate-progress-modal__close"
+                data-progress-close
+                aria-label="Close"
+            >
+                <i class="fas fa-times"></i>
+            </button>
+        </header>
+
+        <div
+            id="candidateProgressModalBody"
+            class="candidate-progress-modal__body"
+        ></div>
+
+        <footer class="candidate-progress-modal__footer">
+            <button
+                type="button"
+                class="pm-dashboard-modal__cancel"
+                data-progress-close
+            >
+                Close
+            </button>
+        </footer>
+    </section>
+</div>
+
 <script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260920"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+
+    const stages = <?= json_encode(
+        recruitment_stages(),
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+    ) ?>;
+
+    const order = <?= json_encode(
+        recruitment_stage_order(),
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+    ) ?>;
+
+    const modal = document.getElementById('candidateProgressModal');
+    const modalBody = document.getElementById('candidateProgressModalBody');
+
+    if (!modal || !modalBody) return;
+
+    let activeTrigger = null;
+
+    function escapeHtml(value) {
+        const el = document.createElement('div');
+        el.textContent = String(value ?? '');
+        return el.innerHTML;
+    }
+
+    function initials(name) {
+        const words = String(name || '').trim().split(/\s+/).filter(Boolean);
+        if (!words.length) return '?';
+        if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+        return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+    }
+
+    function buildTimeline(stageSlug) {
+        const currentIndex = order.indexOf(stageSlug);
+        const isRejected = stageSlug === 'rejected';
+
+        return order.map(function (slug, index) {
+            const stage = stages[slug];
+            const isCurrent = slug === stageSlug;
+            const isComplete = !isRejected && index < currentIndex;
+            const isRejectedStep = isRejected && slug === 'rejected';
+
+            let itemClass = 'candidate-progress-timeline__item';
+            if (isComplete) itemClass += ' is-complete';
+            if (isCurrent) itemClass += ' is-current';
+            if (isRejectedStep) itemClass += ' is-rejected';
+
+            let statusLabel = 'Pending';
+            if (isComplete) statusLabel = 'Completed';
+            if (isCurrent) statusLabel = 'Current Stage';
+            if (isRejectedStep) statusLabel = 'Rejected';
+
+            let statusClass = 'candidate-progress-timeline__status';
+            if (isCurrent) statusClass += ' candidate-progress-timeline__status--current';
+            if (isRejectedStep) statusClass += ' candidate-progress-timeline__status--rejected';
+
+            return `
+                <div class="${itemClass}" style="--stage-colour: ${escapeHtml(stage.colour)};">
+                    <div class="candidate-progress-timeline__marker">
+                        <i class="fas ${escapeHtml(stage.icon)}"></i>
+                    </div>
+                    <div class="candidate-progress-timeline__content">
+                        <strong>${escapeHtml(stage.label)}</strong>
+                        <span>${escapeHtml(stage.description)}</span>
+                        <span class="${statusClass}">${statusLabel}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function openModal(trigger) {
+        activeTrigger = trigger;
+
+        const name = trigger.getAttribute('data-candidate-name') || 'Candidate';
+        const email = trigger.getAttribute('data-candidate-email') || '';
+        const programme = trigger.getAttribute('data-candidate-programme') || '';
+        const cohort = trigger.getAttribute('data-candidate-cohort') || '';
+        const stageSlug = trigger.getAttribute('data-candidate-stage') || 'submitted';
+        const stage = stages[stageSlug] || stages.submitted;
+
+        const assignment = [programme, cohort].filter(Boolean).join(' · ');
+
+        modalBody.innerHTML = `
+            <div class="candidate-progress-summary">
+                <div class="candidate-progress-summary__avatar">
+                    ${escapeHtml(initials(name))}
+                </div>
+                <div class="candidate-progress-summary__info">
+                    <strong>${escapeHtml(name)}</strong>
+                    ${email ? `<span>${escapeHtml(email)}</span>` : ''}
+                    ${assignment ? `<span>${escapeHtml(assignment)}</span>` : ''}
+                </div>
+                <span class="candidate-progress-summary__badge"
+                      style="background: ${escapeHtml(stage.colour)};">
+                    ${escapeHtml(stage.label)}
+                </span>
+            </div>
+            <div class="candidate-progress-timeline">
+                ${buildTimeline(stageSlug)}
+            </div>
+        `;
+
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('candidate-progress-modal-open');
+
+        const closeBtn = modal.querySelector('.candidate-progress-modal__close');
+        if (closeBtn) requestAnimationFrame(() => closeBtn.focus());
+    }
+
+    function closeModal() {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('candidate-progress-modal-open');
+
+        if (activeTrigger && typeof activeTrigger.focus === 'function') {
+            activeTrigger.focus();
+        }
+        activeTrigger = null;
+    }
+
+    document.addEventListener('click', function (event) {
+        const close = event.target.closest('[data-progress-close]');
+        if (close && modal.contains(close)) {
+            event.preventDefault();
+            closeModal();
+            return;
+        }
+
+        const trigger = event.target.closest('.candidate-progress-trigger');
+        if (!trigger) return;
+
+        event.preventDefault();
+        openModal(trigger);
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+            event.preventDefault();
+            closeModal();
+        }
+    });
+});
+</script>
+
 </body>
 </html>
