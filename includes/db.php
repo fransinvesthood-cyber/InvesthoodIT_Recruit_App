@@ -123,11 +123,17 @@ class Database
         }
 
         if ($types !== '' && $params !== []) {
+            // bind_param() requires references. Bind directly to the $params
+            // slots — binding to the foreach $value variable instead would make
+            // EVERY placeholder receive the LAST value (all entries would
+            // reference the same reused variable), silently corrupting any
+            // multi-parameter query (e.g. UPDATE ... SET status = ? WHERE id = ?
+            // would run as SET <id> WHERE <id> and change nothing).
             $bindArgs = [$types];
-            foreach ($params as $index => &$value) {
-                $bindArgs[] = &$value;
+            foreach ($params as $index => $value) {
+                $bindArgs[] = &$params[$index];
             }
-            unset($value);
+            unset($index, $value);
 
             if (!call_user_func_array([$stmt, 'bind_param'], $bindArgs)) {
                 // Capture the error BEFORE closing the statement — accessing

@@ -10,6 +10,84 @@ require_role('admin');
 $user = current_user();
 $roleSlug = current_role() ?? 'admin';
 
+// Allowed placement statuses (must match placements.status ENUM in database/placements.sql).
+$PLACEMENT_STATUSES = ['pending_placement', 'placement_in_progress', 'placed', 'active', 'completed', 'withdrawn', 'cancelled'];
+
+// ---------------------------------------------------------------------------
+// QUICK STATUS UPDATE: POST placement_action=update_status
+// Lets an admin change a placement's status from the list or detail view.
+// Writes placement_status_history + a candidate notification (best-effort).
+// Uses PRG (redirect after POST) so refreshes don't re-submit.
+// ---------------------------------------------------------------------------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['placement_action'] ?? '') === 'update_status') {
+    require_csrf();
+    $statusPid = (int) ($_POST['placement_id'] ?? 0);
+    $newStatus = trim((string) ($_POST['new_status'] ?? ''));
+    $changeReason = trim((string) ($_POST['change_reason'] ?? ''));
+    // Only allow returning to this page (avoid open redirects).
+    $returnTo = trim((string) ($_POST['return_to'] ?? ''));
+    if ($returnTo === '' || stripos($returnTo, 'admin/placements.php') !== 0) {
+        $returnTo = $statusPid > 0 ? 'admin/placements.php?manage=' . $statusPid : 'admin/placements.php';
+    }
+    if ($statusPid <= 0) {
+        set_flash('error', 'Status not updated', 'Missing placement. Please try again.');
+        safe_redirect($returnTo);
+    }
+    if (!in_array($newStatus, $PLACEMENT_STATUSES, true)) {
+        set_flash('error', 'Status not updated', 'Invalid status selected.');
+        safe_redirect($returnTo);
+    }
+    try {
+        $existing = Database::fetchOne("SELECT id, candidate_id, status FROM placements WHERE id = ?", 'i', [$statusPid]);
+        if (!$existing) {
+            set_flash('error', 'Status not updated', 'Placement #' . $statusPid . ' could not be found.');
+            safe_redirect($returnTo);
+        }
+        $oldStatus = (string) ($existing['status'] ?? '');
+        if ($oldStatus === $newStatus) {
+            set_flash('info', 'No change needed', 'Placement is already "' . ucwords(str_replace('_', ' ', $newStatus)) . '".');
+            safe_redirect($returnTo);
+        }
+        Database::execute("UPDATE placements SET status = ?, updated_at = NOW() WHERE id = ?", 'si', [$newStatus, $statusPid]);
+        $actorId = function_exists('current_user_id') ? (int) (current_user_id() ?? 0) : 0;
+        $bySql = $actorId > 0 ? '?' : 'NULL';
+        $byParams = $actorId > 0 ? [$actorId] : [];
+        $byTypes = $actorId > 0 ? 'i' : '';
+        $reasonParam = $changeReason !== '' ? $changeReason : ('Status changed from ' . $oldStatus . ' to ' . $newStatus);
+        // History trail.
+        try {
+            Database::execute(
+                "INSERT INTO placement_status_history (placement_id, field_name, previous_value, new_value, changed_by, change_reason) VALUES (?, 'status', ?, ?, {$bySql}, ?)",
+                'isss' . $byTypes,
+                array_merge([$statusPid, $oldStatus, $newStatus], $byParams, [$reasonParam])
+            );
+        } catch (Throwable $histEx) { error_log('[PLACEMENTS] status history: ' . $histEx->getMessage()); }
+        // Candidate notification (best-effort).
+        try {
+            $niceOld = ucwords(str_replace('_', ' ', $oldStatus));
+            $niceNew = ucwords(str_replace('_', ' ', $newStatus));
+            Database::execute(
+                "INSERT INTO placement_notifications (placement_id, candidate_id, sender_id, notification_type, title, message) VALUES (?, ?, {$bySql}, 'status_changed', 'Placement Status Updated', ?)",
+                'ii' . $byTypes . 's',
+                array_merge([$statusPid, (int) ($existing['candidate_id'] ?? 0)], $byParams, ["Your placement status changed from {$niceOld} to {$niceNew}."])
+            );
+        } catch (Throwable $notifEx) { error_log('[PLACEMENTS] status notify: ' . $notifEx->getMessage()); }
+        // Audit trail (best-effort).
+        try {
+            Database::execute(
+                "INSERT INTO audit_logs (user_id, action, record_type, record_id, reason, ip_address) VALUES ({$bySql}, 'Placement Status Updated', 'placement', ?, ?, ?)",
+                $byTypes . 'iss',
+                array_merge($byParams, [$statusPid, $reasonParam, $_SERVER['REMOTE_ADDR'] ?? '::1'])
+            );
+        } catch (Throwable $auditEx) { error_log('[PLACEMENTS] status audit: ' . $auditEx->getMessage()); }
+        set_flash('success', 'Placement status updated', 'Placement #' . $statusPid . ' is now "' . ucwords(str_replace('_', ' ', $newStatus)) . '".');
+    } catch (Throwable $ex) {
+        error_log('[PLACEMENTS] status update: ' . $ex->getMessage());
+        set_flash('error', 'Status not updated', 'Failed to update placement status. Please try again.');
+    }
+    safe_redirect($returnTo);
+}
+
 // Fetch stats
 $stats = ['total' => 0, 'pending' => 0, 'active' => 0, 'completed' => 0, 'withdrawn' => 0];
 try {
@@ -156,8 +234,20 @@ $flashes = render_flashes();
                       <?= e($dName !== '' ? $dName : '—') ?>
                     </div>
                   </div>
-                  <div style="display:flex;align-items:center;gap:.6rem;">
+                  <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
                     <span class="pl-status pl-status--<?= e($dStatus) ?>"><?= e(ucwords(str_replace('_', ' ', $dStatus))) ?></span>
+                    <form method="post" action="<?= url('admin/placements.php') ?>?manage=<?= (int) $placementDetail['id'] ?>" style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;" onsubmit="return confirm('Change status to \"' + this.new_status.options[this.new_status.selectedIndex].text + '\"?');">
+                      <?= csrf_field() ?>
+                      <input type="hidden" name="placement_action" value="update_status">
+                      <input type="hidden" name="placement_id" value="<?= (int) $placementDetail['id'] ?>">
+                      <input type="hidden" name="return_to" value="admin/placements.php?manage=<?= (int) $placementDetail['id'] ?>">
+                      <select name="new_status" class="pl-filters__select" style="padding:.35rem 1.8rem .35rem .6rem;font-size:.78rem;" aria-label="Change placement status">
+                        <?php foreach (($PLACEMENT_STATUSES ?? []) as $optStatus): ?>
+                          <option value="<?= e($optStatus) ?>" <?= $optStatus === $dStatus ? 'selected' : '' ?>><?= e(ucwords(str_replace('_', ' ', $optStatus))) ?></option>
+                        <?php endforeach; ?>
+                      </select>
+                      <button type="submit" class="pl-btn pl-btn--sm pl-btn--primary"><i class="fas fa-sync-alt"></i> Update Status</button>
+                    </form>
                     <a href="<?= url('admin/placements.php') ?>" class="pl-btn pl-btn--sm"><i class="fas fa-arrow-left"></i> Back to List</a>
                   </div>
                 </div>
@@ -263,11 +353,15 @@ $flashes = render_flashes();
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
             <div>
               <h2 style="font-size:1.25rem;font-weight:700;margin:0;color:var(--text);">Placement Records</h2>
-              <p style="margin:.25rem 0 0;color:var(--text-muted);font-size:.85rem;">
-                <?= (int) $stats['total'] ?> placement<?= (int) $stats['total'] !== 1 ? 's' : ''; ?> total
+              <p style="margin:.35rem 0 0;color:var(--text-muted);font-size:.85rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
+                <span><?= (int) $stats['total'] ?> placement<?= (int) $stats['total'] !== 1 ? 's' : ''; ?> total</span>
+                <?php if ((int) $stats['total'] > 0): ?>
+                  <span class="pl-chip" style="font-size:.7rem;"><i class="fas fa-clock"></i><?= (int) $stats['pending'] ?> pending</span>
+                  <span class="pl-chip pl-chip--green" style="font-size:.7rem;"><i class="fas fa-play"></i><?= (int) $stats['active'] ?> active</span>
+                <?php endif; ?>
               </p>
             </div>
-            <a href="<?= url('admin/create-placement.php') ?>" class="pl-btn pl-btn--primary" style="padding:.6rem 1.2rem;"><i class="fas fa-plus"></i> Create Placement</a>
+            <a href="<?= url('admin/create-placement.php') ?>" class="pl-btn pl-btn--primary" style="padding:.65rem 1.3rem;border-radius:10px;box-shadow:0 6px 16px rgba(26,86,219,.3);"><i class="fas fa-plus"></i> Create Placement</a>
           </div>
 
           <!-- ===== PLACEMENTS TABLE ===== -->
@@ -285,13 +379,13 @@ $flashes = render_flashes();
               <table class="pl-table">
                 <thead>
                   <tr>
-                    <th>Candidate</th>
-                    <th>Programme / Cohort</th>
-                    <th>Department</th>
-                    <th>Supervisor</th>
-                    <th>Duration</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th><i class="fas fa-user" style="margin-right:.35rem;"></i>Candidate</th>
+                    <th><i class="fas fa-graduation-cap" style="margin-right:.35rem;"></i>Programme / Cohort</th>
+                    <th><i class="fas fa-building" style="margin-right:.35rem;"></i>Department</th>
+                    <th><i class="fas fa-user-tie" style="margin-right:.35rem;"></i>Supervisor</th>
+                    <th><i class="fas fa-calendar-days" style="margin-right:.35rem;"></i>Duration</th>
+                    <th><i class="fas fa-flag" style="margin-right:.35rem;"></i>Status</th>
+                    <th><i class="fas fa-bolt" style="margin-right:.35rem;"></i>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -300,40 +394,82 @@ $flashes = render_flashes();
                       $plName   = trim(($pl['first_name'] ?? '') . ' ' . ($pl['last_name'] ?? ''));
                       $plSup    = trim(($pl['sup_first'] ?? '') . ' ' . ($pl['sup_last'] ?? ''));
                       $plStatus = $pl['status'] ?? 'pending_placement';
+                      $plInitials = strtoupper(implode('', array_map(fn($p) => mb_substr($p, 0, 1), array_filter(preg_split('/\s+/', $plName !== '' ? $plName : '??'), fn($p) => $p !== ''))));
+                      $plInitials = $plInitials !== '' ? mb_substr($plInitials, 0, 2) : '—';
+                      $plAvatar = trim((string) ($pl['profile_picture'] ?? ''));
+                      $plHasDates = !empty($pl['start_date']) || !empty($pl['end_date']);
+                      $plDept = trim((string) ($pl['department'] ?? ''));
+                      $plLoc  = trim((string) ($pl['location'] ?? ''));
                     ?>
                     <tr>
-                      <td>
+                      <td data-label="Candidate">
                         <div class="pl-candidate">
+                          <div class="pl-candidate__avatar" aria-hidden="true">
+                            <?php if ($plAvatar !== ''): ?>
+                              <img src="<?= url('uploads/' . $plAvatar) ?>" alt="">
+                            <?php else: ?>
+                              <?= e($plInitials) ?>
+                            <?php endif; ?>
+                          </div>
                           <div class="pl-candidate__info">
                             <div class="pl-candidate__name"><?= e($plName !== '' ? $plName : '—') ?></div>
-                            <div class="pl-candidate__email"><?= e($pl['email'] ?? '') ?> · <?= e($pl['placement_reference'] ?? '') ?></div>
+                            <div class="pl-candidate__email"><i class="fas fa-envelope"></i> <?= e($pl['email'] ?? '—') ?></div>
+                            <?php if (!empty($pl['placement_reference'])): ?>
+                              <div class="pl-candidate__email"><span class="pl-ref"><?= e($pl['placement_reference']) ?></span></div>
+                            <?php endif; ?>
                           </div>
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Programme / Cohort">
                         <div class="pl-opportunity">
-                          <div class="pl-opportunity__title"><?= e($pl['programme_name'] ?? '—') ?></div>
-                          <div class="pl-opportunity__ref"><?= e($pl['cohort_name'] ?? '') ?></div>
+                          <div class="pl-opportunity__title pl-cell__title"><i class="fas fa-graduation-cap" style="color:var(--primary);margin-right:.3rem;"></i><?= e($pl['programme_name'] ?? '—') ?></div>
+                          <?php if (!empty($pl['cohort_name'])): ?>
+                            <div class="pl-cell__sub"><span class="pl-chip"><i class="fas fa-users"></i><?= e($pl['cohort_name']) ?></span></div>
+                          <?php endif; ?>
                         </div>
                       </td>
-                      <td>
-                        <?= e($pl['department'] ?? '—') ?>
-                        <?php if (!empty($pl['location'])): ?>
-                          <div class="pl-candidate__email"><?= e($pl['location']) ?></div>
+                      <td data-label="Department">
+                        <div class="pl-cell__title"><?= e($plDept !== '' ? $plDept : '—') ?></div>
+                        <?php if ($plLoc !== ''): ?>
+                          <div class="pl-cell__sub"><i class="fas fa-location-dot"></i><?= e($plLoc) ?></div>
                         <?php endif; ?>
                       </td>
-                      <td><?= e($plSup !== '' ? $plSup : 'Unassigned') ?></td>
-                      <td>
-                        <?php if (!empty($pl['start_date']) || !empty($pl['end_date'])): ?>
-                          <?= e(!empty($pl['start_date']) ? format_date($pl['start_date'], 'd M Y') : '—') ?>
-                          &ndash;
-                          <?= e(!empty($pl['end_date']) ? format_date($pl['end_date'], 'd M Y') : '—') ?>
+                      <td data-label="Supervisor">
+                        <?php if ($plSup !== ''): ?>
+                          <div class="pl-cell__title"><?= e($plSup) ?></div>
+                          <div class="pl-cell__sub"><span class="pl-chip pl-chip--green"><i class="fas fa-user-check"></i>Assigned</span></div>
                         <?php else: ?>
-                          —
+                          <div class="pl-cell__sub"><span class="pl-chip pl-chip--muted"><i class="fas fa-user-plus"></i>Unassigned</span></div>
                         <?php endif; ?>
                       </td>
-                      <td><span class="pl-status pl-status--<?= e($plStatus) ?>"><?= e(ucwords(str_replace('_', ' ', $plStatus))) ?></span></td>
-                      <td>
+                      <td data-label="Duration">
+                        <?php if ($plHasDates): ?>
+                          <div class="pl-dates">
+                            <i class="fas fa-calendar-days"></i>
+                            <span><?= e(!empty($pl['start_date']) ? format_date($pl['start_date'], 'd M Y') : '—') ?></span>
+                            <span class="pl-dates__sep">&rarr;</span>
+                            <span><?= e(!empty($pl['end_date']) ? format_date($pl['end_date'], 'd M Y') : '—') ?></span>
+                          </div>
+                        <?php else: ?>
+                          <span class="pl-chip pl-chip--muted"><i class="fas fa-calendar-xmark"></i>No dates</span>
+                        <?php endif; ?>
+                      </td>
+                      <td data-label="Status">
+                        <span class="pl-status pl-status--<?= e($plStatus) ?>"><?= e(ucwords(str_replace('_', ' ', $plStatus))) ?></span>
+                        <form method="post" action="<?= url('admin/placements.php') ?>" class="pl-status-form" onsubmit="return confirm('Change status to &quot;' + this.new_status.options[this.new_status.selectedIndex].text + '&quot;?');">
+                          <?= csrf_field() ?>
+                          <input type="hidden" name="placement_action" value="update_status">
+                          <input type="hidden" name="placement_id" value="<?= (int) $pl['id'] ?>">
+                          <input type="hidden" name="return_to" value="admin/placements.php">
+                          <select name="new_status" class="pl-filters__select" aria-label="Change status for placement #<?= (int) $pl['id'] ?>">
+                            <?php foreach (($PLACEMENT_STATUSES ?? []) as $optStatus): ?>
+                              <option value="<?= e($optStatus) ?>" <?= $optStatus === $plStatus ? 'selected' : '' ?>><?= e(ucwords(str_replace('_', ' ', $optStatus))) ?></option>
+                            <?php endforeach; ?>
+                          </select>
+                          <button type="submit" class="pl-btn pl-btn--sm" title="Update status"><i class="fas fa-check"></i></button>
+                        </form>
+                      </td>
+                      <td data-label="Actions">
                         <div class="pl-actions">
                           <a href="<?= url('admin/placements.php') ?>?view=<?= (int) $pl['id'] ?>" class="pl-btn pl-btn--sm" title="View placement"><i class="fas fa-eye"></i></a>
                           <a href="<?= url('admin/placements.php') ?>?manage=<?= (int) $pl['id'] ?>" class="pl-btn pl-btn--sm pl-btn--primary" title="Manage"><i class="fas fa-cog"></i></a>
