@@ -1436,7 +1436,7 @@ require __DIR__ . '/_layout_start.php';
 
 
 
-    transition: *background* .15s ease;
+    transition: background .15s ease;
 
 }
 
