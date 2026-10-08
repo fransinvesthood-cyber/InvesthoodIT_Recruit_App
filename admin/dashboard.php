@@ -83,6 +83,7 @@ $placementPending = 0;
 $placementActive = 0;
 $placementCompleted = 0;
 $placementWithdrawn = 0;
+$placementPlaced = 0;
 $recentPlacements = [];
 try {
     $placementStatsRow = Database::fetchOne(
@@ -90,6 +91,7 @@ try {
             COUNT(*) AS total,
             SUM(CASE WHEN status = 'pending_placement' THEN 1 ELSE 0 END) AS pending,
             SUM(CASE WHEN status IN ('placed','active','placement_in_progress') THEN 1 ELSE 0 END) AS active,
+            SUM(CASE WHEN status = 'placed' THEN 1 ELSE 0 END) AS placed,
             SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
             SUM(CASE WHEN status IN ('cancelled','withdrawn') THEN 1 ELSE 0 END) AS withdrawn
          FROM placements"
@@ -97,6 +99,7 @@ try {
     $placementTotal    = (int) ($placementStatsRow['total'] ?? 0);
     $placementPending  = (int) ($placementStatsRow['pending'] ?? 0);
     $placementActive   = (int) ($placementStatsRow['active'] ?? 0);
+    $placementPlaced   = (int) ($placementStatsRow['placed'] ?? 0);
     $placementCompleted = (int) ($placementStatsRow['completed'] ?? 0);
     $placementWithdrawn = (int) ($placementStatsRow['withdrawn'] ?? 0);
 
@@ -947,11 +950,11 @@ try {
                 <div class="admin-exec-card__icon admin-exec-card__icon--green"><i class="fas fa-check-circle"></i></div>
                 <span class="admin-exec-card__change up">+9.4%</span>
               </div>
-              <span class="admin-exec-card__number" data-count="1056">0</span>
+              <span class="admin-exec-card__number" data-count="<?= (int)$placementPlaced ?>">0</span>
               <span class="admin-exec-card__label">Successful Placements</span>
               <div class="admin-exec-card__footer">
-                <span class="admin-exec-card__period"><i class="fas fa-arrow-up"></i> 42 this quarter</span>
-                <a href="#" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
+                <span class="admin-exec-card__period"><i class="fas fa-arrow-up"></i> <?= (int)$placementTotal ?> total placements</span>
+                <a href="<?= url('admin/placements.php') ?>" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
             <div class="admin-exec-card">
