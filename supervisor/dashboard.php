@@ -3437,6 +3437,15 @@ html[data-theme="dark"] .sv-chatbot__message--assistant,html[data-theme="dark"] 
 
 
 <!-- =========================================================
+     ATTENDANCE MONITORING (added)
+========================================================= -->
+<?php
+require_once __DIR__ . '/_attendance.php';
+sv_att_render_dashboard($supervisorId);
+?>
+
+
+<!-- =========================================================
 
      DASHBOARD CARD MODAL
 

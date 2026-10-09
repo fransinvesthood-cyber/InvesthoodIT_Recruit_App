@@ -1299,6 +1299,32 @@ html[data-theme="dark"] .sv-report-modal__summary-track {
 
 </form>
 
+<!-- =========================================================
+     EXPORT REPORT (added: Exportable Supervisor Reports)
+     Exports the report using the filters currently applied above.
+========================================================= -->
+
+<?php
+$rxQuery = [
+    'programme_id' => $programmeId,
+    'cohort_id'    => $cohortId,
+    'status'       => $status,
+];
+$rxUrl = static fn(string $format): string => url(
+    'supervisor/reports_export.php?' . http_build_query($rxQuery + ['format' => $format])
+);
+?>
+<div class="sv-export-bar" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 18px">
+    <strong style="font-size:12px"><i class="fas fa-download"></i> Export this report</strong>
+    <a class="sv-btn sv-btn--secondary" href="<?= e($rxUrl('csv')) ?>"><i class="fas fa-file-csv"></i> CSV</a>
+    <a class="sv-btn sv-btn--secondary" href="<?= e($rxUrl('xlsx')) ?>"><i class="fas fa-file-excel"></i> Excel</a>
+    <a class="sv-btn sv-btn--secondary" href="<?= e($rxUrl('pdf')) ?>"><i class="fas fa-file-pdf"></i> PDF</a>
+    <small style="color:var(--sv-muted,#667085);font-size:11px">
+        Includes the filters currently applied (<?= number_format(count($rows)) ?> cohort<?= count($rows) === 1 ? '' : 's' ?>).
+    </small>
+</div>
+
+
 
 <!-- =========================================================
      REPORT TABLE
