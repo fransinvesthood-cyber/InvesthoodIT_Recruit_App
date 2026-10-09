@@ -488,6 +488,283 @@ if ($scopeMode !== 'none') {
     }
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Programme Action Centre
+|--------------------------------------------------------------------------
+| The Action Centre is intentionally built from tables that exist in the
+| current application schema. Each query is scoped through programmes
+| visible to this Programme Officer. Optional modules (for example,
+| interviews or candidate profiles) fail safely if their tables are not
+| available in an older local database.
+*/
+$actionItems = [];
+
+function po_add_action(array &$items, string $type, string $priority, string $title, string $description, string $meta, string $url, string $icon): void
+{
+    $items[] = [
+        'type' => $type,
+        'priority' => $priority,
+        'title' => $title,
+        'description' => $description,
+        'meta' => $meta,
+        'url' => $url,
+        'icon' => $icon,
+    ];
+}
+
+/* Candidates selected but not yet onboarded. */
+$sql = "
+    SELECT
+        cp.user_id AS candidate_id,
+        CONCAT_WS(' ', u.first_name, u.last_name) AS candidate_name,
+        c.id AS cohort_id,
+        c.name AS cohort_name,
+        p.name AS programme_name
+    FROM cohort_participants cp
+    INNER JOIN users u ON u.id = cp.user_id
+    INNER JOIN cohorts c ON c.id = cp.cohort_id
+    INNER JOIN programmes p ON p.id = c.programme_id
+    WHERE {$scopeCondition}
+      AND cp.status = 'selected'
+      AND cp.onboarded_at IS NULL
+    ORDER BY cp.updated_at ASC
+    LIMIT 6
+";
+$stmt = $conn->prepare($sql);
+if ($stmt) {
+    $stmt->bind_param('i', $officerId);
+    if ($stmt->execute()) {
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            po_add_action(
+                $actionItems,
+                'onboarding',
+                'high',
+                'Candidate onboarding required',
+                $row['candidate_name'] . ' is selected but has not been onboarded.',
+                $row['programme_name'] . ' · ' . $row['cohort_name'],
+                url('programme_officer/candidate_view.php?id=' . (int) $row['candidate_id'] . '&cohort_id=' . (int) $row['cohort_id']),
+                'fa-user-plus'
+            );
+        }
+    }
+    $stmt->close();
+}
+
+/* Applications waiting at assessment stage. */
+$sql = "
+    SELECT
+        a.id AS application_id,
+        a.candidate_id,
+        a.application_reference,
+        CONCAT_WS(' ', u.first_name, u.last_name) AS candidate_name,
+        c.id AS cohort_id,
+        c.name AS cohort_name,
+        p.name AS programme_name
+    FROM applications a
+    INNER JOIN users u ON u.id = a.candidate_id
+    INNER JOIN opportunities o ON o.id = a.opportunity_id
+    INNER JOIN cohorts c ON c.id = o.cohort_id
+    INNER JOIN programmes p ON p.id = c.programme_id
+    WHERE {$scopeCondition}
+      AND a.status = 'assessment'
+    ORDER BY a.updated_at ASC
+    LIMIT 6
+";
+$stmt = $conn->prepare($sql);
+if ($stmt) {
+    $stmt->bind_param('i', $officerId);
+    if ($stmt->execute()) {
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            po_add_action(
+                $actionItems,
+                'assessment',
+                'high',
+                'Assessment requires attention',
+                $row['candidate_name'] . ' has an application at the assessment stage.',
+                $row['programme_name'] . ' · ' . $row['cohort_name'] . ' · ' . $row['application_reference'],
+                url('programme_officer/candidate_view.php?id=' . (int) $row['candidate_id'] . '&cohort_id=' . (int) $row['cohort_id']),
+                'fa-clipboard-check'
+            );
+        }
+    }
+    $stmt->close();
+}
+
+/* Interviews due now or within the next three days. */
+$sql = "
+    SELECT
+        a.candidate_id,
+        i.interview_date,
+        i.start_time,
+        i.status AS interview_status,
+        CONCAT_WS(' ', u.first_name, u.last_name) AS candidate_name,
+        c.id AS cohort_id,
+        c.name AS cohort_name,
+        p.name AS programme_name
+    FROM interviews i
+    INNER JOIN applications a ON a.id = i.application_id
+    INNER JOIN users u ON u.id = a.candidate_id
+    INNER JOIN opportunities o ON o.id = a.opportunity_id
+    INNER JOIN cohorts c ON c.id = o.cohort_id
+    INNER JOIN programmes p ON p.id = c.programme_id
+    WHERE {$scopeCondition}
+      AND i.status IN ('scheduled', 'confirmed', 'rescheduled')
+      AND i.interview_date <= DATE_ADD(CURDATE(), INTERVAL 3 DAY)
+    ORDER BY i.interview_date ASC, i.start_time ASC
+    LIMIT 6
+";
+$stmt = $conn->prepare($sql);
+if ($stmt) {
+    $stmt->bind_param('i', $officerId);
+    if ($stmt->execute()) {
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $priority = $row['interview_date'] < date('Y-m-d') ? 'high' : 'medium';
+            po_add_action(
+                $actionItems,
+                'interview',
+                $priority,
+                $row['interview_date'] < date('Y-m-d') ? 'Interview follow-up overdue' : 'Interview requires attention',
+                $row['candidate_name'] . ' has an interview ' . ($row['interview_date'] < date('Y-m-d') ? 'that is overdue.' : 'scheduled soon.'),
+                $row['programme_name'] . ' · ' . $row['cohort_name'] . ' · ' . date('d M Y', strtotime($row['interview_date'])) . ' ' . substr((string) $row['start_time'], 0, 5),
+                url('programme_officer/candidate_view.php?id=' . (int) $row['candidate_id'] . '&cohort_id=' . (int) $row['cohort_id']),
+                'fa-calendar-check'
+            );
+        }
+    }
+    $stmt->close();
+}
+
+/* Candidate profiles with incomplete information. */
+$sql = "
+    SELECT DISTINCT
+        u.id AS candidate_id,
+        CONCAT_WS(' ', u.first_name, u.last_name) AS candidate_name,
+        c.id AS cohort_id,
+        c.name AS cohort_name,
+        p.name AS programme_name,
+        COALESCE(cp.completion_percent, 0) AS completion_percent
+    FROM cohort_participants participant
+    INNER JOIN users u ON u.id = participant.user_id
+    INNER JOIN cohorts c ON c.id = participant.cohort_id
+    INNER JOIN programmes p ON p.id = c.programme_id
+    LEFT JOIN candidate_profiles cp ON cp.user_id = u.id
+    WHERE {$scopeCondition}
+      AND participant.status <> 'withdrawn'
+      AND COALESCE(cp.completion_percent, 0) < 100
+    ORDER BY COALESCE(cp.completion_percent, 0) ASC, u.last_name ASC
+    LIMIT 6
+";
+$stmt = $conn->prepare($sql);
+if ($stmt) {
+    $stmt->bind_param('i', $officerId);
+    if ($stmt->execute()) {
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            po_add_action(
+                $actionItems,
+                'candidate_info',
+                'medium',
+                'Candidate information incomplete',
+                $row['candidate_name'] . ' has a profile completion level of ' . (int) $row['completion_percent'] . '%.',
+                $row['programme_name'] . ' · ' . $row['cohort_name'],
+                url('programme_officer/candidate_view.php?id=' . (int) $row['candidate_id'] . '&cohort_id=' . (int) $row['cohort_id']),
+                'fa-user-pen'
+            );
+        }
+    }
+    $stmt->close();
+}
+
+/* Active candidates whose participation record has not been updated recently. */
+$sql = "
+    SELECT
+        cp.user_id AS candidate_id,
+        CONCAT_WS(' ', u.first_name, u.last_name) AS candidate_name,
+        c.id AS cohort_id,
+        c.name AS cohort_name,
+        p.name AS programme_name,
+        cp.updated_at
+    FROM cohort_participants cp
+    INNER JOIN users u ON u.id = cp.user_id
+    INNER JOIN cohorts c ON c.id = cp.cohort_id
+    INNER JOIN programmes p ON p.id = c.programme_id
+    WHERE {$scopeCondition}
+      AND cp.status = 'active'
+      AND cp.updated_at < DATE_SUB(NOW(), INTERVAL 14 DAY)
+    ORDER BY cp.updated_at ASC
+    LIMIT 6
+";
+$stmt = $conn->prepare($sql);
+if ($stmt) {
+    $stmt->bind_param('i', $officerId);
+    if ($stmt->execute()) {
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            po_add_action(
+                $actionItems,
+                'progress',
+                'medium',
+                'Progress update may be due',
+                $row['candidate_name'] . ' has not had a participation update for more than 14 days.',
+                $row['programme_name'] . ' · ' . $row['cohort_name'],
+                url('programme_officer/candidate_view.php?id=' . (int) $row['candidate_id'] . '&cohort_id=' . (int) $row['cohort_id']),
+                'fa-chart-line'
+            );
+        }
+    }
+    $stmt->close();
+}
+
+/* Cohorts with an application closing date within seven days. */
+$sql = "
+    SELECT
+        c.id AS cohort_id,
+        c.name AS cohort_name,
+        p.name AS programme_name,
+        c.application_close_date
+    FROM cohorts c
+    INNER JOIN programmes p ON p.id = c.programme_id
+    WHERE {$scopeCondition}
+      AND c.application_close_date IS NOT NULL
+      AND c.application_close_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+      AND c.status IN ('open', 'active')
+    ORDER BY c.application_close_date ASC
+    LIMIT 6
+";
+$stmt = $conn->prepare($sql);
+if ($stmt) {
+    $stmt->bind_param('i', $officerId);
+    if ($stmt->execute()) {
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            po_add_action(
+                $actionItems,
+                'cohort_activity',
+                'medium',
+                'Cohort application window closing',
+                $row['cohort_name'] . ' is approaching its application closing date.',
+                $row['programme_name'] . ' · closes ' . date('d M Y', strtotime($row['application_close_date'])),
+                url('programme_officer/cohort_view.php?id=' . (int) $row['cohort_id']),
+                'fa-clock'
+            );
+        }
+    }
+    $stmt->close();
+}
+
+$priorityOrder = ['high' => 0, 'medium' => 1, 'low' => 2];
+usort($actionItems, static function (array $a, array $b) use ($priorityOrder): int {
+    return ($priorityOrder[$a['priority']] ?? 9) <=> ($priorityOrder[$b['priority']] ?? 9);
+});
+$actionItems = array_slice($actionItems, 0, 12);
+$actionCount = count($actionItems);
+
+
 /*
 |--------------------------------------------------------------------------
 | First Name
@@ -722,6 +999,49 @@ require __DIR__ . '/_layout_start.php';
 
 </section>
 
+
+
+<!-- =========================================================
+     PROGRAMME ACTION CENTRE
+========================================================= -->
+<section class="po-card po-action-centre">
+    <div class="po-card__header po-action-centre__header">
+        <div>
+            <h3>Programme Action Centre</h3>
+            <p>Outstanding programme items that may require your attention.</p>
+        </div>
+        <span class="po-action-centre__count"><?= number_format($actionCount) ?> action<?= $actionCount === 1 ? '' : 's' ?></span>
+    </div>
+
+    <?php if (!$actionItems): ?>
+        <div class="po-action-centre__empty">
+            <span class="po-action-centre__empty-icon"><i class="fas fa-circle-check"></i></span>
+            <div>
+                <strong>You're all caught up</strong>
+                <span>No outstanding programme actions were identified from the available programme, cohort, candidate, application and interview data.</span>
+            </div>
+        </div>
+    <?php else: ?>
+        <div class="po-action-centre__list">
+            <?php foreach ($actionItems as $action): ?>
+                <a class="po-action-item" href="<?= e($action['url']) ?>">
+                    <span class="po-action-item__icon po-action-item__icon--<?= e($action['priority']) ?>">
+                        <i class="fas <?= e($action['icon']) ?>"></i>
+                    </span>
+                    <span class="po-action-item__body">
+                        <strong><?= e($action['title']) ?></strong>
+                        <span><?= e($action['description']) ?></span>
+                        <small><?= e($action['meta']) ?></small>
+                    </span>
+                    <span class="po-action-item__priority po-action-item__priority--<?= e($action['priority']) ?>">
+                        <?= e(ucfirst($action['priority'])) ?>
+                    </span>
+                    <i class="fas fa-chevron-right po-action-item__arrow"></i>
+                </a>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</section>
 
 <!-- =========================================================
      PROGRAMME PORTFOLIO / QUICK ACTIONS
@@ -1725,6 +2045,8 @@ body.po-dashboard-modal-open { overflow: hidden; }
         padding: 12px 14px;
     }
 }
+
+.po-action-centre{margin-bottom:1.5rem}.po-action-centre__header{display:flex;align-items:center;justify-content:space-between;gap:1rem}.po-action-centre__count{display:inline-flex;align-items:center;padding:.35rem .65rem;border-radius:999px;background:var(--po-primary-soft);color:var(--po-primary);font-size:.72rem;font-weight:800}.po-action-centre__list{display:grid}.po-action-item{display:flex;align-items:center;gap:.85rem;padding:1rem 1.1rem;border-top:1px solid var(--po-border-light);text-decoration:none;color:var(--po-text);transition:background .15s ease}.po-action-item:hover{background:var(--po-soft)}.po-action-item__icon{width:40px;height:40px;flex:0 0 40px;display:grid;place-items:center;border-radius:11px;background:var(--po-primary-soft);color:var(--po-primary)}.po-action-item__icon--high{background:#fee2e2;color:#b91c1c}.po-action-item__icon--medium{background:#fef3c7;color:#92400e}.po-action-item__body{min-width:0;flex:1}.po-action-item__body strong{display:block;font-size:.84rem}.po-action-item__body span{display:block;margin-top:3px;color:var(--po-muted);font-size:.76rem;line-height:1.45}.po-action-item__body small{display:block;margin-top:4px;color:var(--po-subtle);font-size:.68rem}.po-action-item__priority{padding:.25rem .5rem;border-radius:999px;font-size:.64rem;font-weight:800}.po-action-item__priority--high{background:#fee2e2;color:#b91c1c}.po-action-item__priority--medium{background:#fef3c7;color:#92400e}.po-action-item__priority--low{background:#e2e8f0;color:#475569}.po-action-item__arrow{color:var(--po-subtle);font-size:.7rem}.po-action-centre__empty{padding:1.5rem;display:flex;align-items:center;gap:1rem;color:var(--po-muted)}.po-action-centre__empty-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:#dcfce7;color:#166534;flex:0 0 42px}.po-action-centre__empty strong{display:block;color:var(--po-text);font-size:.84rem}.po-action-centre__empty span{display:block;margin-top:3px;font-size:.76rem}@media(max-width:640px){.po-action-item{align-items:flex-start}.po-action-item__priority{display:none}.po-action-centre__header{align-items:flex-start}}
 </style>
 
 <script>
