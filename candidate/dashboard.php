@@ -54,7 +54,52 @@ $appStats = Application::countByStatus($userId);
 $draftApplications = (int) ($appStats['draft'] ?? 0);
 $activeApplications = (int) ($appStats['total'] ?? 0) - (int) ($appStats['rejected'] ?? 0);
 $interviewInvitations = (int) ($appStats['under_review'] ?? 0);
-$placementStatus = (int) ($appStats['selected'] ?? 0);
+
+// Offers integration (Stage 12) — live data from Admin Selection & Offers.
+$offerSummary = ['stats' => ['total' => 0, 'pending' => 0, 'accepted' => 0, 'declined' => 0, 'expired' => 0, 'withdrawn' => 0], 'recent' => null, 'recentList' => [], 'deadlines' => [], 'notifications' => [], 'unread' => 0, 'expired' => 0];
+$offerLoadError = null;
+try {
+    $offerSummary = CandidateOffersController::dashboard($userId);
+} catch (Throwable $e) {
+    error_log('[Candidate Dashboard] Offers unavailable: ' . $e->getMessage());
+    $offerLoadError = 'Offers are temporarily unavailable. Please try again later.';
+}
+$offerStats = $offerSummary['stats'] ?? [];
+$offerRecentList = $offerSummary['recentList'] ?? [];
+$offerDeadlines = $offerSummary['deadlines'] ?? [];
+
+// Placements integration — live data from the Admin Placement Management
+// module (placements table) scoped to the logged-in candidate.
+// Dashboard-safe: CandidatePlacement degrades to null when the Stage 12
+// tables have not been migrated yet.
+$placementStatus = 'Not Yet Placed';
+$placement = null;
+$placementStage = ['stage'=>1,'key'=>'application','label'=>'Application','offer_status'=>null,'selected'=>false,'has_application'=>false];
+$placementProgress = 25;
+$placementStatusMessage = ['tone'=>'info','message'=>'No placement has been assigned yet. Once the programme team places you, your organisation, role and dates will appear here.'];
+$placementLoadError = null;
+$placementOrg = null;
+$placementRole = null;
+
+try {
+    $placement = CandidatePlacement::currentForCandidate($userId);
+    $placementStage = CandidatePlacement::stageForCandidate($userId, $placement);
+    $placementStatus = $placement !== null
+        ? CandidatePlacement::statusLabel($placement['status'] ?? null)
+        : 'Not Yet Placed';
+    $placementProgress = CandidatePlacement::progressForStage(
+        $placementStage['key'] ?? 'application',
+        $placement !== null ? (string)($placement['status'] ?? '') : null
+    );
+    $placementStatusMessage = CandidatePlacement::statusMessage($placement);
+    if ($placement !== null) {
+        $placementOrg = CandidatePlacement::organisationFor($placement);
+        $placementRole = CandidatePlacement::roleFor($placement);
+    }
+} catch (Throwable $e) {
+    $placementLoadError = 'Placement information is temporarily unavailable.';
+    error_log('[Candidate Dashboard] Placement load failed for user ' . $userId . ': ' . $e->getMessage());
+}
 
 // Interviews integration — dynamic data sourced from the interviews table
 // via the candidate's applications (Candidate → Application → Interview).
@@ -148,6 +193,7 @@ $flashes = render_flashes();
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
   <link rel="stylesheet" href="<?= url('css/opportunities.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/candidate_offers.css') ?>">
 </head>
 <body class="dashboard-page">
 
@@ -179,6 +225,7 @@ $flashes = render_flashes();
           <li><a href="#dashboard-placements" class="sidebar__link" data-section="placements"><i class="fas fa-briefcase"></i> Placements</a></li>
           <li><a href="#dashboard-learning" class="sidebar__link" data-section="learning"><i class="fas fa-book-open"></i> Learning & Skills</a></li>
           <li><a href="#dashboard-interviews" class="sidebar__link" data-section="interviews"><i class="fas fa-calendar-check"></i> Interviews</a></li>
+          <li><a href="#dashboard-offers" class="sidebar__link" data-section="offers"><i class="fas fa-envelope-open-text"></i> Offers</a></li>
 <li><a href="#dashboard-notifications" class="sidebar__link" data-section="notifications"><i class="fas fa-bell"></i> Notifications</a></li>
 <li><a href="#dashboard-analytics" class="sidebar__link" data-section="analytics"><i class="fas fa-chart-line"></i> Analytics</a></li>
         </ul>
@@ -324,14 +371,6 @@ $flashes = render_flashes();
               <div class="overview-card__info">
                 <span class="overview-card__number" data-count="<?= $interviewInvitations ?>"><?= $interviewInvitations ?></span>
                 <span class="overview-card__label">Interview Invitations</span>
-              </div>
-              <a href="<?= url('candidate/applications.php') ?>" class="overview-card__link">View <i class="fas fa-arrow-right"></i></a>
-            </div>
-            <div class="overview-card">
-              <div class="overview-card__icon overview-card__icon--purple"><i class="fas fa-user-check"></i></div>
-              <div class="overview-card__info">
-                <span class="overview-card__number" data-count="<?= $placementStatus ?>"><?= $placementStatus ?></span>
-                <span class="overview-card__label">Placement Status</span>
               </div>
               <a href="<?= url('candidate/applications.php') ?>" class="overview-card__link">View <i class="fas fa-arrow-right"></i></a>
             </div>
@@ -742,67 +781,138 @@ $flashes = render_flashes();
           <div class="section__header" style="text-align:left;margin-bottom:1.5rem;">
             <h2 class="section__title" style="font-size:1.5rem;">Placement <span class="text-gradient">Management</span></h2>
           </div>
+          <?php
+          $plTone = $placement !== null ? CandidatePlacement::statusTone($placement['status'] ?? null) : 'pending';
+          $plRef = $placement !== null ? (string)($placement['placement_reference'] ?? '') : '';
+          $plProgramme = $placement !== null ? trim((string)($placement['programme_name'] ?? '')) : '';
+          $plCohort = $placement !== null ? trim((string)($placement['cohort_name'] ?? '')) : '';
+          $plDept = $placement !== null ? trim((string)($placement['department'] ?? '')) : '';
+          $plLoc = $placement !== null ? trim((string)($placement['location'] ?? '')) : '';
+          $plStart = $placement !== null ? (string)($placement['start_date'] ?? '') : '';
+          $plEnd = $placement !== null ? (string)($placement['end_date'] ?? '') : '';
+          $plSup = $placement !== null ? trim((string)($placement['supervisor_name'] ?? '')) : '';
+          $plType = $placement !== null ? trim((string)($placement['programme_type'] ?? '')) : '';
+          $plDaysUntil = CandidatePlacement::daysUntilStart($placement);
+          $plDuration = CandidatePlacement::durationLabel($plStart !== '' ? $plStart : null, $plEnd !== '' ? $plEnd : null);
+          $plDurationRange = ($plStart !== '' ? CandidatePlacement::formatDay($plStart) : '—') . ' - ' . ($plEnd !== '' ? CandidatePlacement::formatDay($plEnd) : '—') . ' (' . $plDuration . ')';
+          $plStageKey = (string)($placementStage['key'] ?? 'application');
+          $plStageNum = (int)($placementStage['stage'] ?? 1);
+          $plSteps = ['application' => 'Application', 'selection' => 'Selection', 'offer' => 'Offer', 'placement' => 'Placement'];
+          $plStepNum = 0;
+          ?>
           <div class="placement-card">
             <div class="placement-card__header">
-              <div class="placement-card__status placement-card__status--active">
-                <i class="fas fa-circle"></i> Active Placement
+              <div class="placement-card__status placement-card__status--<?= e($plTone) ?>"<?php if ($plTone === 'confirmed'): ?> style="color:var(--primary);"<?php elseif ($plTone === 'completed'): ?> style="color:var(--text-light);"<?php elseif ($plTone === 'cancelled'): ?> style="color:var(--danger);"<?php elseif ($plTone === 'withdrawn'): ?> style="color:var(--text-light);"<?php elseif ($plTone === 'pending'): ?> style="color:var(--accent);"<?php endif; ?>>
+                <i class="fas fa-circle"></i> <?= e($placement !== null ? $placementStatus : 'No Placement Yet') ?>
               </div>
               <div class="placement-card__progress">
-                <span class="placement-card__progress-label">Progress: 65%</span>
+                <span class="placement-card__progress-label">Progress: <?= (int)$placementProgress ?>%</span>
                 <div class="progress-bar">
-                  <div class="progress-bar__fill" style="width:65%"></div>
+                  <div class="progress-bar__fill" style="width:<?= (int)$placementProgress ?>%"></div>
                 </div>
               </div>
             </div>
             <div class="placement-card__body">
+              <?php if ($placementLoadError !== null): ?>
+              <div class="placement-card__info" style="grid-template-columns:1fr;">
+                <div class="placement-card__item">
+                  <span class="placement-card__label">Placement Status</span>
+                  <span class="placement-card__value"><?= e($placementLoadError) ?></span>
+                </div>
+              </div>
+              <?php elseif ($placement === null): ?>
+              <div class="placement-card__info" style="grid-template-columns:1fr;">
+                <div class="placement-card__item">
+                  <span class="placement-card__label">Placement Status</span>
+                  <span class="placement-card__value">No placement has been assigned yet.</span>
+                  <span class="placement-card__sub"><?= e($placementStatusMessage['message']) ?></span>
+                </div>
+              </div>
+              <?php else: ?>
               <div class="placement-card__info">
                 <div class="placement-card__item">
                   <span class="placement-card__label">Host Organisation</span>
-                  <span class="placement-card__value">TechCorp South Africa</span>
+                  <span class="placement-card__value"><?= e($placementOrg !== null ? $placementOrg : '—') ?></span>
+                  <?php if ($plRef !== ''): ?><span class="placement-card__sub"><?= e($plRef) ?></span><?php endif; ?>
                 </div>
                 <div class="placement-card__item">
-                  <span class="placement-card__label">Department</span>
-                  <span class="placement-card__value">Software Engineering</span>
+                  <span class="placement-card__label">Role / Position</span>
+                  <span class="placement-card__value"><?= e($placementRole !== null ? $placementRole : '—') ?></span>
+                  <?php if ($plDept !== ''): ?><span class="placement-card__sub"><?= e($plDept) ?></span><?php endif; ?>
+                </div>
+                <div class="placement-card__item">
+                  <span class="placement-card__label">Programme</span>
+                  <span class="placement-card__value"><?= e($plProgramme !== '' ? $plProgramme : '—') ?></span>
+                  <?php if ($plType !== ''): ?><span class="placement-card__sub"><?= e(ucwords(str_replace('_', ' ', $plType))) ?></span><?php endif; ?>
+                </div>
+                <div class="placement-card__item">
+                  <span class="placement-card__label">Cohort</span>
+                  <span class="placement-card__value"><?= e($plCohort !== '' ? $plCohort : '—') ?></span>
                 </div>
                 <div class="placement-card__item">
                   <span class="placement-card__label">Supervisor</span>
-                  <span class="placement-card__value">Sarah Mokoena <span class="placement-card__sub">Senior Developer</span></span>
+                  <span class="placement-card__value"><?= e($plSup !== '' ? $plSup : '—') ?></span>
                 </div>
                 <div class="placement-card__item">
                   <span class="placement-card__label">Duration</span>
-                  <span class="placement-card__value">01 Jan 2025 - 30 Jun 2025 (6 Months)</span>
+                  <span class="placement-card__value"><?= e($plDurationRange) ?></span>
                 </div>
                 <div class="placement-card__item">
                   <span class="placement-card__label">Workplace Location</span>
-                  <span class="placement-card__value">Johannesburg, Gauteng (Hybrid)</span>
+                  <span class="placement-card__value"><?= e($plLoc !== '' ? $plLoc : '—') ?></span>
                 </div>
                 <div class="placement-card__item">
-                  <span class="placement-card__label">Performance Status</span>
-                  <span class="placement-card__value placement-card__value--success">Exceeding Expectations</span>
+                  <span class="placement-card__label">Placement Status</span>
+                  <span class="placement-card__value"><?= e($placementStatus) ?></span>
+                  <span class="placement-card__sub"><?= e($placementStatusMessage['message']) ?></span>
                 </div>
               </div>
+              <?php endif; ?>
             </div>
             <div class="placement-card__footer">
-              <a href="#" class="btn btn--primary btn--sm"><i class="fas fa-clock"></i> Log Activities</a>
-              <a href="#" class="btn btn--outline btn--sm"><i class="fas fa-comment"></i> View Feedback</a>
-              <a href="#" class="btn btn--ghost btn--sm"><i class="fas fa-history"></i> Placement History</a>
+              <?php if ($placement !== null): ?>
+              <a href="<?= url('candidate/placement_detail.php?id=' . (int)$placement['id']) ?>" class="btn btn--primary btn--sm"><i class="fas fa-eye"></i> View Placement Details</a>
+              <?php endif; ?>
+              <a href="<?= url('candidate/applications.php') ?>" class="btn btn--outline btn--sm"><i class="fas fa-file-alt"></i> View Applications</a>
+              <a href="<?= url('candidate/applications.php') ?>" class="btn btn--ghost btn--sm"><i class="fas fa-envelope-open-text"></i> View Offers</a>
             </div>
           </div>
 
-          <!-- Supervisor Feedback -->
-          <div class="placement-feedback">
-            <h3>Supervisor Feedback</h3>
-            <div class="placement-feedback__card">
-              <div class="placement-feedback__header">
-                <div class="placement-feedback__avatar">SM</div>
-                <div>
-                  <strong>Sarah Mokoena</strong>
-                  <span>Senior Developer • 2 days ago</span>
+          <div class="placement-card" aria-label="Recruitment progress">
+            <div class="placement-card__body">
+              <div class="placement-card__info" style="grid-template-columns:1fr;">
+                <div class="placement-card__item">
+                  <span class="placement-card__label">Current Stage: <?= e($placementStage['label'] ?? 'Application') ?></span>
+                  <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem;">
+                    <?php foreach ($plSteps as $stepKey => $stepLabel): ?>
+                      <?php $plStepNum++; ?>
+                      <span class="placement-card__sub" style="<?= $plStepNum <= $plStageNum ? 'color:var(--success);font-weight:700;' : '' ?>">
+                        <?= $plStepNum <= $plStageNum ? '●' : '○' ?> <?= e($stepLabel) ?>
+                      </span>
+                    <?php endforeach; ?>
+                  </div>
+                  <span class="placement-card__sub">Application → Selection → Offer → Placement</span>
                 </div>
               </div>
-              <p class="placement-feedback__text">"John has been demonstrating excellent problem-solving skills and has shown great initiative in the current sprint. His contributions to the API integration project have been very valuable."</p>
             </div>
           </div>
+
+          <?php if ($placement !== null): ?>
+          <div class="placement-card" aria-label="Placement details">
+            <div class="placement-card__body">
+              <div class="placement-card__info">
+                <div class="placement-card__item"><span class="placement-card__label">Organisation</span><span class="placement-card__value"><?= e($placementOrg !== null ? $placementOrg : '—') ?></span></div>
+                <div class="placement-card__item"><span class="placement-card__label">Role</span><span class="placement-card__value"><?= e($placementRole !== null ? $placementRole : '—') ?></span></div>
+                <div class="placement-card__item"><span class="placement-card__label">Programme</span><span class="placement-card__value"><?= e($plProgramme !== '' ? $plProgramme : '—') ?></span></div>
+                <div class="placement-card__item"><span class="placement-card__label">Cohort</span><span class="placement-card__value"><?= e($plCohort !== '' ? $plCohort : '—') ?></span></div>
+                <div class="placement-card__item"><span class="placement-card__label">Location</span><span class="placement-card__value"><?= e($plLoc !== '' ? $plLoc : '—') ?></span></div>
+                <div class="placement-card__item"><span class="placement-card__label">Start Date</span><span class="placement-card__value"><?= e($plStart !== '' ? CandidatePlacement::formatDay($plStart) : '—') ?></span></div>
+                <div class="placement-card__item"><span class="placement-card__label">End Date</span><span class="placement-card__value"><?= e($plEnd !== '' ? CandidatePlacement::formatDay($plEnd) : '—') ?></span></div>
+                <div class="placement-card__item"><span class="placement-card__label">Status</span><span class="placement-card__value"><?= e($placementStatus) ?></span></div>
+              </div>
+            </div>
+          </div>
+          <?php endif; ?>
         </section>
 
         <!-- =============================================
@@ -1060,6 +1170,83 @@ $flashes = render_flashes();
         </section>
 
         <!-- =============================================
+             S9b: OFFERS (Selection & Offers → Candidate)
+             Live data only. Positioned directly after
+             Interview Management per spec.
+             ============================================= -->
+        <section class="dash-section" id="dashboard-offers">
+          <div class="section__header interview-section__header">
+            <div class="interview-section__heading">
+              <span class="section__badge">Selection &amp; Offers</span>
+              <h2 class="section__title" style="font-size:1.5rem;">My <span class="text-gradient">Offers</span></h2>
+              <p class="section__text" style="font-size:0.9rem;">Offers issued to you by the programme team. Open each offer for full details and respond before the deadline.</p>
+            </div>
+            <a href="<?= url('candidate/offers.php') ?>" class="btn btn--primary btn--sm interview-section__manage"><i class="fas fa-envelope-open-text"></i> Manage Offers<?= ((int)($offerStats['pending'] ?? 0) > 0) ? ' (' . (int)($offerStats['pending']) . ' pending)' : '' ?></a>
+          </div>
+          <?php if ($offerLoadError !== null): ?>
+            <div class="offer-notice offer-notice--muted"><i class="fas fa-triangle-exclamation"></i><div><?= e($offerLoadError) ?></div></div>
+          <?php elseif (empty($offerRecentList)): ?>
+            <div class="empty-state">
+              <div class="empty-state__icon"><i class="fas fa-envelope-open-text"></i></div>
+              <h3>No offers available at this time.</h3>
+              <p>Once the programme team issues an offer through Selection &amp; Offers, it will appear here.</p>
+              <a href="<?= url('candidate/applications.php') ?>" class="btn btn--outline btn--sm"><i class="fas fa-file-alt"></i> View Applications</a>
+            </div>
+          <?php else: ?>
+            <div class="interview-grid offer-grid">
+              <?php foreach ($offerRecentList as $off): ?>
+                <?php $oTone = CandidateOffersController::statusTone($off); ?>
+                <?php $oTag = $oTone === 'success' ? 'green' : ($oTone === 'danger' ? 'red' : ($oTone === 'primary' ? 'primary' : ($oTone === 'amber' ? 'amber' : 'muted'))); ?>
+                <?php $oLbl = CandidateOffersController::statusLabel($off); ?>
+                <?php $oCan = CandidateOffersController::canRespond($off); ?>
+                <article class="interview-card offer-card">
+                  <div class="interview-card__header">
+                    <div>
+                      <h3 class="interview-card__title"><?= e($off['title'] ?? $off['position'] ?? 'Offer') ?></h3>
+                      <div class="interview-card__programme"><i class="fas fa-briefcase"></i><?= e($off['opportunity_title'] ?? $off['position'] ?? '') ?></div>
+                    </div>
+                    <span class="tag tag--<?= e($oTag) ?>"><?= e($oLbl) ?></span>
+                  </div>
+                  <div class="interview-card__details">
+                    <div class="interview-card__detail"><i class="fas fa-graduation-cap"></i> <?= e($off['programme_name'] ?? '—') ?></div>
+                    <div class="interview-card__detail"><i class="fas fa-building"></i> <?= e($off['organisation'] ?? '—') ?></div>
+                    <div class="interview-card__detail"><i class="fas fa-calendar-alt"></i> Offer: <?= !empty($off['issued_at']) ? e(format_date($off['issued_at'], 'd M Y')) : '—' ?></div>
+                    <div class="interview-card__detail"><i class="fas fa-hourglass-half"></i> Deadline: <?= !empty($off['expiry_date']) ? e(format_date($off['expiry_date'], 'd M Y')) : '—' ?></div>
+                  </div>
+                  <div class="interview-card__actions">
+                    <a href="<?= url('candidate/offer_detail.php?id=' . (int)$off['id']) ?>" class="btn btn--outline btn--sm"><i class="fas fa-eye"></i> View Offer</a>
+                    <?php if ($oCan): ?>
+                      <form method="post" action="<?= url('candidate/offer_action.php') ?>" data-offer-confirm="accept" style="flex:1;display:flex;">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="offer_id" value="<?= (int)$off['id'] ?>">
+                        <input type="hidden" name="response" value="accepted">
+                        <input type="hidden" name="return_to" value="dashboard">
+                        <button type="submit" class="btn btn--primary btn--sm" style="flex:1;"><i class="fas fa-check"></i> Accept</button>
+                      </form>
+                    <?php endif; ?>
+                  </div>
+                  <?php if ($oCan): ?>
+                    <div class="interview-card__actions" style="margin-top:.5rem;">
+                      <form method="post" action="<?= url('candidate/offer_action.php') ?>" data-offer-confirm="decline" style="flex:1;display:flex;">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="offer_id" value="<?= (int)$off['id'] ?>">
+                        <input type="hidden" name="response" value="declined">
+                        <input type="hidden" name="decline_reason" value="">
+                        <input type="hidden" name="return_to" value="dashboard">
+                        <button type="submit" class="btn btn--ghost btn--sm" style="flex:1;"><i class="fas fa-times"></i> Decline</button>
+                      </form>
+                    </div>
+                  <?php endif; ?>
+                </article>
+              <?php endforeach; ?>
+            </div>
+            <div style="margin-top:.75rem;">
+              <a href="<?= url('candidate/offers.php') ?>" class="interview-list__view-all">View all <?= (int)($offerStats['total'] ?? 0) ?> offers <i class="fas fa-arrow-right"></i></a>
+            </div>
+            <?php endif; ?>
+        </section>
+
+        <!-- =============================================
              S10: NOTIFICATION CENTRE
              ============================================= -->
         <section class="dash-section" id="dashboard-notifications">
@@ -1206,42 +1393,6 @@ $flashes = render_flashes();
               </div>
             </div>
           </div>
-
-          <!-- Stats Summary -->
-          <div class="analytics-stats">
-            <div class="analytics-stat">
-              <span class="analytics-stat__number"><?= (int)($appStats['submitted'] ?? 0) ?></span>
-              <span class="analytics-stat__label">Applications Submitted</span>
-            </div>
-            <div class="analytics-stat">
-              <span class="analytics-stat__number">12</span>
-              <span class="analytics-stat__label">Opportunities Matched</span>
-            </div>
-            <div class="analytics-stat">
-              <span class="analytics-stat__number">8</span>
-              <span class="analytics-stat__label">Skills Verified</span>
-            </div>
-            <div class="analytics-stat">
-              <span class="analytics-stat__number">60%</span>
-              <span class="analytics-stat__label">Programme Progress</span>
-            </div>
-            <div class="analytics-stat">
-              <span class="analytics-stat__number">65%</span>
-              <span class="analytics-stat__label">Placement Progress</span>
-            </div>
-            <div class="analytics-stat">
-              <span class="analytics-stat__number">48%</span>
-              <span class="analytics-stat__label">Learning Completion</span>
-            </div>
-<div class="analytics-stat">
-              <span class="analytics-stat__number"><?= (int)$completion ?>%</span>
-              <span class="analytics-stat__label">Profile Completion</span>
-            </div>
-            <div class="analytics-stat">
-              <span class="analytics-stat__number">8</span>
-              <span class="analytics-stat__label">Career Growth Points</span>
-            </div>
-          </div>
         </section>
 
       </div><!-- // dash-content -->
@@ -1283,6 +1434,25 @@ $flashes = render_flashes();
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
   <script src="<?= url('js/script.js') ?>"></script>
   <script src="<?= url('js/dashboard.js') ?>"></script>
+  <script src="<?= url('js/candidate_offers.js') ?>"></script>
+  <script>
+  (function () {
+    function setHidden(modal, hidden) {
+      if (!modal) return;
+      if (hidden) { modal.setAttribute('hidden', ''); modal.setAttribute('aria-hidden', 'true'); }
+      else { modal.removeAttribute('hidden'); modal.setAttribute('aria-hidden', 'false'); }
+    }
+    document.querySelectorAll('[data-placement-modal-open]').forEach(function (btn) {
+      btn.addEventListener('click', function () { setHidden(document.querySelector('[data-placement-modal]'), false); });
+    });
+    document.querySelectorAll('[data-placement-modal-close]').forEach(function (el) {
+      el.addEventListener('click', function () { setHidden(document.querySelector('[data-placement-modal]'), true); });
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') setHidden(document.querySelector('[data-placement-modal]'), true);
+    });
+  })();
+  </script>
   <?= $flashes ?>
 </body>
 </html>

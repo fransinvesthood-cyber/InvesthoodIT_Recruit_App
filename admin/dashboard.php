@@ -83,6 +83,7 @@ $placementPending = 0;
 $placementActive = 0;
 $placementCompleted = 0;
 $placementWithdrawn = 0;
+$placementPlaced = 0;
 $recentPlacements = [];
 try {
     $placementStatsRow = Database::fetchOne(
@@ -90,6 +91,7 @@ try {
             COUNT(*) AS total,
             SUM(CASE WHEN status = 'pending_placement' THEN 1 ELSE 0 END) AS pending,
             SUM(CASE WHEN status IN ('placed','active','placement_in_progress') THEN 1 ELSE 0 END) AS active,
+            SUM(CASE WHEN status = 'placed' THEN 1 ELSE 0 END) AS placed,
             SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
             SUM(CASE WHEN status IN ('cancelled','withdrawn') THEN 1 ELSE 0 END) AS withdrawn
          FROM placements"
@@ -97,6 +99,7 @@ try {
     $placementTotal    = (int) ($placementStatsRow['total'] ?? 0);
     $placementPending  = (int) ($placementStatsRow['pending'] ?? 0);
     $placementActive   = (int) ($placementStatsRow['active'] ?? 0);
+    $placementPlaced   = (int) ($placementStatsRow['placed'] ?? 0);
     $placementCompleted = (int) ($placementStatsRow['completed'] ?? 0);
     $placementWithdrawn = (int) ($placementStatsRow['withdrawn'] ?? 0);
 
@@ -731,6 +734,69 @@ try {
   <link rel="stylesheet" href="<?= url('css/admin_opportunities.css') ?>">
     <link rel="stylesheet" href="<?= url('css/admin_applications.css') ?>">
   <link rel="stylesheet" href="<?= url('css/admin_selection.css') ?>">
+
+<style id="admin-assistant-styles">
+/* =========================================================
+   ADMIN ASSISTANT CHATBOT
+   ========================================================= */
+.admin-chatbot-launcher{
+  position:fixed;right:24px;bottom:24px;width:60px;height:60px;border:0;border-radius:18px;
+  background:#2563eb;color:#fff;display:grid;place-items:center;box-shadow:0 14px 35px rgba(37,99,235,.35);
+  cursor:pointer;z-index:5900;font-size:22px;transition:transform .18s ease,box-shadow .18s ease;
+}
+.admin-chatbot-launcher:hover{transform:translateY(-2px);box-shadow:0 18px 42px rgba(37,99,235,.42)}
+.admin-chatbot-launcher:focus-visible{outline:3px solid rgba(37,99,235,.28);outline-offset:3px}
+.admin-chatbot{display:none;position:fixed;inset:0;z-index:7000;align-items:center;justify-content:center;padding:20px}
+.admin-chatbot.is-open{display:flex}
+.admin-chatbot__backdrop{position:absolute;inset:0;background:rgba(15,23,42,.62);backdrop-filter:blur(5px)}
+.admin-chatbot__dialog{
+  position:relative;z-index:1;width:min(540px,100%);height:min(720px,calc(100vh - 40px));display:flex;
+  flex-direction:column;overflow:hidden;border:1px solid var(--admin-chat-border,#e4e7ec);border-radius:20px;
+  background:var(--admin-chat-surface,#fff);color:var(--admin-chat-text,#101828);
+  box-shadow:0 30px 90px rgba(15,23,42,.30)
+}
+.admin-chatbot__header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;border-bottom:1px solid var(--admin-chat-border,#e4e7ec)}
+.admin-chatbot__brand{display:flex;align-items:center;gap:11px;min-width:0}
+.admin-chatbot__avatar{width:42px;height:42px;flex:0 0 42px;border-radius:12px;background:rgba(37,99,235,.1);color:#2563eb;display:grid;place-items:center;font-size:18px}
+.admin-chatbot__brand-copy{min-width:0}.admin-chatbot__brand-copy strong{display:block;font-size:14px}.admin-chatbot__brand-copy span{display:block;margin-top:2px;color:var(--admin-chat-muted,#667085);font-size:10px}
+.admin-chatbot__close{width:44px;height:44px;min-width:44px;border:1px solid var(--admin-chat-border,#e4e7ec);border-radius:11px;background:var(--admin-chat-soft,#f8fafc);color:inherit;display:grid;place-items:center;cursor:pointer;font-size:16px}
+.admin-chatbot__body{flex:1;min-height:0;overflow-y:auto;padding:16px;background:var(--admin-chat-body,#f8fafc)}
+.admin-chatbot__message{display:flex;margin-bottom:12px}.admin-chatbot__message--user{justify-content:flex-end}
+.admin-chatbot__bubble{max-width:88%;padding:11px 13px;border-radius:14px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.admin-chatbot__message--assistant .admin-chatbot__bubble{background:#fff;border:1px solid var(--admin-chat-border,#e4e7ec)}
+.admin-chatbot__message--user .admin-chatbot__bubble{background:#2563eb;color:#fff}
+.admin-chatbot__quick{display:flex;flex-wrap:wrap;gap:8px;padding:0 0 12px}
+.admin-chatbot__quick button{border:1px solid var(--admin-chat-border,#d0d5dd);background:#fff;color:inherit;border-radius:999px;padding:8px 11px;font-size:11px;cursor:pointer}
+.admin-chatbot__quick button:hover{border-color:#2563eb;color:#2563eb}
+.admin-chatbot__composer{display:flex;gap:8px;padding:12px;border-top:1px solid var(--admin-chat-border,#e4e7ec);background:var(--admin-chat-surface,#fff)}
+.admin-chatbot__input{flex:1;min-width:0;height:44px;border:1px solid var(--admin-chat-border,#d0d5dd);border-radius:11px;background:var(--admin-chat-soft,#f8fafc);color:inherit;padding:0 12px;font:inherit;font-size:13px;outline:none}
+.admin-chatbot__input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.admin-chatbot__send{width:44px;height:44px;min-width:44px;border:0;border-radius:11px;background:#2563eb;color:#fff;cursor:pointer}
+.admin-chatbot__send:disabled{opacity:.55;cursor:not-allowed}
+.admin-chatbot__typing{opacity:.65;font-style:italic}
+.admin-chatbot__actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+.admin-chatbot__action{display:inline-flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid #2563eb;border-radius:8px;color:#2563eb;background:transparent;text-decoration:none;font-size:11px}
+html[data-theme="dark"] .admin-chatbot__dialog,
+body.dark-mode .admin-chatbot__dialog{background:#101828;color:#f8fafc;border-color:rgba(255,255,255,.09)}
+html[data-theme="dark"] .admin-chatbot__header,html[data-theme="dark"] .admin-chatbot__composer,
+body.dark-mode .admin-chatbot__header,body.dark-mode .admin-chatbot__composer{border-color:rgba(255,255,255,.09)}
+html[data-theme="dark"] .admin-chatbot__message--assistant .admin-chatbot__bubble,
+html[data-theme="dark"] .admin-chatbot__quick button,
+html[data-theme="dark"] .admin-chatbot__input,
+html[data-theme="dark"] .admin-chatbot__close,
+body.dark-mode .admin-chatbot__message--assistant .admin-chatbot__bubble,
+body.dark-mode .admin-chatbot__quick button,
+body.dark-mode .admin-chatbot__input,
+body.dark-mode .admin-chatbot__close{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.09);color:#f8fafc}
+html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body{background:#0b1220}
+@media(max-width:620px){
+  .admin-chatbot{padding:0}.admin-chatbot__dialog{width:100%;height:100%;max-height:none;border:0;border-radius:0}
+  .admin-chatbot__header{min-height:68px;padding:11px 12px 11px 14px}.admin-chatbot__close{width:46px;height:46px}
+  .admin-chatbot__body{padding:12px}.admin-chatbot__bubble{max-width:94%}.admin-chatbot-launcher{right:16px;bottom:16px}
+}
+@media(max-width:360px){.admin-chatbot__close{width:44px;height:44px;min-width:44px}}
+</style>
+
 </head>
 <body class="dashboard-page admin-dashboard">
 
@@ -947,11 +1013,11 @@ try {
                 <div class="admin-exec-card__icon admin-exec-card__icon--green"><i class="fas fa-check-circle"></i></div>
                 <span class="admin-exec-card__change up">+9.4%</span>
               </div>
-              <span class="admin-exec-card__number" data-count="1056">0</span>
+              <span class="admin-exec-card__number" data-count="<?= (int)$placementPlaced ?>">0</span>
               <span class="admin-exec-card__label">Successful Placements</span>
               <div class="admin-exec-card__footer">
-                <span class="admin-exec-card__period"><i class="fas fa-arrow-up"></i> 42 this quarter</span>
-                <a href="#" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
+                <span class="admin-exec-card__period"><i class="fas fa-arrow-up"></i> <?= (int)$placementTotal ?> total placements</span>
+                <a href="<?= url('admin/placements.php') ?>" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
             <div class="admin-exec-card">
@@ -1799,8 +1865,8 @@ try {
 
           <div class="admin-toolbar">
             <div class="admin-toolbar__left">
-              <a href="<?= url('admin/create-placement.php') ?>" class="btn btn--primary btn--sm"><i class="fas fa-plus"></i> New Placement</a>
-              <a href="<?= url('admin/placements.php') ?>" class="btn btn--outline btn--sm"><i class="fas fa-th-list"></i> Manage Placements</a>
+              <a href="create-placement.php" class="btn btn--primary btn--sm"><i class="fas fa-plus"></i> New Placement</a>
+              <a href="placements.php" class="btn btn--outline btn--sm"><i class="fas fa-th-list"></i> Manage Placements</a>
               <select class="admin-filter-select" id="placementFilterStatus">
                 <option value="all">All Statuses</option>
                 <option value="active">Active</option>
@@ -1831,7 +1897,7 @@ try {
               <div class="admin-empty-state__icon"><i class="fas fa-handshake"></i></div>
               <h3>No placements yet</h3>
               <p style="color:var(--text-light);margin-bottom:1rem;">Placements appear here once candidates with accepted offers are placed. Run <code>database/placements.sql</code> if the placements tables are missing.</p>
-              <a href="<?= url('admin/placement_create.php') ?>" class="btn btn--primary btn--sm"><i class="fas fa-plus"></i> New Placement</a>
+              <a href="create-placement.php" class="btn btn--primary btn--sm"><i class="fas fa-plus"></i> New Placement</a>
             </div>
           <?php else: ?>
           <div class="app-table-container">
@@ -1878,8 +1944,8 @@ try {
                     <td class="app-date"><?= e(!empty($pl['start_date']) ? format_date($pl['start_date'], 'd M Y') : '—') ?> &ndash; <?= e(!empty($pl['end_date']) ? format_date($pl['end_date'], 'd M Y') : '—') ?></td>
                     <td><span class="tag tag--<?= e($plTone) ?>"><?= e(ucwords(str_replace('_', ' ', $plStatus))) ?></span></td>
                     <td class="app-actions">
-                      <a href="<?= url('admin/view-placement.php?id=' . (int)$pl['id']) ?>" class="btn btn--ghost btn--sm" title="View placement"><i class="fas fa-eye"></i></a>
-                      <a href="<?= url('admin/edit-placement.php?id=' . (int)$pl['id']) ?>" class="btn btn--primary btn--sm" title="Manage"><i class="fas fa-cog"></i></a>
+                      <a href="placements.php?view=<?= (int)$pl['id'] ?>" class="btn btn--ghost btn--sm" title="View placement"><i class="fas fa-eye"></i></a>
+                      <a href="placements.php?manage=<?= (int)$pl['id'] ?>" class="btn btn--primary btn--sm" title="Manage"><i class="fas fa-cog"></i></a>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -3367,6 +3433,197 @@ $talentSkillsCategories = (int) ($talentSkillsCategoriesRow['cnt'] ?? 0);
 
     </main>
   </div>
+
+
+<!-- =========================================================
+     ADMIN ASSISTANT
+     ========================================================= -->
+<button type="button" class="admin-chatbot-launcher" id="adminChatbotLauncher"
+        aria-label="Open Admin Assistant" title="Admin Assistant">
+  <i class="fas fa-robot"></i>
+</button>
+
+<div class="admin-chatbot" id="adminChatbot" aria-hidden="true">
+  <div class="admin-chatbot__backdrop" data-admin-chat-close></div>
+  <section class="admin-chatbot__dialog" role="dialog" aria-modal="true"
+           aria-labelledby="adminChatbotTitle">
+    <header class="admin-chatbot__header">
+      <div class="admin-chatbot__brand">
+        <div class="admin-chatbot__avatar"><i class="fas fa-robot"></i></div>
+        <div class="admin-chatbot__brand-copy">
+          <strong id="adminChatbotTitle">Admin Assistant</strong>
+          <span>Platform administration &amp; operational intelligence</span>
+        </div>
+      </div>
+      <button type="button" class="admin-chatbot__close" id="adminChatbotClose"
+              aria-label="Close Admin Assistant">
+        <i class="fas fa-times"></i>
+      </button>
+    </header>
+
+    <div class="admin-chatbot__body" id="adminChatbotBody">
+      <div class="admin-chatbot__message admin-chatbot__message--assistant">
+        <div class="admin-chatbot__bubble">
+          Hello. I’m your Admin Assistant. I can help you understand programmes, cohorts,
+          candidates, applications, opportunities, interviews, placements, selections,
+          offers, talent intelligence and platform activity using the live dashboard data.
+        </div>
+      </div>
+      <div class="admin-chatbot__quick" id="adminChatbotQuick">
+        <button type="button" data-admin-prompt="Give me an executive overview.">Executive Overview</button>
+        <button type="button" data-admin-prompt="How many candidates are there?">Candidates</button>
+        <button type="button" data-admin-prompt="Summarise programmes and cohorts.">Programmes &amp; Cohorts</button>
+        <button type="button" data-admin-prompt="Summarise applications and pipeline stages.">Applications</button>
+        <button type="button" data-admin-prompt="What opportunities are available?">Opportunities</button>
+        <button type="button" data-admin-prompt="Summarise interviews and upcoming interviews.">Interviews</button>
+        <button type="button" data-admin-prompt="Summarise placements.">Placements</button>
+        <button type="button" data-admin-prompt="Summarise selection and offers.">Selection &amp; Offers</button>
+        <button type="button" data-admin-prompt="Summarise talent intelligence.">Talent Intelligence</button>
+      </div>
+    </div>
+
+    <form class="admin-chatbot__composer" id="adminChatbotForm" autocomplete="off">
+      <input type="text" class="admin-chatbot__input" id="adminChatbotInput"
+             placeholder="Ask about the platform..." maxlength="500"
+             aria-label="Ask Admin Assistant">
+      <button type="submit" class="admin-chatbot__send" id="adminChatbotSend"
+              aria-label="Send message">
+        <i class="fas fa-paper-plane"></i>
+      </button>
+    </form>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var launcher = document.getElementById('adminChatbotLauncher');
+  var modal = document.getElementById('adminChatbot');
+  var closeBtn = document.getElementById('adminChatbotClose');
+  var body = document.getElementById('adminChatbotBody');
+  var form = document.getElementById('adminChatbotForm');
+  var input = document.getElementById('adminChatbotInput');
+  var sendBtn = document.getElementById('adminChatbotSend');
+  var endpoint = <?= json_encode(url('admin/chatbot_api.php'), JSON_UNESCAPED_SLASHES) ?>;
+  var lastFocus = null;
+
+  function escapeHtml(value) {
+    var el = document.createElement('div');
+    el.textContent = String(value == null ? '' : value);
+    return el.innerHTML;
+  }
+
+  function addMessage(text, role, actions) {
+    var wrap = document.createElement('div');
+    wrap.className = 'admin-chatbot__message admin-chatbot__message--' + role;
+
+    var bubble = document.createElement('div');
+    bubble.className = 'admin-chatbot__bubble';
+    bubble.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+
+    if (Array.isArray(actions) && actions.length) {
+      var actionBox = document.createElement('div');
+      actionBox.className = 'admin-chatbot__actions';
+      actions.forEach(function (action) {
+        if (!action || !action.url || !action.label) return;
+        var a = document.createElement('a');
+        a.className = 'admin-chatbot__action';
+        a.href = action.url;
+        a.innerHTML = '<i class="fas fa-arrow-right"></i> ' + escapeHtml(action.label);
+        actionBox.appendChild(a);
+      });
+      bubble.appendChild(actionBox);
+    }
+
+    wrap.appendChild(bubble);
+    body.appendChild(wrap);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function setOpen(open) {
+    if (!modal) return;
+    if (open) {
+      lastFocus = document.activeElement;
+      modal.classList.add('is-open');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('admin-chatbot-open');
+      setTimeout(function () { if (input) input.focus(); }, 30);
+    } else {
+      modal.classList.remove('is-open');
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('admin-chatbot-open');
+      if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
+    }
+  }
+
+  async function sendMessage(message) {
+    message = String(message || '').trim();
+    if (!message || !input || !sendBtn) return;
+
+    addMessage(message, 'user');
+    input.value = '';
+    sendBtn.disabled = true;
+
+    var typing = document.createElement('div');
+    typing.className = 'admin-chatbot__message admin-chatbot__message--assistant';
+    typing.innerHTML = '<div class="admin-chatbot__bubble admin-chatbot__typing">Assistant is checking the live platform data...</div>';
+    body.appendChild(typing);
+    body.scrollTop = body.scrollHeight;
+
+    try {
+      var response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+        credentials: 'same-origin',
+        body: JSON.stringify({message: message})
+      });
+
+      var data = await response.json();
+      typing.remove();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'The assistant could not process the request.');
+      }
+
+      addMessage(data.message || 'I could not find an answer.', 'assistant', data.actions || []);
+    } catch (error) {
+      typing.remove();
+      addMessage(error.message || 'Unable to contact the Admin Assistant.', 'assistant');
+    } finally {
+      sendBtn.disabled = false;
+      if (input) input.focus();
+    }
+  }
+
+  if (launcher) launcher.addEventListener('click', function () { setOpen(true); });
+  if (closeBtn) closeBtn.addEventListener('click', function () { setOpen(false); });
+
+  document.querySelectorAll('[data-admin-chat-close]').forEach(function (el) {
+    el.addEventListener('click', function () { setOpen(false); });
+  });
+
+  document.querySelectorAll('[data-admin-prompt]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      sendMessage(button.getAttribute('data-admin-prompt') || '');
+    });
+  });
+
+  if (form) {
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      sendMessage(input ? input.value : '');
+    });
+  }
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && modal && modal.classList.contains('is-open')) {
+      setOpen(false);
+    }
+  });
+})();
+</script>
+
 
   <!-- ===== SKELETON LOADER TEMPLATES ===== -->
   <template id="skeletonExecCard">

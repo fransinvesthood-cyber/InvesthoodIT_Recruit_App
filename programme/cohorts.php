@@ -13,6 +13,7 @@
  *   - Capacity monitoring (places filled, warnings, badges)
  *   - Search / status / supervisor / capacity filters
  *   - Read-only; scoped to programmes.programme_manager_id
+ *   - NEW: All 8 summary stat cards are clickable → stat modal
  * ============================================================
  */
 
@@ -636,6 +637,38 @@ $capacityBarClasses = [
         }
 
         /* ============================================================
+           NEW: Clickable stat card
+           ============================================================ */
+        .pm-stat-card {
+            cursor: pointer;
+            position: relative;
+            transition: transform .18s ease, box-shadow .18s ease;
+        }
+        .pm-stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0,0,0,.08);
+        }
+        .pm-stat-card:focus-visible {
+            outline: 3px solid rgba(37,99,235,.25);
+            outline-offset: 3px;
+        }
+        .pm-stat-card__hint {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            font-size: 10px;
+            font-weight: 700;
+            color: #2563eb;
+            opacity: 0;
+            transition: opacity .18s ease;
+            pointer-events: none;
+        }
+        .pm-stat-card:hover .pm-stat-card__hint,
+        .pm-stat-card:focus-visible .pm-stat-card__hint {
+            opacity: 1;
+        }
+
+        /* ============================================================
            Capacity monitoring
            ============================================================ */
         .pm-cap-track {
@@ -731,6 +764,7 @@ $capacityBarClasses = [
             pointer-events: auto;
         }
         #pmSupervisorModal { z-index: 2147483647; }
+        #pmStatModal { z-index: 2147483645; }
 
         .pm-cohort-modal__backdrop {
             position: absolute;
@@ -1026,6 +1060,48 @@ $capacityBarClasses = [
         .pm-status-pill--completed { background:#f0fdf4; color:#166534; }
         .pm-status-pill--withdrawn { background:#fef2f2; color:#b91c1c; }
 
+        /* Stat modal specifics */
+        .pm-stat-modal-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .pm-stat-modal-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            border: 1px solid #e4e7ec;
+            border-radius: 12px;
+            background: #ffffff;
+            text-decoration: none;
+            color: inherit;
+            transition: background .15s ease, border-color .15s ease;
+        }
+        .pm-stat-modal-row:hover {
+            background: #f8fafc;
+            border-color: #c7d2fe;
+        }
+        .pm-stat-modal-row__main { min-width: 0; flex: 1; }
+        .pm-stat-modal-row__title {
+            display: block; font-size: 13px; font-weight: 800; color: #101828;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .pm-stat-modal-row__sub {
+            display: block; margin-top: 2px;
+            font-size: 11px; color: #667085;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .pm-stat-modal-row__value {
+            flex: 0 0 auto;
+            font-size: 14px; font-weight: 800; color: #2563eb;
+        }
+        .pm-stat-modal-empty {
+            padding: 24px 16px; text-align: center;
+            color: #667085; font-size: 13px;
+        }
+
         @media (max-width: 620px) {
             .pm-cohort-modal { padding: 12px; }
             .pm-cohort-modal__dialog { max-height: calc(100vh - 24px); border-radius: 16px; }
@@ -1062,30 +1138,46 @@ $capacityBarClasses = [
                 </div>
             </div>
 
-            <!-- Summary: cohorts -->
+            <!-- Summary: cohorts (CLICKABLE STAT CARDS) -->
             <div class="overview-grid" style="margin-top:2rem;">
-                <div class="overview-card">
+                <div class="overview-card pm-stat-card" role="button" tabindex="0"
+                     aria-haspopup="dialog"
+                     aria-label="View all cohorts"
+                     data-pm-stat="total_cohorts">
+                    <span class="pm-stat-card__hint"><i class="fas fa-up-right-from-square"></i></span>
                     <div class="overview-card__icon overview-card__icon--primary"><i class="fas fa-users"></i></div>
                     <div class="overview-card__info">
                         <span class="overview-card__number"><?= number_format($totalCohorts) ?></span>
                         <span class="overview-card__label">Total Cohorts</span>
                     </div>
                 </div>
-                <div class="overview-card">
+                <div class="overview-card pm-stat-card" role="button" tabindex="0"
+                     aria-haspopup="dialog"
+                     aria-label="View active cohorts"
+                     data-pm-stat="active_cohorts">
+                    <span class="pm-stat-card__hint"><i class="fas fa-up-right-from-square"></i></span>
                     <div class="overview-card__icon overview-card__icon--cyan"><i class="fas fa-play-circle"></i></div>
                     <div class="overview-card__info">
                         <span class="overview-card__number"><?= number_format($activeCohorts) ?></span>
                         <span class="overview-card__label">Active Cohorts</span>
                     </div>
                 </div>
-                <div class="overview-card">
+                <div class="overview-card pm-stat-card" role="button" tabindex="0"
+                     aria-haspopup="dialog"
+                     aria-label="View completed cohorts"
+                     data-pm-stat="completed_cohorts">
+                    <span class="pm-stat-card__hint"><i class="fas fa-up-right-from-square"></i></span>
                     <div class="overview-card__icon overview-card__icon--primary"><i class="fas fa-check-circle"></i></div>
                     <div class="overview-card__info">
                         <span class="overview-card__number"><?= number_format($completedCohorts) ?></span>
                         <span class="overview-card__label">Completed Cohorts</span>
                     </div>
                 </div>
-                <div class="overview-card">
+                <div class="overview-card pm-stat-card" role="button" tabindex="0"
+                     aria-haspopup="dialog"
+                     aria-label="View candidates"
+                     data-pm-stat="candidates">
+                    <span class="pm-stat-card__hint"><i class="fas fa-up-right-from-square"></i></span>
                     <div class="overview-card__icon overview-card__icon--amber"><i class="fas fa-user-graduate"></i></div>
                     <div class="overview-card__info">
                         <span class="overview-card__number"><?= number_format($totalCandidates) ?></span>
@@ -1094,9 +1186,13 @@ $capacityBarClasses = [
                 </div>
             </div>
 
-            <!-- Summary: capacity -->
+            <!-- Summary: capacity (CLICKABLE STAT CARDS) -->
             <div class="overview-grid" style="margin-top:1rem;">
-                <div class="overview-card">
+                <div class="overview-card pm-stat-card" role="button" tabindex="0"
+                     aria-haspopup="dialog"
+                     aria-label="View places filled"
+                     data-pm-stat="places_filled">
+                    <span class="pm-stat-card__hint"><i class="fas fa-up-right-from-square"></i></span>
                     <div class="overview-card__icon overview-card__icon--primary"><i class="fas fa-chair"></i></div>
                     <div class="overview-card__info">
                         <span class="overview-card__number">
@@ -1105,21 +1201,33 @@ $capacityBarClasses = [
                         <span class="overview-card__label">Places Filled</span>
                     </div>
                 </div>
-                <div class="overview-card">
+                <div class="overview-card pm-stat-card" role="button" tabindex="0"
+                     aria-haspopup="dialog"
+                     aria-label="View overall utilisation"
+                     data-pm-stat="overall_utilisation">
+                    <span class="pm-stat-card__hint"><i class="fas fa-up-right-from-square"></i></span>
                     <div class="overview-card__icon overview-card__icon--cyan"><i class="fas fa-percentage"></i></div>
                     <div class="overview-card__info">
                         <span class="overview-card__number"><?= (int) $totalCapacityPercent ?>%</span>
                         <span class="overview-card__label">Overall Utilisation</span>
                     </div>
                 </div>
-                <div class="overview-card">
+                <div class="overview-card pm-stat-card" role="button" tabindex="0"
+                     aria-haspopup="dialog"
+                     aria-label="View near capacity cohorts"
+                     data-pm-stat="near_capacity">
+                    <span class="pm-stat-card__hint"><i class="fas fa-up-right-from-square"></i></span>
                     <div class="overview-card__icon overview-card__icon--amber"><i class="fas fa-exclamation-triangle"></i></div>
                     <div class="overview-card__info">
                         <span class="overview-card__number"><?= number_format($nearCapacityCount) ?></span>
                         <span class="overview-card__label">Near Capacity</span>
                     </div>
                 </div>
-                <div class="overview-card">
+                <div class="overview-card pm-stat-card" role="button" tabindex="0"
+                     aria-haspopup="dialog"
+                     aria-label="View full cohorts"
+                     data-pm-stat="full_cohorts">
+                    <span class="pm-stat-card__hint"><i class="fas fa-up-right-from-square"></i></span>
                     <div class="overview-card__icon overview-card__icon--primary"><i class="fas fa-ban"></i></div>
                     <div class="overview-card__info">
                         <span class="overview-card__number"><?= number_format($fullCount) ?></span>
@@ -1434,6 +1542,31 @@ $capacityBarClasses = [
     </section>
 </div>
 
+<!-- ==================== STAT CARD MODAL (NEW) ==================== -->
+<div id="pmStatModal" class="pm-cohort-modal" aria-hidden="true">
+    <div class="pm-cohort-modal__backdrop" data-pm-stat-close></div>
+
+    <section class="pm-cohort-modal__dialog" role="dialog" aria-modal="true"
+             aria-labelledby="pmStatModalTitle"
+             style="width:min(720px,100%);">
+        <header class="pm-cohort-modal__header">
+            <div>
+                <span class="pm-cohort-modal__eyebrow" id="pmStatModalEyebrow">Summary</span>
+                <h2 id="pmStatModalTitle" class="pm-cohort-modal__title">Details</h2>
+            </div>
+            <button type="button" class="pm-cohort-modal__close" data-pm-stat-close aria-label="Close">
+                <i class="fas fa-times"></i>
+            </button>
+        </header>
+
+        <div id="pmStatModalBody" class="pm-cohort-modal__body"></div>
+
+        <footer class="pm-cohort-modal__footer">
+            <button type="button" class="pm-cohort-modal__cancel" data-pm-stat-close>Close</button>
+        </footer>
+    </section>
+</div>
+
 <!-- Data tags -->
 <script type="application/json" id="pmCohortModalData"><?= $cohortModalJson ?></script>
 <script type="application/json" id="pmSupervisorOversightData"><?= $supervisorOversightJson ?></script>
@@ -1441,7 +1574,7 @@ $capacityBarClasses = [
 <!-- Base scripts -->
 <script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260927"></script>
 
-<!-- Cohort + Supervisor modal logic (no ?. or ?? for browser safety) -->
+<!-- Cohort + Supervisor + Stat modal logic (no ?. or ?? for browser safety) -->
 <script>
 (function () {
     'use strict';
@@ -1724,7 +1857,10 @@ $capacityBarClasses = [
         modal.setAttribute('aria-hidden', 'true');
 
         var supModal = getEl('pmSupervisorModal');
-        if (!supModal || !supModal.classList.contains('is-open')) {
+        var statModal = getEl('pmStatModal');
+        var supOpen = supModal && supModal.classList.contains('is-open');
+        var statOpen = statModal && statModal.classList.contains('is-open');
+        if (!supOpen && !statOpen) {
             document.body.classList.remove('pm-cohort-modal-open');
         }
     }
@@ -1831,7 +1967,222 @@ $capacityBarClasses = [
         supModal.setAttribute('aria-hidden', 'true');
 
         var cohortModal = getEl('pmCohortModal');
-        if (!cohortModal || !cohortModal.classList.contains('is-open')) {
+        var statModal = getEl('pmStatModal');
+        var coOpen = cohortModal && cohortModal.classList.contains('is-open');
+        var stOpen = statModal && statModal.classList.contains('is-open');
+        if (!coOpen && !stOpen) {
+            document.body.classList.remove('pm-cohort-modal-open');
+        }
+    }
+
+    /* =========================================================
+       Stat card modal (NEW)
+       ========================================================= */
+    function openStatModal(statKey) {
+        var statModal  = getEl('pmStatModal');
+        var titleEl    = getEl('pmStatModalTitle');
+        var eyebrowEl  = getEl('pmStatModalEyebrow');
+        var bodyEl     = getEl('pmStatModalBody');
+        if (!statModal || !titleEl || !bodyEl) return;
+
+        var cohorts = [];
+        var k;
+        for (k in COHORT_DATA) {
+            if (!Object.prototype.hasOwnProperty.call(COHORT_DATA, k)) continue;
+            cohorts.push(COHORT_DATA[k]);
+        }
+
+        var title   = 'Details';
+        var eyebrow = 'Summary';
+        var html    = '';
+
+        function cohortRow(c) {
+            var status = String(c.cohort_status || '').toLowerCase();
+            var sub    = titleCase(c.programme_name || '') + ' • ' + titleCase(status);
+            var val    = (c.candidate_count || 0) + ' candidates';
+            return '<a class="pm-stat-modal-row" href="' + escapeHtml(c.view_url || '#') + '">'
+                +  '<div class="pm-stat-modal-row__main">'
+                +    '<span class="pm-stat-modal-row__title">' + escapeHtml(c.cohort_name || 'Cohort') + '</span>'
+                +    '<span class="pm-stat-modal-row__sub">' + escapeHtml(sub) + '</span>'
+                +  '</div>'
+                +  '<span class="pm-stat-modal-row__value">' + escapeHtml(val) + '</span>'
+                + '</a>';
+        }
+
+        function cohortRowCapacity(c) {
+            var capMax    = Number(c.capacity_max || 0);
+            var capFilled = Number(c.capacity_filled || 0);
+            var capPct    = Number(c.capacity_percent || 0);
+            var sub       = titleCase(c.programme_name || '');
+            var val       = capMax > 0
+                ? (capFilled + ' / ' + capMax + ' (' + capPct + '%)')
+                : 'No capacity set';
+            return '<a class="pm-stat-modal-row" href="' + escapeHtml(c.view_url || '#') + '">'
+                +  '<div class="pm-stat-modal-row__main">'
+                +    '<span class="pm-stat-modal-row__title">' + escapeHtml(c.cohort_name || 'Cohort') + '</span>'
+                +    '<span class="pm-stat-modal-row__sub">' + escapeHtml(sub) + '</span>'
+                +  '</div>'
+                +  '<span class="pm-stat-modal-row__value">' + escapeHtml(val) + '</span>'
+                + '</a>';
+        }
+
+        function emptyState(msg) {
+            return '<div class="pm-stat-modal-empty">' + escapeHtml(msg) + '</div>';
+        }
+
+        var i;
+
+        if (statKey === 'total_cohorts') {
+            title   = 'Total Cohorts';
+            eyebrow = 'All Cohorts';
+            if (!cohorts.length) { html = emptyState('No cohorts found.'); }
+            else {
+                html = '<div class="pm-stat-modal-list">';
+                for (i = 0; i < cohorts.length; i++) html += cohortRow(cohorts[i]);
+                html += '</div>';
+            }
+        }
+        else if (statKey === 'active_cohorts') {
+            title   = 'Active Cohorts';
+            eyebrow = 'Cohorts Currently Active';
+            var act = [];
+            for (i = 0; i < cohorts.length; i++) {
+                if (String(cohorts[i].cohort_status || '').toLowerCase() === 'active') act.push(cohorts[i]);
+            }
+            if (!act.length) { html = emptyState('No active cohorts.'); }
+            else {
+                html = '<div class="pm-stat-modal-list">';
+                for (i = 0; i < act.length; i++) html += cohortRow(act[i]);
+                html += '</div>';
+            }
+        }
+        else if (statKey === 'completed_cohorts') {
+            title   = 'Completed Cohorts';
+            eyebrow = 'Cohorts Marked Completed';
+            var comp = [];
+            for (i = 0; i < cohorts.length; i++) {
+                if (String(cohorts[i].cohort_status || '').toLowerCase() === 'completed') comp.push(cohorts[i]);
+            }
+            if (!comp.length) { html = emptyState('No completed cohorts.'); }
+            else {
+                html = '<div class="pm-stat-modal-list">';
+                for (i = 0; i < comp.length; i++) html += cohortRow(comp[i]);
+                html += '</div>';
+            }
+        }
+        else if (statKey === 'candidates') {
+            title   = 'Candidates';
+            eyebrow = 'Total Candidates';
+            var totalCand = 0;
+            for (i = 0; i < cohorts.length; i++) totalCand += Number(cohorts[i].candidate_count || 0);
+            html = '<div class="pm-cohort-stats" style="margin-bottom:18px;">'
+                +   '<div class="pm-cohort-stat"><span class="pm-cohort-stat__value">' + totalCand + '</span><span class="pm-cohort-stat__label">Total Candidates</span></div>'
+                +   '<div class="pm-cohort-stat"><span class="pm-cohort-stat__value">' + cohorts.length + '</span><span class="pm-cohort-stat__label">Cohorts</span></div>'
+                + '</div>';
+            if (!cohorts.length) { html += emptyState('No candidates.'); }
+            else {
+                html += '<div class="pm-stat-modal-list">';
+                for (i = 0; i < cohorts.length; i++) html += cohortRow(cohorts[i]);
+                html += '</div>';
+            }
+        }
+        else if (statKey === 'places_filled') {
+            title   = 'Places Filled';
+            eyebrow = 'Capacity Breakdown';
+            var totalMax = 0, totalFill = 0;
+            for (i = 0; i < cohorts.length; i++) {
+                totalMax  += Number(cohorts[i].capacity_max || 0);
+                totalFill += Number(cohorts[i].capacity_filled || 0);
+            }
+            var pct = totalMax > 0 ? Math.round((totalFill / totalMax) * 100) : 0;
+            html = '<div class="pm-cohort-stats" style="margin-bottom:18px;">'
+                +   '<div class="pm-cohort-stat"><span class="pm-cohort-stat__value">' + totalFill + ' / ' + totalMax + '</span><span class="pm-cohort-stat__label">Places Filled</span></div>'
+                +   '<div class="pm-cohort-stat"><span class="pm-cohort-stat__value">' + pct + '%</span><span class="pm-cohort-stat__label">Utilisation</span></div>'
+                + '</div>';
+            if (!cohorts.length) { html += emptyState('No cohorts.'); }
+            else {
+                html += '<div class="pm-stat-modal-list">';
+                for (i = 0; i < cohorts.length; i++) html += cohortRowCapacity(cohorts[i]);
+                html += '</div>';
+            }
+        }
+        else if (statKey === 'overall_utilisation') {
+            title   = 'Overall Utilisation';
+            eyebrow = 'Capacity Utilisation';
+            var tMax = 0, tFill = 0;
+            for (i = 0; i < cohorts.length; i++) {
+                tMax  += Number(cohorts[i].capacity_max || 0);
+                tFill += Number(cohorts[i].capacity_filled || 0);
+            }
+            var p = tMax > 0 ? Math.round((tFill / tMax) * 100) : 0;
+            html = '<div class="pm-cohort-stats" style="margin-bottom:18px;">'
+                +   '<div class="pm-cohort-stat"><span class="pm-cohort-stat__value">' + p + '%</span><span class="pm-cohort-stat__label">Overall</span></div>'
+                +   '<div class="pm-cohort-stat"><span class="pm-cohort-stat__value">' + tFill + ' / ' + tMax + '</span><span class="pm-cohort-stat__label">Filled</span></div>'
+                + '</div>';
+            if (!cohorts.length) { html += emptyState('No cohorts.'); }
+            else {
+                html += '<div class="pm-stat-modal-list">';
+                for (i = 0; i < cohorts.length; i++) html += cohortRowCapacity(cohorts[i]);
+                html += '</div>';
+            }
+        }
+        else if (statKey === 'near_capacity') {
+            title   = 'Near Capacity Cohorts';
+            eyebrow = 'Nearing / At Capacity';
+            var near = [];
+            for (i = 0; i < cohorts.length; i++) {
+                var cs = String(cohorts[i].capacity_status || '');
+                if (cs === 'filling_fast' || cs === 'nearly_full' || cs === 'full' || cs === 'over_capacity') {
+                    near.push(cohorts[i]);
+                }
+            }
+            if (!near.length) { html = emptyState('No cohorts near capacity.'); }
+            else {
+                html = '<div class="pm-stat-modal-list">';
+                for (i = 0; i < near.length; i++) html += cohortRowCapacity(near[i]);
+                html += '</div>';
+            }
+        }
+        else if (statKey === 'full_cohorts') {
+            title   = 'Full Cohorts';
+            eyebrow = 'At or Over Capacity';
+            var fulls = [];
+            for (i = 0; i < cohorts.length; i++) {
+                var csf = String(cohorts[i].capacity_status || '');
+                if (csf === 'full' || csf === 'over_capacity') fulls.push(cohorts[i]);
+            }
+            if (!fulls.length) { html = emptyState('No full cohorts.'); }
+            else {
+                html = '<div class="pm-stat-modal-list">';
+                for (i = 0; i < fulls.length; i++) html += cohortRowCapacity(fulls[i]);
+                html += '</div>';
+            }
+        }
+        else {
+            title = 'Details';
+            html = emptyState('No data available.');
+        }
+
+        titleEl.textContent = title;
+        if (eyebrowEl) eyebrowEl.textContent = eyebrow;
+        bodyEl.innerHTML = html;
+
+        statModal.classList.add('is-open');
+        statModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('pm-cohort-modal-open');
+    }
+
+    function closeStatModal() {
+        var statModal = getEl('pmStatModal');
+        if (!statModal) return;
+        statModal.classList.remove('is-open');
+        statModal.setAttribute('aria-hidden', 'true');
+
+        var cohortModal = getEl('pmCohortModal');
+        var supModal    = getEl('pmSupervisorModal');
+        var coOpen = cohortModal && cohortModal.classList.contains('is-open');
+        var spOpen = supModal && supModal.classList.contains('is-open');
+        if (!coOpen && !spOpen) {
             document.body.classList.remove('pm-cohort-modal-open');
         }
     }
@@ -1841,13 +2192,15 @@ $capacityBarClasses = [
     window.pmCloseCohortModal     = closeCohortModal;
     window.pmOpenSupervisorModal  = openSupervisorModalById;
     window.pmCloseSupervisorModal = closeSupervisorModal;
+    window.pmOpenStatModal        = openStatModal;
+    window.pmCloseStatModal       = closeStatModal;
 
     /* =========================================================
        Attach handlers
        ========================================================= */
     function attachCardHandlers() {
         var cards = document.querySelectorAll('.pm-cohort-card');
-        console.log('[pm-cohort-modal] attaching handlers to', cards.length, 'cards');
+        console.log('[pm-cohort-modal] attaching handlers to', cards.length, 'cohort cards');
 
         var i;
         for (i = 0; i < cards.length; i++) {
@@ -1862,7 +2215,7 @@ $capacityBarClasses = [
                     e.stopPropagation();
 
                     var cid = Number(card.getAttribute('data-pm-cohort-id') || 0);
-                    console.log('[pm-cohort-modal] card clicked, cohort id =', cid);
+                    console.log('[pm-cohort-modal] cohort card clicked, cohort id =', cid);
 
                     if (cid > 0) {
                         try { openCohortModalById(cid); }
@@ -1878,6 +2231,40 @@ $capacityBarClasses = [
                     }
                 }, false);
             })(cards[i]);
+        }
+
+        /* Stat cards */
+        var statCards = document.querySelectorAll('.pm-stat-card');
+        console.log('[pm-cohort-modal] attaching handlers to', statCards.length, 'stat cards');
+
+        for (i = 0; i < statCards.length; i++) {
+            (function (card) {
+                if (card.getAttribute('data-pm-bound') === '1') return;
+                card.setAttribute('data-pm-bound', '1');
+                card.style.cursor = 'pointer';
+
+                card.addEventListener('click', function (e) {
+                    if (e.target.closest('a, button, input, select, textarea')) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    var key = card.getAttribute('data-pm-stat') || '';
+                    console.log('[pm-cohort-modal] stat card clicked, key =', key);
+
+                    if (key) {
+                        try { openStatModal(key); }
+                        catch (err) { console.error('[pm-cohort-modal] stat open failed:', err); }
+                    }
+                }, false);
+
+                card.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        var key = card.getAttribute('data-pm-stat') || '';
+                        if (key) openStatModal(key);
+                    }
+                }, false);
+            })(statCards[i]);
         }
     }
 
@@ -1903,6 +2290,17 @@ $capacityBarClasses = [
                     closeSupervisorModal();
                 }, false);
             })(closeSupEls[i]);
+        }
+
+        var closeStatEls = document.querySelectorAll('#pmStatModal [data-pm-stat-close]');
+        for (i = 0; i < closeStatEls.length; i++) {
+            (function (el) {
+                el.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    closeStatModal();
+                }, false);
+            })(closeStatEls[i]);
         }
 
         var cohortBody = getEl('pmCohortModalBody');
@@ -1935,6 +2333,10 @@ $capacityBarClasses = [
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;
 
+        var statModal = getEl('pmStatModal');
+        if (statModal && statModal.classList.contains('is-open')) {
+            e.preventDefault(); closeStatModal(); return;
+        }
         var supModal = getEl('pmSupervisorModal');
         if (supModal && supModal.classList.contains('is-open')) {
             e.preventDefault(); closeSupervisorModal(); return;
@@ -1948,9 +2350,8 @@ $capacityBarClasses = [
     function init() {
         try {
             loadData();
-            console.log('[pm-cohort-modal] Ready. Cards:',
-                document.querySelectorAll('.pm-cohort-card').length,
-                'Cohorts:', Object.keys(COHORT_DATA).length,
+            console.log('[pm-cohort-modal] Ready. Cohorts:',
+                Object.keys(COHORT_DATA).length,
                 'Supervisors:', Object.keys(SUPERVISOR_DATA).length);
             attachCardHandlers();
             attachModalHandlers();

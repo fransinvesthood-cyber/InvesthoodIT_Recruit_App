@@ -1974,6 +1974,16 @@ if ($displayName === '') {
 
     </style>
 
+<style id="pm-chatbot-styles">
+.pm-chatbot-launcher{position:fixed;right:24px;bottom:24px;z-index:2147483000;width:58px;height:58px;border:0;border-radius:50%;display:grid;place-items:center;background:#2563eb;color:#fff;box-shadow:0 14px 35px rgba(37,99,235,.35);cursor:pointer;font-size:21px;transition:transform .18s ease,box-shadow .18s ease}.pm-chatbot-launcher:hover{transform:translateY(-2px);box-shadow:0 18px 40px rgba(37,99,235,.42)}.pm-chatbot-launcher:focus-visible{outline:3px solid rgba(37,99,235,.35);outline-offset:3px}
+.pm-chatbot{position:fixed;inset:0;z-index:2147483001;display:flex;align-items:flex-end;justify-content:flex-end;padding:24px;visibility:hidden;opacity:0;pointer-events:none;transition:opacity .18s ease,visibility .18s ease;box-sizing:border-box}.pm-chatbot.is-open{visibility:visible;opacity:1;pointer-events:auto}.pm-chatbot__backdrop{position:absolute;inset:0;background:rgba(15,23,42,.48);backdrop-filter:blur(3px)}
+.pm-chatbot__dialog{position:relative;z-index:2;width:min(420px,100%);height:min(680px,calc(100vh - 48px));display:flex;flex-direction:column;overflow:hidden;background:#fff;border:1px solid #e4e7ec;border-radius:20px;box-shadow:0 30px 80px rgba(15,23,42,.28);transform:translateY(16px) scale(.98);transition:transform .18s ease}.pm-chatbot.is-open .pm-chatbot__dialog{transform:none}
+.pm-chatbot__header{min-height:72px;padding:14px 14px 14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #e4e7ec;background:#fff;box-sizing:border-box}.pm-chatbot__identity{display:flex;align-items:center;gap:11px;min-width:0}.pm-chatbot__avatar{width:42px;height:42px;flex:0 0 42px;border-radius:13px;display:grid;place-items:center;background:#eff6ff;color:#2563eb}.pm-chatbot__title{margin:0;color:#101828;font-size:14px;font-weight:800}.pm-chatbot__subtitle{display:block;margin-top:2px;color:#667085;font-size:11px}.pm-chatbot__close{width:44px;height:44px;min-width:44px;flex:0 0 44px;padding:0;border:1px solid #d0d5dd;border-radius:11px;background:#f8fafc;color:#344054;display:grid;place-items:center;cursor:pointer;font-size:17px;line-height:1}.pm-chatbot__close:hover{background:#eff6ff;color:#2563eb;border-color:#bfdbfe}.pm-chatbot__close:focus-visible{outline:3px solid rgba(37,99,235,.28);outline-offset:2px}
+.pm-chatbot__body{flex:1;min-height:0;overflow-y:auto;padding:16px;background:#f8fafc}.pm-chatbot__messages{display:flex;flex-direction:column;gap:10px}.pm-chatbot__message{max-width:86%;padding:10px 12px;border-radius:14px;font-size:12px;line-height:1.55;word-break:break-word}.pm-chatbot__message-content{white-space:pre-wrap}.pm-chatbot__action{display:inline-flex;align-items:center;justify-content:center;gap:7px;margin-top:9px;padding:8px 11px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;color:#1d4ed8;text-decoration:none;font-size:10px;font-weight:800;cursor:pointer}.pm-chatbot__action:hover{background:#dbeafe;border-color:#93c5fd}.pm-chatbot__action:focus-visible{outline:3px solid rgba(37,99,235,.22);outline-offset:2px}.pm-chatbot__message--bot{align-self:flex-start;background:#fff;border:1px solid #e4e7ec;color:#344054;border-bottom-left-radius:5px}.pm-chatbot__message--user{align-self:flex-end;background:#2563eb;color:#fff;border-bottom-right-radius:5px}.pm-chatbot__quick{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.pm-chatbot__quick button{border:1px solid #bfdbfe;background:#fff;color:#1d4ed8;border-radius:999px;padding:7px 10px;font-size:10px;font-weight:700;cursor:pointer}.pm-chatbot__quick button:hover{background:#eff6ff}.pm-chatbot__composer{padding:12px;border-top:1px solid #e4e7ec;background:#fff}.pm-chatbot__form{display:flex;align-items:flex-end;gap:8px}.pm-chatbot__input{flex:1;min-width:0;min-height:42px;max-height:110px;resize:none;border:1px solid #d0d5dd;border-radius:12px;padding:11px 12px;outline:none;background:#fff;color:#101828;font:inherit;font-size:12px;box-sizing:border-box}.pm-chatbot__input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}.pm-chatbot__send{width:44px;height:42px;flex:0 0 44px;border:0;border-radius:12px;background:#2563eb;color:#fff;cursor:pointer}.pm-chatbot__send:disabled{opacity:.55;cursor:not-allowed}.pm-chatbot__typing{font-size:10px;color:#667085;margin-top:7px;display:none}.pm-chatbot__typing.is-visible{display:block}
+html[data-theme="dark"] .pm-chatbot__dialog{background:#1e293b;border-color:#334155}html[data-theme="dark"] .pm-chatbot__header,html[data-theme="dark"] .pm-chatbot__composer{background:#1e293b;border-color:#334155}html[data-theme="dark"] .pm-chatbot__body{background:#0f172a}html[data-theme="dark"] .pm-chatbot__title{color:#f8fafc}html[data-theme="dark"] .pm-chatbot__subtitle,html[data-theme="dark"] .pm-chatbot__typing{color:#94a3b8}html[data-theme="dark"] .pm-chatbot__close{background:#111827;color:#e2e8f0;border-color:#475569}html[data-theme="dark"] .pm-chatbot__message--bot{background:#111827;color:#e2e8f0;border-color:#334155}html[data-theme="dark"] .pm-chatbot__quick button{background:#111827;color:#93c5fd;border-color:#334155}html[data-theme="dark"] .pm-chatbot__action{background:#172554;color:#bfdbfe;border-color:#1e40af}html[data-theme="dark"] .pm-chatbot__action:hover{background:#1e3a8a;border-color:#3b82f6}html[data-theme="dark"] .pm-chatbot__input{background:#111827;color:#f8fafc;border-color:#475569}
+@media(max-width:620px){.pm-chatbot-launcher{right:16px;bottom:16px;width:54px;height:54px}.pm-chatbot{padding:0;align-items:stretch;justify-content:stretch}.pm-chatbot__backdrop{background:rgba(15,23,42,.62)}.pm-chatbot__dialog{width:100%;height:100%;max-height:none;border-radius:0;border:0}.pm-chatbot__header{min-height:68px;padding:11px 12px 11px 14px}.pm-chatbot__close{width:46px;height:46px;min-width:46px;flex-basis:46px;border-radius:12px}.pm-chatbot__body{padding:13px}.pm-chatbot__composer{padding:10px}.pm-chatbot__message{max-width:91%}}
+@media(max-width:360px){.pm-chatbot__subtitle{display:none}.pm-chatbot__title{font-size:13px}.pm-chatbot__avatar{width:38px;height:38px;flex-basis:38px}.pm-chatbot__close{width:44px;height:44px;min-width:44px;flex-basis:44px}}
+</style>
 </head>
 
 
@@ -2728,6 +2738,50 @@ if ($displayName === '') {
 
 </div>
 
+
+
+<!-- =========================================================
+     PROGRAMME MANAGER CHATBOT
+     ========================================================= -->
+<button type="button" id="pmChatbotLauncher" class="pm-chatbot-launcher" aria-label="Open Programme Assistant" aria-controls="pmChatbot" aria-expanded="false">
+    <i class="fas fa-robot" aria-hidden="true"></i>
+</button>
+
+<div id="pmChatbot" class="pm-chatbot" aria-hidden="true">
+    <div class="pm-chatbot__backdrop" data-pm-chatbot-close></div>
+    <section class="pm-chatbot__dialog" role="dialog" aria-modal="true" aria-labelledby="pmChatbotTitle">
+        <header class="pm-chatbot__header">
+            <div class="pm-chatbot__identity">
+                <div class="pm-chatbot__avatar"><i class="fas fa-robot" aria-hidden="true"></i></div>
+                <div>
+                    <h2 id="pmChatbotTitle" class="pm-chatbot__title">Programme Assistant</h2>
+                    <span class="pm-chatbot__subtitle">Your programme management assistant</span>
+                </div>
+            </div>
+            <button type="button" id="pmChatbotClose" class="pm-chatbot__close" data-pm-chatbot-close aria-label="Close Programme Assistant" title="Close">
+                <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+        </header>
+        <div class="pm-chatbot__body" id="pmChatbotBody">
+            <div class="pm-chatbot__messages" id="pmChatbotMessages">
+                <div class="pm-chatbot__message pm-chatbot__message--bot">Hello <?= e($displayName) ?>. I can help you with your assigned programmes, cohorts and candidates. What would you like to know?</div>
+            </div>
+            <div class="pm-chatbot__quick" id="pmChatbotQuick">
+                <button type="button" data-pm-prompt="Give me an overview of my programmes.">Programme Overview</button>
+                <button type="button" data-pm-prompt="How many active cohorts do I have?">Active Cohorts</button>
+                <button type="button" data-pm-prompt="How many candidates do I have?">Candidates</button>
+                <button type="button" data-pm-prompt="Give me my completion rate.">Completion Rate</button>
+            </div>
+        </div>
+        <div class="pm-chatbot__composer">
+            <form id="pmChatbotForm" class="pm-chatbot__form" autocomplete="off">
+                <textarea id="pmChatbotInput" class="pm-chatbot__input" rows="1" maxlength="1000" placeholder="Ask about your programmes..."></textarea>
+                <button type="submit" id="pmChatbotSend" class="pm-chatbot__send" aria-label="Send message"><i class="fas fa-paper-plane"></i></button>
+            </form>
+            <div id="pmChatbotTyping" class="pm-chatbot__typing">Programme Assistant is checking your programme data…</div>
+        </div>
+    </section>
+</div>
 
 <!-- =========================================================
      DASHBOARD MODAL
@@ -4117,6 +4171,96 @@ document.addEventListener(
 </script>
 
 
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const launcher = document.getElementById('pmChatbotLauncher');
+    const modal = document.getElementById('pmChatbot');
+    const closeButton = document.getElementById('pmChatbotClose');
+    const body = document.getElementById('pmChatbotBody');
+    const messages = document.getElementById('pmChatbotMessages');
+    const form = document.getElementById('pmChatbotForm');
+    const input = document.getElementById('pmChatbotInput');
+    const send = document.getElementById('pmChatbotSend');
+    const typing = document.getElementById('pmChatbotTyping');
+    let previousFocus = null;
+
+    function openChatbot() {
+        previousFocus = document.activeElement;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        launcher.setAttribute('aria-expanded', 'true');
+        document.body.classList.add('pm-dashboard-modal-open');
+        setTimeout(function(){ input.focus(); }, 50);
+    }
+    function closeChatbot() {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        launcher.setAttribute('aria-expanded', 'false');
+        document.body.classList.remove('pm-dashboard-modal-open');
+        if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+        else launcher.focus();
+    }
+    function appendMessage(text, type, action) {
+        const el = document.createElement('div');
+        el.className = 'pm-chatbot__message pm-chatbot__message--' + type;
+
+        const content = document.createElement('div');
+        content.className = 'pm-chatbot__message-content';
+        content.textContent = text;
+        el.appendChild(content);
+
+        if (type === 'bot' && action && action.url && action.label) {
+            const link = document.createElement('a');
+            link.className = 'pm-chatbot__action';
+            link.href = action.url;
+            link.innerHTML = '<i class="fas fa-arrow-right" aria-hidden="true"></i><span></span>';
+            link.querySelector('span').textContent = action.label;
+            el.appendChild(link);
+        }
+
+        messages.appendChild(el);
+        body.scrollTop = body.scrollHeight;
+    }
+    function setLoading(loading) {
+        typing.classList.toggle('is-visible', loading);
+        send.disabled = loading;
+        input.disabled = loading;
+    }
+    async function sendMessage(prompt) {
+        prompt = String(prompt || '').trim();
+        if (!prompt) return;
+        appendMessage(prompt, 'user');
+        input.value = '';
+        input.style.height = '42px';
+        setLoading(true);
+        try {
+            const response = await fetch('<?= e(url('programme/chatbot_api.php')) ?>', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                body: JSON.stringify({message: prompt})
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.message || 'Unable to process the request.');
+            appendMessage(data.reply || 'I could not find an answer.', 'bot', data.action || null);
+        } catch (error) {
+            appendMessage(error.message || 'Sorry, I could not process that request.', 'bot');
+        } finally {
+            setLoading(false);
+            input.focus();
+        }
+    }
+    launcher.addEventListener('click', openChatbot);
+    closeButton.addEventListener('click', closeChatbot);
+    modal.addEventListener('click', function(event){ if(event.target.closest('[data-pm-chatbot-close]')) closeChatbot(); });
+    document.querySelectorAll('[data-pm-prompt]').forEach(function(button){ button.addEventListener('click', function(){ sendMessage(button.getAttribute('data-pm-prompt')); }); });
+    form.addEventListener('submit', function(event){ event.preventDefault(); sendMessage(input.value); });
+    input.addEventListener('keydown', function(event){ if(event.key === 'Enter' && !event.shiftKey){ event.preventDefault(); form.requestSubmit(); }});
+    input.addEventListener('input', function(){ this.style.height='42px'; this.style.height=Math.min(this.scrollHeight,110)+'px'; });
+    document.addEventListener('keydown', function(event){ if(event.key === 'Escape' && modal.classList.contains('is-open')){ event.preventDefault(); closeChatbot(); }});
+});
+</script>
 </body>
 
 </html>
