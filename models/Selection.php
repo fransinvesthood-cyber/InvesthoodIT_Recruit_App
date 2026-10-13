@@ -1605,6 +1605,25 @@ class Selection
                 error_log('[Selection] offer notify: ' . $nx->getMessage());
             }
 
+            // Best-effort candidate in-app notification (duplicate-proof).
+            try {
+                $offRow = Database::fetchOne(
+                    'SELECT candidate_id, position FROM offers WHERE id = ?',
+                    'i',
+                    [$offerId]
+                );
+                if ($offRow) {
+                    CandidateNotification::forOfferEvent(
+                        (int) $offRow['candidate_id'],
+                        $offerId,
+                        $newStatus,
+                        (string) ($offRow['position'] ?? '')
+                    );
+                }
+            } catch (Throwable $notifEx) {
+                error_log('[Selection] offer in-app notification: ' . $notifEx->getMessage());
+            }
+
             return [
                 'previous_status' => $currentStatus,
                 'new_status'      => $newStatus,

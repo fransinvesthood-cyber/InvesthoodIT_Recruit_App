@@ -818,6 +818,45 @@ class Interview
     // CREATE
     // --------------------------------------------------------
 
+    /**
+     * Best-effort candidate notification for an interview event.
+     * Never throws — notifications must never break interview
+     * management. Duplicate-proof via the model's dedupe keys.
+     */
+    private static function notifyCandidate(
+        int $interviewId,
+        string $event,
+        ?string $interviewDate = null,
+        ?string $startTime = null,
+        ?string $reason = null,
+        ?string $dedupeSuffix = null
+    ): void {
+        try {
+            $row = Database::fetchOne(
+                "SELECT a.candidate_id, i.interview_date, i.start_time
+                 FROM interviews i
+                 INNER JOIN applications a ON a.id = i.application_id
+                 WHERE i.id = ?",
+                'i',
+                [$interviewId]
+            );
+            if (!$row) {
+                return;
+            }
+            CandidateNotification::forInterviewEvent(
+                (int) $row['candidate_id'],
+                $interviewId,
+                $event,
+                (string) ($interviewDate ?? $row['interview_date'] ?? ''),
+                (string) ($startTime ?? $row['start_time'] ?? ''),
+                $reason,
+                $dedupeSuffix
+            );
+        } catch (Throwable $e) {
+            error_log('[Interview] notification: ' . $e->getMessage());
+        }
+    }
+
     public static function create(array $data): int
     {
         Database::execute(
@@ -841,6 +880,13 @@ class Interview
         );
         $id = Database::lastInsertId();
         self::logStatusHistory($id, null, $data['status'] ?? 'scheduled', $data['created_by'] ?? null, 'Interview scheduled');
+        // Candidate notification (best-effort).
+        self::notifyCandidate(
+            $id,
+            'scheduled',
+            (string) ($data['interview_date'] ?? ''),
+            (string) ($data['start_time'] ?? '')
+        );
         // Best-effort candidate email (honours interview toggle).
         try {
             $sendIt = !class_exists('SettingsMail', false) || SettingsMail::allowed('interview');
@@ -884,10 +930,19 @@ class Interview
         $types .= 'i';
         $params[] = $id;
 
-        return Database::execute(
+        $result = Database::execute(
             "UPDATE interviews SET " . implode(', ', $sets) . " WHERE id = ?",
             $types, $params
         ) >= 0;
+
+        if ($result) {
+            // Candidate notification (best-effort). The value-hash suffix
+            // makes retried identical requests duplicate-proof while still
+            // notifying for each distinct change.
+            self::notifyCandidate($id, 'updated', null, null, null, substr(md5(serialize($data)), 0, 12));
+        }
+
+        return $result;
     }
 
     public static function reschedule(int $id, array $data, int $adminId): bool
@@ -931,6 +986,15 @@ class Interview
 
         if ($result) {
             self::logStatusHistory($id, $interview['status'], 'rescheduled', $adminId, $data['reschedule_reason'] ?? null);
+            // Candidate notification (best-effort, duplicate-proof per change).
+            self::notifyCandidate(
+                $id,
+                'rescheduled',
+                (string) ($data['interview_date'] ?? $interview['interview_date'] ?? ''),
+                (string) ($data['start_time'] ?? $interview['start_time'] ?? ''),
+                isset($data['reschedule_reason']) ? (string) $data['reschedule_reason'] : null,
+                substr(md5(serialize($data)), 0, 12)
+            );
             try {
                 $sendIt = !class_exists('SettingsMail', false) || SettingsMail::allowed('interview');
                 if ($sendIt) {
@@ -1005,6 +1069,18 @@ class Interview
             } catch (Throwable $notifyEx) {
                 error_log('[Interview] status notify: ' . $notifyEx->getMessage());
             }
+            // Candidate notification (best-effort, duplicate-proof).
+            $notifyEvent = in_array($newStatus, ['cancelled', 'confirmed', 'completed'], true)
+                ? $newStatus
+                : 'updated';
+            self::notifyCandidate(
+                $id,
+                $notifyEvent,
+                (string) ($interview['interview_date'] ?? ''),
+                (string) ($interview['start_time'] ?? ''),
+                $reason,
+                $notifyEvent === 'updated' ? $newStatus : null
+            );
         }
 
         return $result;

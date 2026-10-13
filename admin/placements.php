@@ -74,6 +74,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['placement_action'] ?? '') 
                 'ii' . $byTypes . 's',
                 array_merge([$statusPid, (int) ($existing['candidate_id'] ?? 0)], $byParams, ["Your placement status changed from {$niceOld} to {$niceNew}."])
             );
+            // Unified candidate notification feed (best-effort, duplicate-proof).
+            try {
+                CandidateNotification::forPlacementEvent(
+                    (int) ($existing['candidate_id'] ?? 0),
+                    (int) $statusPid,
+                    'status_changed',
+                    "from {$niceOld} to {$niceNew}"
+                );
+            } catch (Throwable $pnEx) { error_log('[PLACEMENTS] unified notification: ' . $pnEx->getMessage()); }
             $prow = Database::fetchOne("SELECT u.email, u.first_name FROM users u WHERE u.id = ?", 'i', [(int)($existing['candidate_id'] ?? 0)]);
             if ($prow && !empty($prow['email'])) {
                 $sn = class_exists('SystemSettings', false) ? SystemSettings::get('site_name', APP_NAME) : APP_NAME;

@@ -68,6 +68,25 @@ $offerStats = $offerSummary['stats'] ?? [];
 $offerRecentList = $offerSummary['recentList'] ?? [];
 $offerDeadlines = $offerSummary['deadlines'] ?? [];
 
+// Notifications integration — unified candidate notification feed
+// (applications, programmes/opportunities, interviews, offers,
+// placements, account). Dashboard-safe loading: a notification
+// problem must never block the rest of the dashboard.
+$notifUnread = 0;
+$notifRecent = [];
+$notifCentre = ['records' => [], 'unread' => 0, 'total' => 0, 'categoryCounts' => []];
+try {
+    // Lazy, idempotent syncs (deadline reminders, new relevant
+    // opportunities, offer event mirror) — duplicate-proof.
+    CandidateNotification::syncOpportunityEvents($userId);
+    CandidateNotification::mirrorOfferNotifications($userId);
+    $notifUnread = CandidateNotification::unreadCount($userId);
+    $notifRecent = CandidateNotification::recentForCandidate($userId, 5);
+    $notifCentre = CandidateNotification::forCandidate($userId, [], 1, 8);
+} catch (Throwable $e) {
+    error_log('[Candidate Dashboard] Notification load failed for user ' . $userId . ': ' . $e->getMessage());
+}
+
 // Placements integration — live data from the Admin Placement Management
 // module (placements table) scoped to the logged-in candidate.
 // Dashboard-safe: CandidatePlacement degrades to null when the Stage 12
@@ -194,6 +213,9 @@ $flashes = render_flashes();
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
   <link rel="stylesheet" href="<?= url('css/opportunities.css') ?>">
   <link rel="stylesheet" href="<?= url('css/candidate_offers.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/candidate_notifications.css') ?>">
+  <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
+  <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
 </head>
 <body class="dashboard-page">
 
@@ -274,10 +296,46 @@ $flashes = render_flashes();
           <button class="dash-header__icon-btn" id="themeToggle" aria-label="Toggle dark mode">
             <i class="fas fa-moon"></i>
           </button>
-          <button class="dash-header__icon-btn dash-header__notif-btn" id="notifHeaderBtn" aria-label="Notifications">
-            <i class="fas fa-bell"></i>
-            <span class="dash-header__notif-badge">5</span>
-          </button>
+          <div class="notif-bell-wrap">
+            <button class="dash-header__icon-btn dash-header__notif-btn" id="notifHeaderBtn" aria-label="Notifications" aria-expanded="false" aria-haspopup="true">
+              <i class="fas fa-bell"></i>
+              <span class="dash-header__notif-badge<?= $notifUnread > 0 ? '' : ' is-hidden' ?>" id="notifHeaderBadge"><?= $notifUnread > 99 ? '99+' : $notifUnread ?></span>
+            </button>
+            <!-- ===== NOTIFICATION DROPDOWN ===== -->
+            <div class="notif-dropdown" id="notifDropdown" aria-hidden="true">
+              <div class="notif-dropdown__header">
+                <span class="notif-dropdown__title">Notifications</span>
+                <span class="notif-dropdown__count" id="notifDropdownCount"><?= $notifUnread ?> unread</span>
+              </div>
+              <div class="notif-dropdown__list" id="notifDropdownList">
+                <?php if (empty($notifRecent)): ?>
+                  <div class="notif-dropdown__empty"><i class="fas fa-bell-slash"></i> You are all caught up!</div>
+                <?php else: foreach ($notifRecent as $n): ?>
+                  <?php
+                    $nCat    = CandidateNotification::normaliseCategory((string) $n['category']);
+                    $nUnread = (int) $n['is_read'] === 0;
+                    $nUrl    = url(CandidateNotification::destinationUrl(
+                        $n['module'] !== null && $n['module'] !== '' ? (string) $n['module'] : null,
+                        isset($n['record_id']) && $n['record_id'] !== null ? (int) $n['record_id'] : null
+                    ));
+                  ?>
+                  <a class="notif-item notif-dropdown__item<?= $nUnread ? ' notif-item--unread' : '' ?>"
+                     href="<?= e($nUrl) ?>" data-notif-id="<?= (int) $n['id'] ?>" data-notif-url="<?= e($nUrl) ?>">
+                    <div class="notif-item__icon notif-item__icon--<?= e($nCat) ?>"><i class="fas <?= e(CandidateNotification::categoryIcon($nCat)) ?>"></i></div>
+                    <div class="notif-item__content">
+                      <div class="notif-item__title"><?= e($n['title']) ?></div>
+                      <div class="notif-item__message"><?= e($n['message']) ?></div>
+                      <div class="notif-item__time"><?= e(time_ago((string) $n['created_at'])) ?></div>
+                    </div>
+                  </a>
+                <?php endforeach; endif; ?>
+              </div>
+              <div class="notif-dropdown__footer">
+                <button type="button" class="btn btn--ghost btn--sm" data-notif-mark-all><i class="fas fa-check-double"></i> Mark All Read</button>
+                <a href="<?= url('candidate/notifications.php') ?>" class="btn btn--primary btn--sm">View All Notifications</a>
+              </div>
+            </div>
+          </div>
 <div class="dash-header__user">
             <img src="<?= $avatar ?>" alt="Profile" class="dash-header__avatar">
           </div>
@@ -1257,16 +1315,51 @@ $flashes = render_flashes();
             <div class="notif-centre__toolbar">
               <div class="notif-centre__filters">
                 <button class="notif-centre__filter active" data-filter="all">All</button>
-                <button class="notif-centre__filter" data-filter="opportunities">Opportunities</button>
-                <button class="notif-centre__filter" data-filter="programmes">Programmes</button>
-                <button class="notif-centre__filter" data-filter="applications">Applications</button>
-                <button class="notif-centre__filter" data-filter="interviews">Interviews</button>
-                <button class="notif-centre__filter" data-filter="learning">Learning</button>
+                <button class="notif-centre__filter" data-filter="application">Applications</button>
+                <button class="notif-centre__filter" data-filter="opportunity">Programmes</button>
+                <button class="notif-centre__filter" data-filter="interview">Interviews</button>
+                <button class="notif-centre__filter" data-filter="offer">Offers</button>
+                <button class="notif-centre__filter" data-filter="placement">Placements</button>
+                <button class="notif-centre__filter" data-filter="account">Account</button>
               </div>
-              <button class="btn btn--ghost btn--sm" id="markAllRead"><i class="fas fa-check-double"></i> Mark All Read</button>
+              <button class="btn btn--ghost btn--sm" id="markAllRead" data-notif-mark-all><i class="fas fa-check-double"></i> Mark All Read</button>
             </div>
             <div class="notif-centre__list" id="notifList">
-              <!-- Populated by JS -->
+              <?php if (empty($notifCentre['records'])): ?>
+                <div class="notif-dropdown__empty" id="notifCentreEmpty"><i class="fas fa-bell-slash"></i> You are all caught up! New notifications about your applications, interviews, offers and placements will appear here.</div>
+              <?php else: foreach ($notifCentre['records'] as $n): ?>
+                <?php
+                  $nCat    = CandidateNotification::normaliseCategory((string) $n['category']);
+                  $nUnread = (int) $n['is_read'] === 0;
+                  $nUrl    = url(CandidateNotification::destinationUrl(
+                      $n['module'] !== null && $n['module'] !== '' ? (string) $n['module'] : null,
+                      isset($n['record_id']) && $n['record_id'] !== null ? (int) $n['record_id'] : null
+                  ));
+                ?>
+                <div class="notif-item<?= $nUnread ? ' notif-item--unread' : '' ?>"
+                     data-notif-id="<?= (int) $n['id'] ?>"
+                     data-category="<?= e($nCat) ?>"
+                     data-notif-url="<?= e($nUrl) ?>">
+                  <div class="notif-item__icon notif-item__icon--<?= e($nCat) ?>"><i class="fas <?= e(CandidateNotification::categoryIcon($nCat)) ?>"></i></div>
+                  <div class="notif-item__content">
+                    <div class="notif-item__head">
+                      <a class="notif-item__title" href="<?= e($nUrl) ?>" data-notif-open><?= e($n['title']) ?></a>
+                      <?php if ($nUnread): ?><span class="notif-item__unread-dot" title="Unread"></span><?php endif; ?>
+                    </div>
+                    <div class="notif-item__message"><?= e($n['message']) ?></div>
+                    <div class="notif-item__time"><?= e(time_ago((string) $n['created_at'])) ?></div>
+                  </div>
+                  <div class="notif-item__actions">
+                    <?php if ($nUnread): ?>
+                      <button type="button" class="notif-item__mark-read" data-notif-mark-read title="Mark as read" aria-label="Mark as read"><i class="fas fa-check"></i></button>
+                    <?php endif; ?>
+                    <button type="button" class="notif-item__delete" data-notif-delete title="Delete notification" aria-label="Delete notification"><i class="fas fa-trash-alt"></i></button>
+                  </div>
+                </div>
+              <?php endforeach; endif; ?>
+            </div>
+            <div style="text-align:center;margin-top:1rem;">
+              <a href="<?= url('candidate/notifications.php') ?>" class="btn btn--outline btn--sm"><i class="fas fa-bell"></i> View All Notifications (<?= (int) ($notifCentre['total'] ?? 0) ?>)</a>
             </div>
           </div>
         </section>
@@ -1345,7 +1438,7 @@ $flashes = render_flashes();
               <div class="quick-action-card__icon quick-action-card__icon--indigo"><i class="fas fa-download"></i></div>
               <span>Download Documents</span>
             </a>
-            <a href="#" class="quick-action-card">
+            <a href="<?= url('candidate/notifications.php') ?>" class="quick-action-card">
               <div class="quick-action-card__icon quick-action-card__icon--cyan"><i class="fas fa-bell"></i></div>
               <span>View Notifications</span>
             </a>
@@ -1435,6 +1528,7 @@ $flashes = render_flashes();
   <script src="<?= url('js/script.js') ?>"></script>
   <script src="<?= url('js/dashboard.js') ?>"></script>
   <script src="<?= url('js/candidate_offers.js') ?>"></script>
+  <script src="<?= url('js/notifications.js') ?>"></script>
   <script>
   (function () {
     function setHidden(modal, hidden) {

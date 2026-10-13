@@ -463,6 +463,14 @@ class AuthController
             'status'            => STATUS_ACTIVE,
         ]);
 
+        // In-app account notification (best-effort, duplicate-proof —
+        // re-using a token after verification never raises it again).
+        try {
+            CandidateNotification::forAccountEvent((int) $user['id'], 'email_verified');
+        } catch (Throwable $notifEx) {
+            error_log('[Auth] email verified notification: ' . $notifEx->getMessage());
+        }
+
         return ['success' => true, 'message' => 'Your email has been verified successfully. You can now log in.'];
     }
 

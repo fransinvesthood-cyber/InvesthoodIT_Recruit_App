@@ -397,6 +397,18 @@ class CandidateApplicationsController
 
             $conn->commit();
 
+            // Candidate notification (best-effort, never blocks the submission).
+            try {
+                CandidateNotification::forApplicationSubmitted(
+                    $candidateId,
+                    $applicationId,
+                    $reference,
+                    (string) ($lockedOpportunity['title'] ?? '')
+                );
+            } catch (Throwable $notifEx) {
+                error_log('[Applications] notification: ' . $notifEx->getMessage());
+            }
+
             return [
                 'success' => true,
                 'message' => 'Application submitted successfully.',

@@ -688,6 +688,26 @@ class Application
             } catch (Throwable $notifyEx) {
                 error_log('[Application] status notify: ' . $notifyEx->getMessage());
             }
+            // ---- 4. In-app notification (best-effort, duplicate-proof) ----
+            try {
+                $row = Database::fetchOne(
+                    "SELECT candidate_id, application_reference FROM applications WHERE id = ?",
+                    'i',
+                    [$applicationId]
+                );
+                if ($row) {
+                    CandidateNotification::forApplicationStatusChange(
+                        (int) $row['candidate_id'],
+                        $applicationId,
+                        (string) ($row['application_reference'] ?? ''),
+                        $currentStatus,
+                        $newStatus,
+                        $reason
+                    );
+                }
+            } catch (Throwable $notifEx) {
+                error_log('[Application] status notification: ' . $notifEx->getMessage());
+            }
             return true;
         } catch (Exception $e) {
             Database::rollback();
