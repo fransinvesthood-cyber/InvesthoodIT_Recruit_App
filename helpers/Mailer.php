@@ -99,20 +99,31 @@ class Mailer
      */
     public static function sendPasswordResetEmail(string $to, string $name, string $token): bool
     {
-        $link = APP_URL . '/reset-password.php?token=' . urlencode($token);
-        $subject = 'Reset your password — ' . APP_NAME;
+        $link = url('reset-password.php?token=' . urlencode($token));
+        $subject = 'Reset Your Password — ' . APP_NAME;
+
+        $safeName = htmlspecialchars($name !== '' ? $name : 'there', ENT_QUOTES, 'UTF-8');
+        $safeLink = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
 
         $body = self::template(
             'Password Reset',
-            'Hello ' . htmlspecialchars($name) . ',',
-            'We received a request to reset your password. Click the button below to choose a new password. The link will expire in ' . PASSWORD_RESET_EXPIRY_HOURS . ' hour(s).',
+            'Hello ' . $safeName . ',',
+            'We received a request to reset the password for your ' . APP_NAME . ' account. '
+            . 'Click the button below to choose a new password. '
+            . 'This link expires in 30 minutes and can only be used once.',
             'Reset Password',
-            $link,
-            'If you did not request a password reset, please ignore this email. Your password will remain unchanged.'
+            $safeLink,
+            'If you did not request a password reset, please ignore this email — '
+            . 'your password will remain unchanged and no further action is needed. '
+            . 'If the button does not work, copy and paste this link into your browser:<br>'
+            . '<span style="word-break:break-all;">' . $safeLink . '</span>'
         );
 
-        $altBody = "Reset your password: {$link}\n\n"
-                 . "We received a request to reset your password. The link expires in " . PASSWORD_RESET_EXPIRY_HOURS . " hour(s).";
+        $altBody = "Hello " . ($name !== '' ? $name : 'there') . ",\n\n"
+                 . "We received a request to reset the password for your " . APP_NAME . " account.\n"
+                 . "Open this link to choose a new password (expires in 30 minutes, single use):\n{$link}\n\n"
+                 . "If you did not request a password reset, please ignore this email — "
+                 . "your password will remain unchanged.";
 
         return self::send($to, $name, $subject, $body, $altBody);
     }
@@ -154,7 +165,9 @@ HTML;
     }
 
     /**
-     * Log email to file when mail is disabled.
+     * Log email to file when mail is disabled (development outbox).
+     * Includes a plain-text excerpt so reset/verify LINKS remain
+     * testable without SMTP — never commit this file (see .gitignore).
      */
     private static function log(string $to, string $subject, string $body): void
     {
@@ -163,7 +176,12 @@ HTML;
             mkdir($logDir, 0755, true);
         }
         $logFile = $logDir . '/email_log.txt';
-        $entry = "[" . date('Y-m-d H:i:s') . "] TO: {$to} | SUBJECT: {$subject}\n";
+        $plain = html_entity_decode(strip_tags(str_replace(['<br>', '<br/>', '<br />', '</p>'], "\n", $body)), ENT_QUOTES, 'UTF-8');
+        $plain = trim(preg_replace('/[ \t]+/', ' ', (string) $plain));
+        if (mb_strlen($plain) > 2000) {
+            $plain = mb_substr($plain, 0, 2000) . '…';
+        }
+        $entry = "[" . date('Y-m-d H:i:s') . "] TO: {$to} | SUBJECT: {$subject}\n{$plain}\n---\n";
         file_put_contents($logFile, $entry, FILE_APPEND | LOCK_EX);
     }
 }

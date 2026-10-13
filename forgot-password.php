@@ -39,7 +39,7 @@ unset($_SESSION['_form_old']);
           <p class="auth-card__subtitle">Enter your email address and we'll send you a link to reset your password.</p>
         </div>
 
-        <form class="form" method="POST" action="<?= url('auth/forgot_password.php') ?>" novalidate>
+        <form class="form" id="forgotPasswordForm" method="POST" action="<?= url('auth/forgot_password.php') ?>" novalidate>
           <?= csrf_field() ?>
 
           <div class="form-group">
@@ -55,14 +55,18 @@ unset($_SESSION['_form_old']);
               required
               autocomplete="email"
               inputmode="email"
+              maxlength="100"
               value="<?= e($old['email'] ?? '') ?>"
             />
             <div class="form-error" id="forgotEmailError"></div>
           </div>
 
-          <button type="submit" class="btn btn--primary btn--full">
+          <button type="submit" class="btn btn--primary btn--full" id="forgotPasswordBtn">
             <span class="btn__text">Send Reset Link</span>
           </button>
+          <p class="auth-card__subtitle" style="font-size:0.8rem;margin-top:0.75rem;">
+            <i class="fas fa-shield-alt"></i> For your security, we always show the same confirmation — even if the email isn't registered.
+          </p>
 
           <div class="auth-footer">
             <p class="auth-footer__text">
