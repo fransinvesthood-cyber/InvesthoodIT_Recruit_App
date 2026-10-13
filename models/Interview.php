@@ -841,6 +841,19 @@ class Interview
         );
         $id = Database::lastInsertId();
         self::logStatusHistory($id, null, $data['status'] ?? 'scheduled', $data['created_by'] ?? null, 'Interview scheduled');
+        // Best-effort candidate email (honours interview toggle).
+        try {
+            $sendIt = !class_exists('SettingsMail', false) || SettingsMail::allowed('interview');
+            if ($sendIt) {
+                $row = Database::fetchOne("SELECT u.email, u.first_name FROM applications a INNER JOIN users u ON u.id = a.candidate_id WHERE a.id = ?", 'i', [(int) ($data['application_id'] ?? 0)]);
+                if ($row && !empty($row['email'])) {
+                    $site = class_exists('SystemSettings', false) ? SystemSettings::get('site_name', APP_NAME) : APP_NAME;
+                    Mailer::send((string) $row['email'], (string) ($row['first_name'] ?? ''), 'Interview scheduled — ' . $site, '<p>Hello ' . htmlspecialchars((string) ($row['first_name'] ?? 'there')) . ',</p><p>An interview has been scheduled for your application on <strong>' . htmlspecialchars((string) ($data['interview_date'] ?? '')) . ' ' . htmlspecialchars((string) ($data['start_time'] ?? '')) . '</strong>.</p>');
+                }
+            }
+        } catch (Throwable $notifyEx) {
+            error_log('[Interview] notify: ' . $notifyEx->getMessage());
+        }
         return $id;
     }
 
@@ -918,6 +931,18 @@ class Interview
 
         if ($result) {
             self::logStatusHistory($id, $interview['status'], 'rescheduled', $adminId, $data['reschedule_reason'] ?? null);
+            try {
+                $sendIt = !class_exists('SettingsMail', false) || SettingsMail::allowed('interview');
+                if ($sendIt) {
+                    $row = Database::fetchOne("SELECT u.email, u.first_name FROM applications a INNER JOIN users u ON u.id = a.candidate_id WHERE a.id = ?", 'i', [(int) ($interview['application_id'] ?? 0)]);
+                    if ($row && !empty($row['email'])) {
+                        $site = class_exists('SystemSettings', false) ? SystemSettings::get('site_name', APP_NAME) : APP_NAME;
+                        Mailer::send((string) $row['email'], (string) ($row['first_name'] ?? ''), 'Interview rescheduled — ' . $site, '<p>Hello ' . htmlspecialchars((string) ($row['first_name'] ?? 'there')) . ',</p><p>Your interview has been rescheduled to <strong>' . htmlspecialchars((string) ($data['interview_date'] ?? '')) . ' ' . htmlspecialchars((string) ($data['start_time'] ?? '')) . '</strong>.</p>');
+                    }
+                }
+            } catch (Throwable $notifyEx) {
+                error_log('[Interview] reschedule notify: ' . $notifyEx->getMessage());
+            }
         }
 
         return $result;
@@ -968,6 +993,18 @@ class Interview
 
         if ($result) {
             self::logStatusHistory($id, $currentStatus, $newStatus, $adminId, $reason);
+            try {
+                $sendIt = !class_exists('SettingsMail', false) || SettingsMail::allowed('interview');
+                if ($sendIt && in_array($newStatus, ['cancelled', 'confirmed', 'completed'], true)) {
+                    $row = Database::fetchOne("SELECT u.email, u.first_name FROM applications a INNER JOIN users u ON u.id = a.candidate_id WHERE a.id = ?", 'i', [(int) ($interview['application_id'] ?? 0)]);
+                    if ($row && !empty($row['email'])) {
+                        $site = class_exists('SystemSettings', false) ? SystemSettings::get('site_name', APP_NAME) : APP_NAME;
+                        Mailer::send((string) $row['email'], (string) ($row['first_name'] ?? ''), 'Interview ' . self::label($newStatus) . ' — ' . $site, '<p>Hello ' . htmlspecialchars((string) ($row['first_name'] ?? 'there')) . ',</p><p>Your interview status is now <strong>' . htmlspecialchars(self::label($newStatus)) . '</strong>.</p>');
+                    }
+                }
+            } catch (Throwable $notifyEx) {
+                error_log('[Interview] status notify: ' . $notifyEx->getMessage());
+            }
         }
 
         return $result;

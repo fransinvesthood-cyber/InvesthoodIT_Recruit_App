@@ -25,6 +25,16 @@ class Mailer
      */
     public static function send(string $to, string $toName, string $subject, string $body, string $altBody = ''): bool
     {
+        // Admin master switch: no platform emails when disabled in System Settings.
+        if (class_exists('SystemSettings', false)) {
+            try {
+                if (!SystemSettings::getBool('mail_notifications_enabled', true)) {
+                    error_log('[Mailer] suppressed by mail_notifications_enabled=0 to ' . $to);
+                    return true;
+                }
+            } catch (Throwable $ex) {
+            }
+        }
         // If mail is not enabled, log it
         if (!MAIL_ENABLED) {
             self::log($to, $subject, $body);
@@ -71,6 +81,14 @@ class Mailer
      */
     public static function sendVerificationEmail(string $to, string $name, string $token): bool
     {
+        if (class_exists('SettingsMail', false)) {
+            try {
+                if (!SettingsMail::allowed('verification')) {
+                    return true;
+                }
+            } catch (Throwable $ex) {
+            }
+        }
         $link = APP_URL . '/auth/verify_email.php?token=' . urlencode($token);
         $subject = 'Verify your email — ' . APP_NAME;
 

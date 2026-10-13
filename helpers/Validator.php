@@ -66,6 +66,16 @@ class Validator
 
             case 'min':
                 $min = (int) ($params[0] ?? 0);
+                // Admin-configured minimum password length wins over the rule param.
+                if ($field === 'password' && class_exists('SystemSettings', false)) {
+                    try {
+                        $dbMin = SystemSettings::getInt('password_min_length', 0, 6, 32);
+                        if ($dbMin > 0) {
+                            $min = $dbMin;
+                        }
+                    } catch (Throwable $ex) {
+                    }
+                }
                 if (mb_strlen(trim((string) $value)) < $min && trim((string) $value) !== '') {
                     $this->errors[$field] = "{$label} must be at least {$min} characters.";
                 }
@@ -101,14 +111,24 @@ class Validator
                 break;
 
 case 'strength':
-                // Strong password policy
+                // Password policy honours System Settings toggles; falls back to strict.
                 $pw = (string) $value;
                 if (trim($pw) === '') break;
+                $reqU = true; $reqL = true; $reqN = true; $reqS = true;
+                if (class_exists('SystemSettings', false)) {
+                    try {
+                        $reqU = SystemSettings::getBool('password_require_uppercase', true);
+                        $reqL = SystemSettings::getBool('password_require_lowercase', true);
+                        $reqN = SystemSettings::getBool('password_require_number', true);
+                        $reqS = SystemSettings::getBool('password_require_special', true);
+                    } catch (Throwable $ex) {
+                    }
+                }
                 $missing = [];
-                if (!preg_match('/[A-Z]/', $pw)) $missing[] = 'an uppercase letter';
-                if (!preg_match('/[a-z]/', $pw)) $missing[] = 'a lowercase letter';
-                if (!preg_match('/[0-9]/', $pw)) $missing[] = 'a number';
-                if (!preg_match('/[^a-zA-Z0-9]/', $pw)) $missing[] = 'a special character';
+                if ($reqU && !preg_match('/[A-Z]/', $pw)) $missing[] = 'an uppercase letter';
+                if ($reqL && !preg_match('/[a-z]/', $pw)) $missing[] = 'a lowercase letter';
+                if ($reqN && !preg_match('/[0-9]/', $pw)) $missing[] = 'a number';
+                if ($reqS && !preg_match('/[^a-zA-Z0-9]/', $pw)) $missing[] = 'a special character';
                 if (!empty($missing)) {
                     $this->errors[$field] = "{$label} must contain " . implode(', ', $missing) . '.';
                 }

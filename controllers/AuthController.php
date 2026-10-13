@@ -18,6 +18,15 @@ class AuthController
      */
     public static function register(array $input): array
     {
+        // Admin kill-switch: candidate self-registration can be disabled.
+        if (class_exists('SystemSettings', false)) {
+            try {
+                if (!SystemSettings::getBool('registration_enabled', true)) {
+                    return ['success' => false, 'errors' => ['general' => 'Registrations are currently closed. Please try again later or contact support.'], 'user' => null];
+                }
+            } catch (Throwable $ex) {
+            }
+        }
         // ---- 1. Sanitise input ----
         $clean = [
             'first_name'           => Sanitizer::name($input['first_name'] ?? ''),
@@ -111,15 +120,57 @@ class AuthController
             ]);
 
             // ---- 6. Generate verification token & send email ----
-            $token = Token::generate();
-            EmailVerification::create($userId, Token::hash($token));
-            $emailSent = Mailer::sendVerificationEmail($clean['email'], $clean['first_name'], $token);
-
-            if (!$emailSent) {
-                error_log('[Auth] Verification email failed for user ' . $userId);
+            // When verification is not required, activate immediately.
+            $verifyRequired = true;
+            if (class_exists('SystemSettings', false)) {
+                try {
+                    $verifyRequired = SystemSettings::getBool('email_verification_required', true);
+                } catch (Throwable $ex) {
+                }
+            }
+            if (!$verifyRequired) {
+                User::update($userId, ['email_verified_at' => date('Y-m-d H:i:s'), 'status' => STATUS_ACTIVE]);
+            } else {
+                $token = Token::generate();
+                EmailVerification::create($userId, Token::hash($token));
+                $sendIt = true;
+                if (class_exists('SettingsMail', false)) {
+                    try {
+                        $sendIt = SettingsMail::allowed('verification');
+                    } catch (Throwable $ex) {
+                    }
+                }
+                if ($sendIt) {
+                    $emailSent = Mailer::sendVerificationEmail($clean['email'], $clean['first_name'], $token);
+                    if (!$emailSent) {
+                        error_log('[Auth] Verification email failed for user ' . $userId);
+                    }
+                }
             }
 
             Database::commit();
+
+            // Welcome email (honours the registration toggle; the master
+            // mail switch inside Mailer::send is the final backstop).
+            try {
+                $sendWelcome = true;
+                if (class_exists('SettingsMail', false)) {
+                    $sendWelcome = SettingsMail::allowed('registration');
+                }
+                if ($sendWelcome) {
+                    $site = class_exists('SystemSettings', false) ? SystemSettings::get('site_name', APP_NAME) : APP_NAME;
+                    Mailer::send(
+                        $clean['email'],
+                        $clean['first_name'],
+                        'Welcome to ' . $site,
+                        '<p>Hello ' . htmlspecialchars($clean['first_name']) . ',</p>'
+                        . '<p>Welcome to the ' . htmlspecialchars($site) . ' talent community. Your account has been created successfully.</p>'
+                        . '<p>You can now sign in and complete your profile to start applying for opportunities.</p>'
+                    );
+                }
+            } catch (Throwable $welcomeEx) {
+                error_log('[Auth] Welcome email failed: ' . $welcomeEx->getMessage());
+            }
 
             $user = User::find($userId);
             return ['success' => true, 'errors' => [], 'user' => $user];
@@ -151,9 +202,16 @@ class AuthController
             return ['success' => false, 'redirect' => '', 'errors' => ['general' => 'Please enter your email/username and password.']];
         }
 
-        // ---- 2. Brute-force check per IP ----
+        // ---- 2. Brute-force check per IP (limits from System Settings) ----
+        $lockMins = LOGIN_LOCKOUT_MINUTES;
+        if (class_exists('SystemSettings', false)) {
+            try {
+                $lockMins = SystemSettings::getInt('login_lockout_minutes', LOGIN_LOCKOUT_MINUTES, 1, 120);
+            } catch (Throwable $ex) {
+            }
+        }
         if (LoginAttempt::isIpLocked($ip)) {
-            return ['success' => false, 'redirect' => '', 'errors' => ['general' => 'Too many failed attempts. Your IP is temporarily blocked for ' . LOGIN_LOCKOUT_MINUTES . ' minutes.']];
+            return ['success' => false, 'redirect' => '', 'errors' => ['general' => 'Too many failed attempts. Your IP is temporarily blocked for ' . $lockMins . ' minutes.']];
         }
 
         // ---- 3. Locate user by login ----
@@ -168,8 +226,15 @@ class AuthController
         if (!password_verify($password, $user['password_hash'])) {
             LoginAttempt::record((int) $user['id'], $ip, $login, false);
 
-            // Check if account should be locked
-            if (LoginAttempt::countFailedForUser((int) $user['id']) >= LOGIN_MAX_ATTEMPTS) {
+            // Check if account should be locked (threshold from System Settings)
+            $maxAttempts = LOGIN_MAX_ATTEMPTS;
+            if (class_exists('SystemSettings', false)) {
+                try {
+                    $maxAttempts = SystemSettings::getInt('login_max_attempts', LOGIN_MAX_ATTEMPTS, 3, 20);
+                } catch (Throwable $ex) {
+                }
+            }
+            if (LoginAttempt::countFailedForUser((int) $user['id']) >= $maxAttempts) {
                 Security::lockAccount((int) $user['id']);
                 return ['success' => false, 'redirect' => '', 'errors' => ['general' => 'Account temporarily locked due to too many failed attempts. Please reset your password or wait.']];
             }
@@ -177,8 +242,15 @@ class AuthController
             return ['success' => false, 'redirect' => '', 'errors' => ['general' => 'Invalid credentials. Please try again.']];
         }
 
-        // ---- 5. Check email verification ----
-        if ($user['status'] === STATUS_PENDING) {
+        // ---- 5. Check email verification (skipped when admin disables it) ----
+        $verifyRequired = true;
+        if (class_exists('SystemSettings', false)) {
+            try {
+                $verifyRequired = SystemSettings::getBool('email_verification_required', true);
+            } catch (Throwable $ex) {
+            }
+        }
+        if ($verifyRequired && $user['status'] === STATUS_PENDING) {
             return ['success' => false, 'redirect' => '', 'errors' => ['unverified' => 'Please verify your email address before logging in. Check your inbox or <a href="auth/resend_verification.php">resend the verification link</a>.']];
         }
 
@@ -468,6 +540,8 @@ class AuthController
             // Secure token; store ONLY its SHA-256 hash.
             $token = Token::generate(32);
             PasswordReset::create((int) $user['id'], Token::hash($token));
+            // Delivery of the reset email honours the master mail switch
+            // inside Mailer::send; no per-type toggle applies here.
             $sent = Mailer::sendPasswordResetEmail((string) $user['email'], (string) ($user['first_name'] ?? ''), $token);
             if (!$sent) {
                 error_log('[Auth] Password-reset email failed for user ' . (int) $user['id']);

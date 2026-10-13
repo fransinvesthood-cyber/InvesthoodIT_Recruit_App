@@ -16,6 +16,22 @@ require_guest();
 $errors = $_SESSION['_form_errors'] ?? [];
 $old    = $_SESSION['_form_old'] ?? [];
 unset($_SESSION['_form_errors'], $_SESSION['_form_old']);
+
+// Admin kill-switch: closed registrations show a friendly closed page.
+$regOpen = true;
+try {
+    if (class_exists('SystemSettings', false)) {
+        $regOpen = SystemSettings::getBool('registration_enabled', true);
+    }
+} catch (Throwable $ex) {
+}
+$supportEmail = 'support@investhoodit.co.za';
+try {
+    if (class_exists('SystemSettings', false)) {
+        $supportEmail = SystemSettings::get('support_email', $supportEmail);
+    }
+} catch (Throwable $ex) {
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -65,6 +81,15 @@ unset($_SESSION['_form_errors'], $_SESSION['_form_old']);
 
         <form class="form" id="registerForm" method="POST" action="<?= url('auth/register.php') ?>" novalidate>
           <?= csrf_field() ?>
+          <?php if (!$regOpen): ?>
+            <div class="auth-notice" style="border-color:#f59e0b;">
+              <i class="fas fa-pause-circle"></i>
+              <div>
+                <strong>Registrations are currently closed</strong>
+                <span>Please check back later or contact <?= e($supportEmail) ?> for help.</span>
+              </div>
+            </div>
+          <?php endif; ?>
 
           <!-- ===== Personal Information ===== -->
           <div class="auth-divider">

@@ -3403,7 +3403,7 @@ $talentSkillsCategories = (int) ($talentSkillsCategoriesRow['cnt'] ?? 0);
               <div class="admin-quick-action__icon admin-quick-action__icon--amber"><i class="fas fa-shield-alt"></i></div>
               <span>Review Compliance</span>
             </a>
-            <a href="<?= url('candidate/settings.php') ?>" class="admin-quick-action">
+            <a href="<?= url('admin/settings.php') ?>" class="admin-quick-action">
               <div class="admin-quick-action__icon admin-quick-action__icon--green"><i class="fas fa-cog"></i></div>
               <span>System Settings</span>
             </a>

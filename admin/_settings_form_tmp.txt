@@ -1,0 +1,88 @@
+FORMSTART
+<form method="POST" action="<?= url('admin/settings_save.php') ?>" enctype="multipart/form-data" id="settingsForm" novalidate>
+<?= csrf_field() ?>
+<input type="hidden" name="existing_logo_path" value="<?= e($flat['logo_path'] ?? '') ?>">
+<div class="set-tabs" role="tablist">
+<button type="button" class="set-tab active" data-tab="general" role="tab"><i class="fas fa-sliders-h"></i> General</button>
+<button type="button" class="set-tab" data-tab="accounts" role="tab"><i class="fas fa-user-shield"></i> Users &amp; Accounts</button>
+<button type="button" class="set-tab" data-tab="notifications" role="tab"><i class="fas fa-bell"></i> Notifications</button>
+<button type="button" class="set-tab" data-tab="programmes" role="tab"><i class="fas fa-graduation-cap"></i> Programmes</button>
+<button type="button" class="set-tab" data-tab="maintenance" role="tab"><i class="fas fa-tools"></i> Maintenance</button>
+</div>
+<section class="set-panel active" data-panel="general">
+<h3 class="set-panel__title"><i class="fas fa-sliders-h"></i> General Configuration</h3>
+<div class="set-grid">
+<div class="set-field"><label for="f_site_name">Platform name *</label><input id="f_site_name" class="form-input" name="site_name" maxlength="100" value="<?= e(sVal('site_name',$flat,$old)) ?>"><?= field_error($errors,'site_name') ?></div>
+<div class="set-field"><label for="f_org">Organisation name *</label><input id="f_org" class="form-input" name="organisation_name" maxlength="100" value="<?= e(sVal('organisation_name',$flat,$old)) ?>"><?= field_error($errors,'organisation_name') ?></div>
+<div class="set-field set-field--full"><label for="f_desc">Platform description</label><textarea id="f_desc" class="form-input" name="site_description" rows="3" maxlength="500"><?= e(sVal('site_description',$flat,$old)) ?></textarea><?= field_error($errors,'site_description') ?></div>
+<div class="set-field"><label for="f_email">Support email *</label><input id="f_email" type="email" class="form-input" name="support_email" maxlength="100" value="<?= e(sVal('support_email',$flat,$old)) ?>"><?= field_error($errors,'support_email') ?></div>
+<div class="set-field"><label for="f_phone">Contact phone</label><input id="f_phone" class="form-input" name="contact_phone" maxlength="20" value="<?= e(sVal('contact_phone',$flat,$old)) ?>"><?= field_error($errors,'contact_phone') ?></div>
+<div class="set-field"><label for="f_tz">Timezone</label><select id="f_tz" class="form-input" name="timezone"><?php foreach ($tzList as $tz): ?><option value="<?= e($tz) ?>" <?= sVal('timezone',$flat,$old)===$tz?'selected':'' ?>><?= e($tz) ?></option><?php endforeach; ?></select><?= field_error($errors,'timezone') ?></div>
+<div class="set-field"><label for="f_df">Date format</label><select id="f_df" class="form-input" name="date_format"><?php foreach (['d M Y'=>'12 Jan 2026','Y-m-d'=>'2026-01-12','d/m/Y'=>'12/01/2026','m/d/Y'=>'01/12/2026','F j, Y'=>'January 12, 2026'] as $v=>$l): ?><option value="<?= e($v) ?>" <?= sVal('date_format',$flat,$old)===$v?'selected':'' ?>><?= e($l) ?></option><?php endforeach; ?></select><?= field_error($errors,'date_format') ?></div>
+<div class="set-field"><label for="f_tf">Time format</label><select id="f_tf" class="form-input" name="time_format"><?php foreach (['H:i'=>'14:30 (24h)','h:i A'=>'02:30 PM (12h)','H:i:s'=>'14:30:05'] as $v=>$l): ?><option value="<?= e($v) ?>" <?= sVal('time_format',$flat,$old)===$v?'selected':'' ?>><?= e($l) ?></option><?php endforeach; ?></select><?= field_error($errors,'time_format') ?></div>
+<div class="set-field"><label for="f_lang">Default language</label><select id="f_lang" class="form-input" name="default_language"><?php foreach (['en'=>'English','af'=>'Afrikaans','zu'=>'isiZulu','xh'=>'isiXhosa','st'=>'Sesotho'] as $v=>$l): ?><option value="<?= e($v) ?>" <?= sVal('default_language',$flat,$old)===$v?'selected':'' ?>><?= e($l) ?></option><?php endforeach; ?></select><?= field_error($errors,'default_language') ?></div>
+<div class="set-field set-field--full"><label for="f_logo">Platform logo (PNG/JPG/WebP, max 2MB)</label><?php if ($logoUrl !== ''): ?><div class="set-logo-preview"><img src="<?= e($logoUrl) ?>" alt="Platform logo"></div><?php endif; ?><input id="f_logo" type="file" class="form-input" name="logo" accept=".png,.jpg,.jpeg,.webp"><?= field_error($errors,'logo') ?></div>
+</div>
+</section>
+<section class="set-panel" data-panel="accounts">
+<h3 class="set-panel__title"><i class="fas fa-user-shield"></i> Users &amp; Accounts</h3>
+<div class="set-switch-row"><div><strong>Candidate registrations</strong><span>When off, register.php shows registrations closed.</span></div><label class="set-switch"><input type="checkbox" name="registration_enabled" value="1" <?= sChecked('registration_enabled',$flat,$old) ?>><span></span></label></div>
+<div class="set-switch-row"><div><strong>Email verification required</strong><span>When off, new accounts are active immediately.</span></div><label class="set-switch"><input type="checkbox" name="email_verification_required" value="1" <?= sChecked('email_verification_required',$flat,$old) ?>><span></span></label></div>
+<div class="set-grid">
+<div class="set-field"><label for="f_pwmin">Min password length (6-32)</label><input id="f_pwmin" type="number" class="form-input" name="password_min_length" min="6" max="32" value="<?= e(sVal('password_min_length',$flat,$old)) ?>"><?= field_error($errors,'password_min_length') ?></div>
+<div class="set-field"><label for="f_sess">Session timeout (minutes)</label><input id="f_sess" type="number" class="form-input" name="session_timeout_minutes" min="5" max="480" value="<?= e(sVal('session_timeout_minutes',$flat,$old)) ?>"><?= field_error($errors,'session_timeout_minutes') ?></div>
+<div class="set-field"><label for="f_att">Max login attempts</label><input id="f_att" type="number" class="form-input" name="login_max_attempts" min="3" max="20" value="<?= e(sVal('login_max_attempts',$flat,$old)) ?>"><?= field_error($errors,'login_max_attempts') ?></div>
+<div class="set-field"><label for="f_lock">Lockout minutes</label><input id="f_lock" type="number" class="form-input" name="login_lockout_minutes" min="1" max="120" value="<?= e(sVal('login_lockout_minutes',$flat,$old)) ?>"><?= field_error($errors,'login_lockout_minutes') ?></div>
+</div>
+<h4 class="set-sub">Password complexity</h4>
+<div class="set-checks">
+<label><input type="checkbox" name="password_require_uppercase" value="1" <?= sChecked('password_require_uppercase',$flat,$old) ?>> Uppercase letter</label>
+<label><input type="checkbox" name="password_require_lowercase" value="1" <?= sChecked('password_require_lowercase',$flat,$old) ?>> Lowercase letter</label>
+<label><input type="checkbox" name="password_require_number" value="1" <?= sChecked('password_require_number',$flat,$old) ?>> Number</label>
+<label><input type="checkbox" name="password_require_special" value="1" <?= sChecked('password_require_special',$flat,$old) ?>> Special character</label>
+</div>
+</section>
+<section class="set-panel" data-panel="notifications">
+<h3 class="set-panel__title"><i class="fas fa-bell"></i> Email &amp; Notifications</h3>
+<p class="set-hint">SMTP credentials stay in server environment variables and are never shown here.</p>
+<div class="set-switch-row"><div><strong>Master email switch</strong><span>When off, no platform emails are sent.</span></div><label class="set-switch"><input type="checkbox" name="mail_notifications_enabled" value="1" <?= sChecked('mail_notifications_enabled',$flat,$old) ?>><span></span></label></div>
+<div class="set-switch-row"><div><strong>Registration welcome email</strong></div><label class="set-switch"><input type="checkbox" name="notif_registration" value="1" <?= sChecked('notif_registration',$flat,$old) ?>><span></span></label></div>
+<div class="set-switch-row"><div><strong>Verification email</strong></div><label class="set-switch"><input type="checkbox" name="notif_verification" value="1" <?= sChecked('notif_verification',$flat,$old) ?>><span></span></label></div>
+<div class="set-switch-row"><div><strong>Application status updates</strong></div><label class="set-switch"><input type="checkbox" name="notif_application_status" value="1" <?= sChecked('notif_application_status',$flat,$old) ?>><span></span></label></div>
+<div class="set-switch-row"><div><strong>Interview notifications</strong></div><label class="set-switch"><input type="checkbox" name="notif_interview" value="1" <?= sChecked('notif_interview',$flat,$old) ?>><span></span></label></div>
+<div class="set-switch-row"><div><strong>Selection &amp; offer notifications</strong></div><label class="set-switch"><input type="checkbox" name="notif_offer" value="1" <?= sChecked('notif_offer',$flat,$old) ?>><span></span></label></div>
+<div class="set-switch-row"><div><strong>Placement notifications</strong></div><label class="set-switch"><input type="checkbox" name="notif_placement" value="1" <?= sChecked('notif_placement',$flat,$old) ?>><span></span></label></div>
+<div class="set-switch-row"><div><strong>Admin system alerts</strong></div><label class="set-switch"><input type="checkbox" name="notif_admin_alerts" value="1" <?= sChecked('notif_admin_alerts',$flat,$old) ?>><span></span></label></div>
+</section>
+<section class="set-panel" data-panel="programmes">
+<h3 class="set-panel__title"><i class="fas fa-graduation-cap"></i> Programmes &amp; Opportunities</h3>
+<div class="set-switch-row"><div><strong>Applications enabled</strong><span>When off, candidates cannot start or submit applications.</span></div><label class="set-switch"><input type="checkbox" name="applications_enabled" value="1" <?= sChecked('applications_enabled',$flat,$old) ?>><span></span></label></div>
+<div class="set-switch-row"><div><strong>Enforce closing dates</strong><span>Block applications after the opportunity deadline.</span></div><label class="set-switch"><input type="checkbox" name="close_past_deadline" value="1" <?= sChecked('close_past_deadline',$flat,$old) ?>><span></span></label></div>
+<div class="set-switch-row"><div><strong>Only published opportunities</strong><span>Draft opportunities never accept applications.</span></div><label class="set-switch"><input type="checkbox" name="opportunities_require_published" value="1" <?= sChecked('opportunities_require_published',$flat,$old) ?>><span></span></label></div>
+<div class="set-switch-row"><div><strong>Talent pool enabled</strong></div><label class="set-switch"><input type="checkbox" name="talent_pool_enabled" value="1" <?= sChecked('talent_pool_enabled',$flat,$old) ?>><span></span></label></div>
+<div class="set-switch-row"><div><strong>New programmes active by default</strong></div><label class="set-switch"><input type="checkbox" name="auto_publish_programmes" value="1" <?= sChecked('auto_publish_programmes',$flat,$old) ?>><span></span></label></div>
+<div class="set-grid"><div class="set-field"><label for="f_das">Default application status</label><select id="f_das" class="form-input" name="default_application_status"><option value="draft" <?= sVal('default_application_status',$flat,$old)==='draft'?'selected':'' ?>>Draft</option><option value="submitted" <?= sVal('default_application_status',$flat,$old)==='submitted'?'selected':'' ?>>Submitted</option></select><?= field_error($errors,'default_application_status') ?></div></div>
+</section>
+<section class="set-panel" data-panel="maintenance">
+<h3 class="set-panel__title"><i class="fas fa-tools"></i> Maintenance &amp; Platform</h3>
+<div class="set-alert"><i class="fas fa-exclamation-triangle"></i><div><strong>Maintenance mode never locks out admins.</strong><span>Admins always bypass it; only public and candidate pages show the message.</span></div></div>
+<div class="set-switch-row set-switch-row--danger"><div><strong>Maintenance mode</strong><span>Show the message below to non-admin users.</span></div><label class="set-switch"><input type="checkbox" name="maintenance_mode" value="1" id="maintToggle" <?= sChecked('maintenance_mode',$flat,$old) ?>><span></span></label></div>
+<div class="set-field set-field--full"><label for="f_mmsg">Maintenance message *</label><textarea id="f_mmsg" class="form-input" name="maintenance_message" rows="3" maxlength="500"><?= e(sVal('maintenance_message',$flat,$old)) ?></textarea><?= field_error($errors,'maintenance_message') ?></div>
+<div class="set-switch-row"><div><strong>Reporting features</strong></div><label class="set-switch"><input type="checkbox" name="feature_reporting_enabled" value="1" <?= sChecked('feature_reporting_enabled',$flat,$old) ?>><span></span></label></div>
+<div class="set-switch-row"><div><strong>Chatbot widget</strong></div><label class="set-switch"><input type="checkbox" name="feature_chatbot_enabled" value="1" <?= sChecked('feature_chatbot_enabled',$flat,$old) ?>><span></span></label></div>
+<div class="set-grid"><div class="set-field"><label for="f_ver">App version</label><input id="f_ver" class="form-input" name="app_version" maxlength="20" value="<?= e(sVal('app_version',$flat,$old)) ?>"><?= field_error($errors,'app_version') ?></div></div>
+<h4 class="set-sub">System health</h4>
+<div class="set-health">
+<div><span>Database</span><strong><?= e($health['database']) ?></strong></div>
+<div><span>Environment</span><strong><?= e($health['environment']) ?></strong></div>
+<div><span>PHP</span><strong><?= e($health['php']) ?></strong></div>
+<div><span>Maintenance</span><strong><?= e($health['maintenance']) ?></strong></div>
+</div>
+</section>
+<div class="set-actions"><button type="button" class="btn btn--ghost" id="settingsReset"><i class="fas fa-undo"></i> Reset</button><button type="submit" class="btn btn--primary" id="settingsSaveBtn"><span class="btn__spinner" hidden><i class="fas fa-spinner fa-spin"></i></span> <span class="btn__text"><i class="fas fa-save"></i> Save Changes</span></button></div>
+
+
+
+
+</form>
+FORMEND

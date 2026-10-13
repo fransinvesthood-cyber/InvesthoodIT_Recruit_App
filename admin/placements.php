@@ -62,8 +62,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['placement_action'] ?? '') 
                 array_merge([$statusPid, $oldStatus, $newStatus], $byParams, [$reasonParam])
             );
         } catch (Throwable $histEx) { error_log('[PLACEMENTS] status history: ' . $histEx->getMessage()); }
-        // Candidate notification (best-effort).
+        // Candidate notification (best-effort, honours placement toggle).
         try {
+            $sendIt = true;
+            if (class_exists('SettingsMail', false)) { $sendIt = SettingsMail::allowed('placement'); }
+            if ($sendIt) {
             $niceOld = ucwords(str_replace('_', ' ', $oldStatus));
             $niceNew = ucwords(str_replace('_', ' ', $newStatus));
             Database::execute(
@@ -71,6 +74,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['placement_action'] ?? '') 
                 'ii' . $byTypes . 's',
                 array_merge([$statusPid, (int) ($existing['candidate_id'] ?? 0)], $byParams, ["Your placement status changed from {$niceOld} to {$niceNew}."])
             );
+            $prow = Database::fetchOne("SELECT u.email, u.first_name FROM users u WHERE u.id = ?", 'i', [(int)($existing['candidate_id'] ?? 0)]);
+            if ($prow && !empty($prow['email'])) {
+                $sn = class_exists('SystemSettings', false) ? SystemSettings::get('site_name', APP_NAME) : APP_NAME;
+                Mailer::send((string)$prow['email'], (string)($prow['first_name'] ?? ''), 'Placement update — ' . $sn, '<p>Your placement status changed from ' . htmlspecialchars($niceOld) . ' to <strong>' . htmlspecialchars($niceNew) . '</strong>.</p>');
+            }
+            }
         } catch (Throwable $notifEx) { error_log('[PLACEMENTS] status notify: ' . $notifEx->getMessage()); }
         // Audit trail (best-effort).
         try {

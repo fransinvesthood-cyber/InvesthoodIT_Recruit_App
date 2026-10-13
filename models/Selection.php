@@ -1582,6 +1582,29 @@ class Selection
 
             Database::commit();
 
+            // Best-effort candidate offer email (honours offer toggle).
+            try {
+                $sendIt = true;
+                if (class_exists('SettingsMail', false)) { $sendIt = SettingsMail::allowed('offer'); }
+                if ($sendIt) {
+                    $nt = Database::fetchOne(
+                        "SELECT u.email, u.first_name FROM offers o INNER JOIN users u ON u.id = o.candidate_id WHERE o.id = ?",
+                        'i', [$offerId]
+                    );
+                    if ($nt && !empty($nt['email'])) {
+                        $sn = class_exists('SystemSettings', false) ? SystemSettings::get('site_name', APP_NAME) : APP_NAME;
+                        Mailer::send(
+                            (string) $nt['email'],
+                            (string) ($nt['first_name'] ?? ''),
+                            'Offer update — ' . $sn,
+                            '<p>Hello ' . htmlspecialchars((string) ($nt['first_name'] ?? 'there')) . ',</p><p>Your offer is now <strong>' . htmlspecialchars(self::offerStatusLabel($newStatus)) . '</strong>.</p>'
+                        );
+                    }
+                }
+            } catch (Throwable $nx) {
+                error_log('[Selection] offer notify: ' . $nx->getMessage());
+            }
+
             return [
                 'previous_status' => $currentStatus,
                 'new_status'      => $newStatus,
