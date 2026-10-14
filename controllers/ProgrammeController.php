@@ -36,6 +36,7 @@ class ProgrammeController
 
         $id = Programme::create($userId, $clean);
         AuditLog::log($userId, 'Programme Created', 'programme', $id, 'Programme created');
+        try { AdminNotification::forProgrammeEvent('programme', (int) $id, (string) ($clean['name'] ?? 'Programme')); } catch (Throwable $anEx) { error_log('[Programme] admin notification: ' . $anEx->getMessage()); }
         return $id;
     }
 

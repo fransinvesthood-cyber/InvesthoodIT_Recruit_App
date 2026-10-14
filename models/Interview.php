@@ -887,6 +887,7 @@ class Interview
             (string) ($data['interview_date'] ?? ''),
             (string) ($data['start_time'] ?? '')
         );
+        try { AdminNotification::forInterviewScheduled($id, 'Application #' . (int) ($data['application_id'] ?? 0)); } catch (Throwable $anEx) { error_log('[Interview] admin notification: ' . $anEx->getMessage()); }
         // Best-effort candidate email (honours interview toggle).
         try {
             $sendIt = !class_exists('SettingsMail', false) || SettingsMail::allowed('interview');
@@ -1007,6 +1008,7 @@ class Interview
             } catch (Throwable $notifyEx) {
                 error_log('[Interview] reschedule notify: ' . $notifyEx->getMessage());
             }
+            try { AdminNotification::forInterviewStatus($id, 'rescheduled', isset($data['reschedule_reason']) ? (string) $data['reschedule_reason'] : ''); } catch (Throwable $anEx) { error_log('[Interview] admin notification: ' . $anEx->getMessage()); }
         }
 
         return $result;
@@ -1081,6 +1083,7 @@ class Interview
                 $reason,
                 $notifyEvent === 'updated' ? $newStatus : null
             );
+            try { AdminNotification::forInterviewStatus($id, $newStatus, $reason ?? ''); } catch (Throwable $anEx) { error_log('[Interview] admin notification: ' . $anEx->getMessage()); }
         }
 
         return $result;

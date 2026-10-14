@@ -408,6 +408,7 @@ class CandidateApplicationsController
             } catch (Throwable $notifEx) {
                 error_log('[Applications] notification: ' . $notifEx->getMessage());
             }
+            try { AdminNotification::forApplicationSubmitted($applicationId, $reference, ''); } catch (Throwable $anEx) { error_log('[Applications] admin notification: ' . $anEx->getMessage()); }
 
             return [
                 'success' => true,

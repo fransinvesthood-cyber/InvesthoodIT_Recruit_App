@@ -1,0 +1,20 @@
+/* Admin Notifications: reuses candidate feed classes, adds admin tones. */
+.notif-bell-wrap { position: relative; z-index: 200; }
+#adminNotifBadge.is-hidden { display: none; }
+/* Keep the admin dropdown above the sticky dash header (z-index 50)
+   so it is visible immediately on click without scrolling. */
+.dash-header .notif-dropdown { z-index: 1200; }
+.notif-dropdown.is-open { z-index: 1200; }
+.notif-priority { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 0.15rem 0.45rem; border-radius: 999px; background: var(--border-light); color: var(--text-light); }
+.notif-priority--action { background: rgba(26,86,219,0.12); color: var(--primary); }
+.notif-priority--critical { background: rgba(239,68,68,0.12); color: #dc2626; }
+.notif-item__icon--application { background: rgba(26,86,219,0.12); color: var(--primary); }
+.notif-item__icon--opportunity { background: rgba(6,182,212,0.12); color: #0891b2; }
+.notif-item__icon--interview { background: rgba(245,158,11,0.12); color: #d97706; }
+.notif-item__icon--offer { background: rgba(139,92,246,0.12); color: #7c3aed; }
+.notif-item__icon--placement { background: rgba(16,185,129,0.12); color: #059669; }
+.notif-item__icon--account { background: rgba(100,116,139,0.12); color: #64748b; }
+@media (max-width: 768px) {
+  .notif-centre__tools, .notif-search { width: 100%; }
+  .notif-search__field, .notif-search__select { flex: 1; min-width: 0; }
+}

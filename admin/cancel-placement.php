@@ -47,6 +47,13 @@ try {
         'issis'
     );
 } catch (Throwable $pnEx) { error_log('[PLACEMENTS] unified notification: ' . $pnEx->getMessage()); }
+try {
+    dbExecute(
+        "INSERT IGNORE INTO admin_notifications (category, priority, title, message, module, record_id, dedupe_key) VALUES ('placement', 'critical', ?, ?, 'placement', ?, ?)",
+        ['Placement cancelled #' . $placementId, 'Placement #' . $placementId . ' was cancelled. Reason: ' . $reason, $placementId, 'placement_cancelled_' . $placementId],
+        'ssis'
+    );
+} catch (Throwable $anEx) { error_log('[PLACEMENTS] admin notification: ' . $anEx->getMessage()); }
 
 // Audit log
 dbExecute("INSERT INTO audit_logs (user_id, action, record_type, record_id, reason, ip_address) VALUES (?, 'Placement Cancelled', 'placement', ?, ?, ?)", [$currentUserId, $placementId, $reason, $_SERVER['REMOTE_ADDR'] ?? '::1'], 'iiss');

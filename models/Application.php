@@ -704,6 +704,10 @@ class Application
                         $newStatus,
                         $reason
                     );
+                    try {
+                        $aname = Database::fetchOne("SELECT TRIM(CONCAT(first_name,' ',last_name)) AS nm FROM users WHERE id=?", 'i', [(int) $row['candidate_id']]);
+                        AdminNotification::forApplicationStatus($applicationId, $currentStatus, $newStatus, (string) ($aname['nm'] ?? ''));
+                    } catch (Throwable $anEx) { error_log('[Application] admin notification: ' . $anEx->getMessage()); }
                 }
             } catch (Throwable $notifEx) {
                 error_log('[Application] status notification: ' . $notifEx->getMessage());

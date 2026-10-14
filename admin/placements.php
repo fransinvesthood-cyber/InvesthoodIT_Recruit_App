@@ -83,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['placement_action'] ?? '') 
                     "from {$niceOld} to {$niceNew}"
                 );
             } catch (Throwable $pnEx) { error_log('[PLACEMENTS] unified notification: ' . $pnEx->getMessage()); }
+            try { AdminNotification::forPlacementEvent((int) $statusPid, $newStatus, "from {$niceOld} to {$niceNew}"); } catch (Throwable $anEx) { error_log('[PLACEMENTS] admin notification: ' . $anEx->getMessage()); }
             $prow = Database::fetchOne("SELECT u.email, u.first_name FROM users u WHERE u.id = ?", 'i', [(int)($existing['candidate_id'] ?? 0)]);
             if ($prow && !empty($prow['email'])) {
                 $sn = class_exists('SystemSettings', false) ? SystemSettings::get('site_name', APP_NAME) : APP_NAME;

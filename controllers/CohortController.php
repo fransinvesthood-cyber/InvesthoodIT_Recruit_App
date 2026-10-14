@@ -48,6 +48,7 @@ class CohortController
         CohortEligibility::inheritFromProgramme($id, (int) $clean['programme_id']);
 
         AuditLog::log($userId, 'Cohort Created', 'cohort', $id, 'Cohort created under programme #' . $clean['programme_id']);
+        try { AdminNotification::forProgrammeEvent('cohort', (int) $id, (string) ($clean['name'] ?? 'Cohort')); } catch (Throwable $anEx) { error_log('[Cohort] admin notification: ' . $anEx->getMessage()); }
         return $id;
     }
 

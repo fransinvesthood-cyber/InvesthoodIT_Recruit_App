@@ -981,6 +981,7 @@ class Selection
             );
 
             Database::commit();
+            try { AdminNotification::forSelectionDecision($applicationId, $decision); } catch (Throwable $anEx) { error_log('[Selection] admin decision notification: ' . $anEx->getMessage()); }
 
             return [
                 'previous_status' => $currentStatus,
@@ -1353,6 +1354,7 @@ class Selection
 
             $offerId = Database::lastInsertId();
             Database::commit();
+            try { AdminNotification::forOfferEvent($offerId, 'created', 'Draft offer created for application #' . $applicationId); } catch (Throwable $anEx) { error_log('[Selection] admin offer notification: ' . $anEx->getMessage()); }
             return $offerId;
         } catch (Exception $e) {
             Database::rollback();
@@ -1623,6 +1625,7 @@ class Selection
             } catch (Throwable $notifEx) {
                 error_log('[Selection] offer in-app notification: ' . $notifEx->getMessage());
             }
+            try { AdminNotification::forOfferEvent($offerId, $newStatus, $reason ?? ''); } catch (Throwable $anEx) { error_log('[Selection] admin offer notification: ' . $anEx->getMessage()); }
 
             return [
                 'previous_status' => $currentStatus,

@@ -15,6 +15,14 @@ require_role('admin');
 $user = current_user();
 $flashes = render_flashes();
 
+// Admin notifications: real unread count + lazy sync of pending alerts.
+$adminNotifUnread = 0;
+try {
+    AdminNotification::ensureSchema();
+    AdminNotification::syncPendingEvents();
+    $adminNotifUnread = AdminNotification::unreadCount((int) current_user_id());
+} catch (Throwable $anEx) { error_log('[Admin Dashboard] notifications: ' . $anEx->getMessage()); }
+
 // Talent Intelligence Hub filter data
 $skills = Database::fetchAll("SELECT name FROM skills WHERE is_active = 1 ORDER BY name");
 $citiesRow = Database::fetchOne("SELECT GROUP_CONCAT(DISTINCT city ORDER BY city SEPARATOR ',') AS cities FROM candidate_profiles WHERE city IS NOT NULL AND city != ''");
@@ -734,6 +742,8 @@ try {
   <link rel="stylesheet" href="<?= url('css/admin_opportunities.css') ?>">
     <link rel="stylesheet" href="<?= url('css/admin_applications.css') ?>">
   <link rel="stylesheet" href="<?= url('css/admin_selection.css') ?>">
+  <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
+  <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
 
 <style id="admin-assistant-styles">
 /* =========================================================
@@ -823,6 +833,7 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
           <li><a href="#admin-executive" class="sidebar__link active" data-section="executive"><i class="fas fa-th-large"></i> Executive Overview</a></li>
           <li><a href="#admin-analytics" class="sidebar__link" data-section="analytics"><i class="fas fa-chart-pie"></i> Analytics</a></li>
           <li><a href="#admin-alerts" class="sidebar__link" data-section="alerts"><i class="fas fa-exclamation-triangle"></i> Alerts <span class="alert-badge-sidebar">6</span></a></li>
+          <li><a href="<?= url('admin/notifications.php') ?>" class="sidebar__link"><i class="fas fa-bell"></i> Notifications<?php if ((int) ($adminNotifUnread ?? 0) > 0): ?> <span class="alert-badge-sidebar"><?= ((int) ($adminNotifUnread ?? 0)) > 99 ? '99+' : (int) ($adminNotifUnread ?? 0) ?></span><?php endif; ?></a></li>
         </ul>
 
 <div class="sidebar__section-label">Management</div>
@@ -892,13 +903,20 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
           </div>
         </div>
         <div class="dash-header__right">
-          <button class="dash-header__icon-btn" id="themeToggle" aria-label="Toggle dark mode">
-            <i class="fas fa-moon"></i>
-          </button>
-          <button class="dash-header__icon-btn dash-header__notif-btn" id="adminNotifBtn" aria-label="Notifications">
+          <link rel="stylesheet" href="<?= url('css/candidate_notifications.css') ?>">
+          <link rel="stylesheet" href="<?= url('css/admin_notifications.css') ?>">
+          <div class="notif-bell-wrap">
+          <button class="dash-header__icon-btn dash-header__notif-btn" id="adminNotifBtn" aria-label="Notifications" aria-expanded="false">
             <i class="fas fa-bell"></i>
-            <span class="dash-header__notif-badge">8</span>
+            <span class="dash-header__notif-badge<?= ((int) ($adminNotifUnread ?? 0)) === 0 ? ' is-hidden' : '' ?>" id="adminNotifBadge"><?= ((int) ($adminNotifUnread ?? 0)) > 99 ? '99+' : (int) ($adminNotifUnread ?? 0) ?></span>
           </button>
+          <div class="notif-dropdown" id="adminNotifDropdown" aria-hidden="true">
+            <div class="notif-dropdown__header"><span class="notif-dropdown__title">Notifications</span><span class="notif-dropdown__count" id="adminNotifDropdownCount"><?= (int) ($adminNotifUnread ?? 0) ?> unread</span></div>
+            <div class="notif-dropdown__list" id="adminNotifDropdownList"></div>
+            <div class="notif-dropdown__footer"><button type="button" class="btn btn--ghost btn--sm" data-notif-mark-all><i class="fas fa-check-double"></i> Mark All Read</button><a href="<?= url('admin/notifications.php') ?>" class="btn btn--primary btn--sm">View All</a></div>
+          </div>
+          </div>
+          <button class="dash-header__icon-btn" id="themeToggle" aria-label="Toggle dark mode"><i class="fas fa-moon"></i></button>
           <button class="dash-header__icon-btn" id="adminAlertsBtn" aria-label="Alerts">
             <i class="fas fa-exclamation-circle"></i>
             <span class="dash-header__notif-badge" style="background:var(--accent);">6</span>
@@ -924,6 +942,22 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
 
           <!-- Executive Stats Grid -->
           <div class="admin-executive-grid" id="adminExecutiveGrid">
+            <?php $adminPending = []; try { $adminPending = AdminNotification::pendingTasks(); } catch (Throwable $e) { $adminPending = []; } ?>
+            <?php if (!empty($adminPending) && array_sum(array_map('intval', $adminPending)) > 0): ?>
+            <div class="admin-exec-card" style="border-color:var(--primary);">
+              <div class="admin-exec-card__header"><div class="admin-exec-card__icon admin-exec-card__icon--primary"><i class="fas fa-bell"></i></div><span class="admin-exec-card__change up"><?= (int) ($adminNotifUnread ?? 0) ?> unread</span></div>
+              <span class="admin-exec-card__number" data-count="<?= (int) array_sum(array_map('intval', $adminPending)) ?>">0</span>
+              <span class="admin-exec-card__label">Pending Admin Tasks</span>
+              <div class="admin-exec-card__footer" style="flex-direction:column;align-items:stretch;gap:0.35rem;">
+                <span class="admin-exec-card__period"><i class="fas fa-file-alt"></i> <?= (int) ($adminPending['applications'] ?? 0) ?> applications awaiting review — <a href="<?= url('admin/applications.php') ?>">Review</a></span>
+                <span class="admin-exec-card__period"><i class="fas fa-calendar-check"></i> <?= (int) ($adminPending['interviews'] ?? 0) ?> interviews awaiting outcomes — <a href="<?= url('admin/interviews.php') ?>">View</a></span>
+                <span class="admin-exec-card__period"><i class="fas fa-user-check"></i> <?= (int) ($adminPending['selection'] ?? 0) ?> selection decisions pending — <a href="<?= url('admin/selection.php') ?>">Decide</a></span>
+                <span class="admin-exec-card__period"><i class="fas fa-envelope-open-text"></i> <?= (int) ($adminPending['offers'] ?? 0) ?> offers requiring action — <a href="<?= url('admin/offers.php') ?>">Manage</a></span>
+                <span class="admin-exec-card__period"><i class="fas fa-handshake"></i> <?= (int) ($adminPending['placements'] ?? 0) ?> placements awaiting confirmation — <a href="<?= url('admin/placements.php') ?>">Confirm</a></span>
+                <a href="<?= url('admin/notifications.php') ?>" class="admin-exec-card__link">View all notifications <i class="fas fa-arrow-right"></i></a>
+              </div>
+            </div>
+            <?php endif; ?>
             <div class="admin-exec-card">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--primary"><i class="fas fa-users"></i></div>
@@ -3690,7 +3724,7 @@ $talentSkillsCategories = (int) ($talentSkillsCategoriesRow['cnt'] ?? 0);
     window.liveFilterInterviews = liveFilterInterviews;
   })();
   </script>
-  <script src="<?= url('js/admin_dashboard.js?v=20260916') ?>"></script>
+  <script src="<?= url('js/admin_dashboard.js?v=20261014a') ?>"></script>
   <script>
   /* Analytics filter options used by js/admin_analytics.js to keep the
      Programme -> Cohort -> Opportunity dropdowns in sync (no extra
@@ -3714,6 +3748,7 @@ $talentSkillsCategories = (int) ($talentSkillsCategoriesRow['cnt'] ?? 0);
   </script>
   <script src="<?= url('js/admin_analytics.js?v=20261001') ?>"></script>
   <script src="<?= url('js/admin_programmes.js') ?>"></script>
+  <script src="<?= url('js/admin_notifications.js?v=20261014a') ?>"></script>
   <?= $flashes ?>
 </body>
 </html>

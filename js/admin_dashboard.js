@@ -210,19 +210,10 @@ function openSidebar() {
   }
 
   // ============================================
-  // 7. HEADER NOTIFICATION BUTTON
-  // ============================================
-  var adminNotifBtn = document.getElementById('adminNotifBtn');
-  if (adminNotifBtn) {
-    adminNotifBtn.addEventListener('click', function () {
-      var alertsSection = document.getElementById('admin-alerts');
-      if (alertsSection) {
-        var offset = 80;
-        var pos = alertsSection.getBoundingClientRect().top + window.scrollY - offset;
-        window.scrollTo({ top: pos, behavior: 'smooth' });
-      }
-    });
-  }
+  // 7. HEADER NOTIFICATION BUTTON — intentionally no handler here.
+  // The live dropdown is owned by js/admin_notifications.js. A legacy
+  // handler used to smooth-scroll this bell to #admin-alerts, which
+  // caused the "redirect to alerts" behaviour. Do not re-add it.
 
   var adminAlertsBtn = document.getElementById('adminAlertsBtn');
   if (adminAlertsBtn) {
