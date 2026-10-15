@@ -153,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $params[] = $offerId;
                 $affected = Database::execute(
                     "INSERT INTO placements (placement_reference, candidate_id, application_id, offer_id, programme_id, cohort_id, department, location, supervisor_id, start_date, end_date, status, notes, created_by)
-                     SELECT ?, ?, ap.id, ?, ?, ?, ?, ?, {$supervisorSql}, ?, ?, 'pending_placement', ?, {$createdBySql}
+                     SELECT ?, ?, ap.id, ?, ?, ?, ?, ?, {$supervisorSql}, ?, ?, 'active', ?, {$createdBySql}
                      FROM applications ap JOIN offers o ON o.application_id = ap.id
                      WHERE ap.candidate_id = ? AND o.id = ? AND o.status = 'accepted'",
                     $types,
@@ -169,8 +169,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $histTypes = 'i';
                     if (!$useNullCreatedBy) { $histParams[] = $currentUserId; $histTypes .= 'i'; }
 
-                    Database::execute("INSERT INTO placement_status_history (placement_id, field_name, previous_value, new_value, changed_by, change_reason) VALUES (?, 'status', NULL, 'pending_placement', {$histBy}, 'Placement created')", $histTypes, $histParams);
+                    Database::execute("INSERT INTO placement_status_history (placement_id, field_name, previous_value, new_value, changed_by, change_reason) VALUES (?, 'status', NULL, 'active', {$histBy}, 'Placement created')", $histTypes, $histParams);
                     Database::execute("INSERT INTO placement_notifications (placement_id, candidate_id, sender_id, notification_type, title, message) VALUES (?, ?, {$histBy}, 'placement_created', 'Placement Created', ?)", $histTypes . 'is', array_merge([$placementId, $candidateId], (!$useNullCreatedBy ? [$currentUserId] : []), ["Your placement has been created. Programme: $progName. Start: $startDate. End: $endDate."]));
+                    // Unified candidate notification feed (best-effort, duplicate-proof).
+                    try { CandidateNotification::forPlacementEvent((int) $candidateId, (int) $placementId, 'placement_created', "Programme: $progName. Start: $startDate. End: $endDate."); } catch (Throwable $pnEx) { error_log('[PLACEMENTS] unified notification: ' . $pnEx->getMessage()); }
+                    try { AdminNotification::forPlacementEvent((int) $placementId, 'created', "Programme: $progName. Start: $startDate. End: $endDate."); } catch (Throwable $anEx) { error_log('[PLACEMENTS] admin notification: ' . $anEx->getMessage()); }
                     try { Database::execute("INSERT INTO audit_logs (user_id, action, record_type, record_id, reason, ip_address) VALUES ({$histBy}, 'Placement Created', 'placement', ?, 'Placement created', ?)", ($useNullCreatedBy ? '' : 'i') . 'is', array_merge((!$useNullCreatedBy ? [$currentUserId] : []), [$placementId, $_SERVER['REMOTE_ADDR'] ?? '::1'])); } catch (Throwable $auditEx) { error_log('[PLACEMENTS] audit: ' . $auditEx->getMessage()); }
 
                     $success = true;

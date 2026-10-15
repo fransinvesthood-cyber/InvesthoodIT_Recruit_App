@@ -61,6 +61,15 @@ class CandidateApplicationsController
      */
     public static function startApplication(int $candidateId, int $opportunityId): array
     {
+        // Admin kill-switch: applications can be paused platform-wide.
+        if (class_exists('SystemSettings', false)) {
+            try {
+                if (!SystemSettings::getBool('applications_enabled', true)) {
+                    return ['success' => false, 'application' => null, 'message' => 'Applications are currently paused. Please try again later.', 'redirect' => 'candidate/opportunities.php'];
+                }
+            } catch (Throwable $ex) {
+            }
+        }
         // ---- 1. Fetch the opportunity ----
         $opportunity = Opportunity::find($opportunityId);
         if (!$opportunity) {
@@ -72,8 +81,15 @@ class CandidateApplicationsController
             ];
         }
 
-        // ---- 2. Validate opportunity is published ----
-        if (($opportunity['status'] ?? '') !== 'published') {
+        // ---- 2. Validate opportunity is published (skippable via settings) ----
+        $requirePublished = true;
+        if (class_exists('SystemSettings', false)) {
+            try {
+                $requirePublished = SystemSettings::getBool('opportunities_require_published', true);
+            } catch (Throwable $ex) {
+            }
+        }
+        if ($requirePublished && ($opportunity['status'] ?? '') !== 'published') {
             return [
                 'success'     => false,
                 'application' => null,
@@ -95,8 +111,15 @@ class CandidateApplicationsController
             ];
         }
 
-        // Already closed
-        if (!empty($opportunity['application_close_date']) && $opportunity['application_close_date'] < $today) {
+        // Already closed (skippable when admin disables deadline enforcement)
+        $enforceDeadline = true;
+        if (class_exists('SystemSettings', false)) {
+            try {
+                $enforceDeadline = SystemSettings::getBool('close_past_deadline', true);
+            } catch (Throwable $ex) {
+            }
+        }
+        if ($enforceDeadline && !empty($opportunity['application_close_date']) && $opportunity['application_close_date'] < $today) {
             return [
                 'success'     => false,
                 'application' => null,
@@ -159,6 +182,15 @@ class CandidateApplicationsController
             $reference = Application::generateReference();
 
             $applicationId = Application::create($candidateId, $opportunityId, $reference, 'draft');
+            // Admin-configured default: drafts stay drafts; "submitted" submits instantly.
+            if (class_exists('SystemSettings', false)) {
+                try {
+                    if (SystemSettings::get('default_application_status', 'draft') === 'submitted') {
+                        Database::execute("UPDATE applications SET status = 'submitted', submitted_at = NOW() WHERE id = ?", 'i', [$applicationId]);
+                    }
+                } catch (Throwable $ex) {
+                }
+            }
 
             Database::commit();
 
@@ -364,6 +396,19 @@ class CandidateApplicationsController
             AuditLog::log($candidateId, 'application_submitted', 'application', $applicationId, 'Application submitted with reference ' . $reference);
 
             $conn->commit();
+
+            // Candidate notification (best-effort, never blocks the submission).
+            try {
+                CandidateNotification::forApplicationSubmitted(
+                    $candidateId,
+                    $applicationId,
+                    $reference,
+                    (string) ($lockedOpportunity['title'] ?? '')
+                );
+            } catch (Throwable $notifEx) {
+                error_log('[Applications] notification: ' . $notifEx->getMessage());
+            }
+            try { AdminNotification::forApplicationSubmitted($applicationId, $reference, ''); } catch (Throwable $anEx) { error_log('[Applications] admin notification: ' . $anEx->getMessage()); }
 
             return [
                 'success' => true,

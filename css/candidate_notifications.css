@@ -1,0 +1,343 @@
+/* ================================================
+   INVESTHOOD IT - Candidate Notifications
+   Header bell dropdown + notifications page styles.
+   Reuses the shared .notif-item / .notif-centre classes
+   from css/styles.css and only adds what is missing.
+   ================================================ */
+
+/* ----- Header bell + dropdown ----- */
+.notif-bell-wrap {
+  position: relative;
+}
+
+.dash-header__notif-badge.is-hidden {
+  display: none;
+}
+
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 380px;
+  max-width: calc(100vw - 2rem);
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+  z-index: 1050;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+  transition: all 0.2s ease;
+}
+
+.notif-dropdown.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.notif-dropdown__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.125rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.notif-dropdown__title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.notif-dropdown__count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-bg);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+.notif-dropdown__list {
+  max-height: 380px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.notif-dropdown__item {
+  text-decoration: none;
+  padding: 0.8rem 1.125rem;
+}
+
+.notif-dropdown__item .notif-item__message {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.notif-dropdown__empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--text-light);
+  font-size: 0.82rem;
+}
+
+.notif-dropdown__empty i {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 1.4rem;
+  opacity: 0.6;
+}
+
+.notif-dropdown__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 1.125rem;
+  border-top: 1px solid var(--border-light);
+  background: var(--bg);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  flex-wrap: wrap;
+}
+
+/* ----- Missing category icon tones (offer / placement / account) ----- */
+.notif-item__icon--offer { background: rgba(245, 158, 11, 0.12); color: #d97706; }
+.notif-item__icon--placement { background: rgba(139, 92, 246, 0.12); color: #7c3aed; }
+.notif-item__icon--account { background: rgba(100, 116, 139, 0.12); color: #64748b; }
+
+/* ----- Feed items (notifications page) ----- */
+.notif-feed__item {
+  cursor: default;
+}
+
+.notif-item__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.2rem;
+}
+
+.notif-item__head .notif-item__title {
+  margin-bottom: 0;
+}
+
+a.notif-item__title {
+  text-decoration: none;
+}
+
+a.notif-item__title:hover {
+  color: var(--primary);
+}
+
+.notif-item__tag {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: var(--border-light);
+  color: var(--text-light);
+}
+
+.notif-item__tag--application { background: rgba(245, 158, 11, 0.12); color: #b45309; }
+.notif-item__tag--opportunity { background: rgba(6, 182, 212, 0.12); color: #0e7490; }
+.notif-item__tag--interview { background: rgba(16, 185, 129, 0.12); color: #047857; }
+.notif-item__tag--offer { background: rgba(245, 158, 11, 0.12); color: #b45309; }
+.notif-item__tag--placement { background: rgba(139, 92, 246, 0.12); color: #6d28d9; }
+.notif-item__tag--account { background: rgba(100, 116, 139, 0.12); color: #475569; }
+
+.notif-item__unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+}
+
+.notif-item__delete {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-lighter);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all var(--transition);
+  font-size: 0.75rem;
+}
+
+.notif-item__delete:hover {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* ----- Toolbar: search + category filter ----- */
+.notif-centre__tools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.notif-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.notif-search__field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.7rem;
+  min-width: 200px;
+}
+
+.notif-search__field i {
+  color: var(--text-lighter);
+  font-size: 0.8rem;
+}
+
+.notif-search__field input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.8rem;
+  color: var(--text);
+  width: 100%;
+}
+
+.notif-search__select {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.7rem;
+}
+
+.notif-search__select i {
+  color: var(--text-lighter);
+  font-size: 0.8rem;
+}
+
+.notif-search__select select {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.notif-filter-count {
+  display: inline-block;
+  min-width: 18px;
+  text-align: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: var(--border-light);
+  color: var(--text-light);
+  margin-left: 0.25rem;
+}
+
+.notif-centre__filter.active .notif-filter-count {
+  background: var(--primary);
+  color: #fff;
+}
+
+a.notif-centre__filter {
+  text-decoration: none;
+}
+
+/* ----- Pagination ----- */
+.notif-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 1.25rem 1rem;
+  flex-wrap: wrap;
+}
+
+.notif-pagination__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-light);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: all var(--transition);
+}
+
+.notif-pagination__link:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.notif-pagination__link.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.notif-pagination__ellipsis {
+  color: var(--text-lighter);
+  padding: 0 0.25rem;
+}
+
+/* ----- Responsive ----- */
+@media (max-width: 768px) {
+  .notif-dropdown {
+    position: fixed;
+    top: 70px;
+    right: 1rem;
+    left: 1rem;
+    width: auto;
+    max-width: none;
+  }
+
+  .notif-centre__tools,
+  .notif-search {
+    width: 100%;
+  }
+
+  .notif-search__field,
+  .notif-search__select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .notif-centre__tools .btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+/* ----- Dark mode ----- */
+body.dark-mode .notif-dropdown {
+  background: var(--bg-white);
+  border-color: var(--border);
+}
+

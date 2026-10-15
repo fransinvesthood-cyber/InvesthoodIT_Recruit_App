@@ -16,7 +16,9 @@ require_guest();
 $token = $_GET['token'] ?? ($_POST['token'] ?? '');
 
 // Validate the token before showing the form
-$record = PasswordReset::findValid(Token::hash($token));
+$record = ($token !== '' && preg_match('/^[a-f0-9]{32,128}$/i', $token))
+    ? PasswordReset::findValid(Token::hash($token))
+    : null;
 $tokenInvalid = ($token === '' || !$record);
 
 // Handle POST submission
@@ -75,14 +77,14 @@ unset($_SESSION['_form_errors']);
           <p class="auth-card__subtitle">Choose a strong, secure password for your account.</p>
         </div>
 
-        <form class="form" method="POST" action="<?= url('auth/reset_password.php') ?>">
+        <form class="form" id="resetPasswordForm" method="POST" action="<?= url('auth/reset_password.php') ?>" novalidate>
           <?= csrf_field() ?>
           <input type="hidden" name="token" value="<?= e($token) ?>">
 
           <div class="form-group">
             <label for="password" class="form-label">New Password <span class="form-label__required">*</span></label>
             <div class="password-input-wrapper">
-              <input type="password" id="password" name="password" class="form-input" placeholder="Create a strong password" required autocomplete="new-password" minlength="8">
+              <input type="password" id="newPassword" name="password" class="form-input" placeholder="Create a strong password" required autocomplete="new-password" minlength="8">
               <button type="button" class="password-toggle" aria-label="Toggle password visibility" tabindex="-1"><i class="fas fa-eye"></i></button>
             </div>
             <div class="password-strength">
@@ -95,15 +97,17 @@ unset($_SESSION['_form_errors']);
               </div>
               <span class="password-strength__text"></span>
             </div>
+            <div class="form-error" id="newPasswordError"></div>
             <?= field_error($errors, 'password') ?>
           </div>
 
           <div class="form-group">
             <label for="confirm_password" class="form-label">Confirm New Password <span class="form-label__required">*</span></label>
             <div class="password-input-wrapper">
-              <input type="password" id="confirm_password" name="confirm_password" class="form-input" placeholder="Confirm your new password" required autocomplete="new-password">
+              <input type="password" id="confirmNewPassword" name="confirm_password" class="form-input" placeholder="Confirm your new password" required autocomplete="new-password">
               <button type="button" class="password-toggle" aria-label="Toggle password visibility" tabindex="-1"><i class="fas fa-eye"></i></button>
             </div>
+            <div class="form-error" id="confirmNewPasswordError"></div>
             <?= field_error($errors, 'confirm_password') ?>
           </div>
 
@@ -113,7 +117,7 @@ unset($_SESSION['_form_errors']);
             </p>
           </div>
 
-          <button type="submit" class="btn btn--primary btn--full">Reset Password</button>
+          <button type="submit" class="btn btn--primary btn--full" id="resetPasswordBtn"><span class="btn__text">Reset Password</span></button>
 
           <div class="auth-footer">
             <div class="auth-nav">

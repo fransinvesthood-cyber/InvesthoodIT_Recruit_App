@@ -1,0 +1,26 @@
+<?php
+require_once __DIR__ . '/../includes/bootstrap.php';
+require_role('supervisor');
+header('Content-Type: application/json; charset=utf-8');
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') { http_response_code(405); echo json_encode(['success'=>false,'message'=>'POST required.']); exit; }
+$user=current_user(); $supervisorId=(int)($user['id']??$user['user_id']??0); if($supervisorId<=0){http_response_code(403);echo json_encode(['success'=>false,'message'=>'Invalid Supervisor account.']);exit;}
+$payload=json_decode(file_get_contents('php://input'),true); $question=trim((string)($payload['message']??''));
+if($question===''){echo json_encode(['success'=>false,'message'=>'Please enter a question.']);exit;}
+if(function_exists('mb_strtolower')){$q=mb_strtolower($question,'UTF-8');}else{$q=strtolower($question);}
+if(strlen($question)>500){echo json_encode(['success'=>false,'message'=>'Please keep your question below 500 characters.']);exit;}
+$conn=Database::getConnection();
+function svChatCount(mysqli $c,string $sql,int $id):int{ $s=$c->prepare($sql); if(!$s) throw new RuntimeException('Prepare failed: '.$c->error); $s->bind_param('i',$id); $s->execute(); $r=$s->get_result()->fetch_assoc(); $s->close(); return (int)($r['total']??0); }
+function svChatRate(mysqli $c,int $id):int{ $sql="SELECT COUNT(DISTINCT CASE WHEN cp.status <> 'withdrawn' THEN cp.user_id END) total, COUNT(DISTINCT CASE WHEN cp.status='completed' THEN cp.user_id END) completed FROM cohort_participants cp INNER JOIN cohorts c ON c.id=cp.cohort_id WHERE c.supervisor_id=?"; $s=$c->prepare($sql); if(!$s) throw new RuntimeException('Prepare failed: '.$c->error); $s->bind_param('i',$id); $s->execute(); $r=$s->get_result()->fetch_assoc()?:[];$s->close();$total=(int)($r['total']??0);$completed=(int)($r['completed']??0);return $total>0?(int)round(($completed/$total)*100):0; }
+function svChatAnswer(mysqli $c,int $id,string $q):array{
+ $action=null;
+ if(str_contains($q,'completion')||str_contains($q,'progress')||str_contains($q,'completion rate')){$rate=svChatRate($c,$id);$action=['label'=>'View Progress Report','url'=>url('supervisor/reports.php')];return ['message'=>"Your current completion rate is {$rate}% based on non-withdrawn participants across your assigned cohorts.",'action'=>$action];}
+ if(str_contains($q,'withdrawn')){$n=svChatCount($c,"SELECT COUNT(DISTINCT cp.user_id) total FROM cohort_participants cp INNER JOIN cohorts c ON c.id=cp.cohort_id WHERE c.supervisor_id=? AND cp.status='withdrawn'",$id);return ['message'=>"You currently have {$n} withdrawn candidate(s) across your assigned cohorts.",'action'=>['label'=>'View Withdrawn Candidates','url'=>url('supervisor/candidates.php?status=withdrawn')]];}
+ if(str_contains($q,'completed')){$n=svChatCount($c,"SELECT COUNT(DISTINCT cp.user_id) total FROM cohort_participants cp INNER JOIN cohorts c ON c.id=cp.cohort_id WHERE c.supervisor_id=? AND cp.status='completed'",$id);return ['message'=>"You currently have {$n} completed candidate(s) across your assigned cohorts.",'action'=>['label'=>'View Completed Candidates','url'=>url('supervisor/candidates.php?status=completed')]];}
+ if(str_contains($q,'current candidate')||str_contains($q,'active candidate')||str_contains($q,'candidate')){$n=svChatCount($c,"SELECT COUNT(DISTINCT cp.user_id) total FROM cohort_participants cp INNER JOIN cohorts c ON c.id=cp.cohort_id WHERE c.supervisor_id=? AND cp.status <> 'withdrawn'",$id);return ['message'=>"You currently have {$n} current candidate(s) across your assigned cohorts.",'action'=>['label'=>'View Candidates','url'=>url('supervisor/candidates.php')]];}
+ if(str_contains($q,'active cohort')){$n=svChatCount($c,"SELECT COUNT(DISTINCT c.id) total FROM cohorts c WHERE c.supervisor_id=? AND c.status='active'",$id);return ['message'=>"You currently have {$n} active cohort(s) assigned to you.",'action'=>['label'=>'View Active Cohorts','url'=>url('supervisor/cohorts.php?status=active')]];}
+ if(str_contains($q,'cohort')){$n=svChatCount($c,"SELECT COUNT(DISTINCT c.id) total FROM cohorts c WHERE c.supervisor_id=?",$id);return ['message'=>"You currently have {$n} assigned cohort(s).",'action'=>['label'=>'View My Cohorts','url'=>url('supervisor/cohorts.php')]];}
+ if(str_contains($q,'report'))return ['message'=>'Your Supervisor progress reports are available for reviewing cohort performance and completion.','action'=>['label'=>'View Progress Report','url'=>url('supervisor/reports.php')]];
+ if(str_contains($q,'activity')||str_contains($q,'audit'))return ['message'=>'Your Supervisor activity log contains recent operational activity within your assigned scope.','action'=>['label'=>'View Activity Log','url'=>url('supervisor/activity_log.php')]];
+ return ['message'=>'I can help with assigned cohorts, active cohorts, current candidates, completed or withdrawn candidates, completion progress, reports and activity.','action'=>['label'=>'Open Supervisor Dashboard','url'=>url('supervisor/dashboard.php')]];
+}
+try{$answer=svChatAnswer($conn,$supervisorId,$q);echo json_encode(['success'=>true,'message'=>$answer['message'],'action'=>$answer['action']??null],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);}catch(Throwable $e){http_response_code(500);echo json_encode(['success'=>false,'message'=>'I could not retrieve the Supervisor data right now.']);}

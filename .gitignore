@@ -1,0 +1,20 @@
+# --- Secrets & local config (never commit) ---
+.env
+config/env.local.php
+
+# --- Dev mail outbox (contains reset links) ---
+uploads/email_log.txt
+
+# --- Uploads ---
+uploads/*
+!uploads/.gitkeep
+
+# --- Dependencies ---
+vendor/
+
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

@@ -22,6 +22,108 @@ class Cohort
         'archived'  => ['open'], // authorised restore action
     ];
 
+    /** @var bool Whether the lazy schema migration has been checked this request */
+    private static bool $schemaChecked = false;
+
+    /** @var array<string,bool> Column-existence cache keyed by "table.column" */
+    private static array $columnCache = [];
+
+    /** @var array<string,bool> Foreign-key-existence cache keyed by "table.constraint" */
+    private static array $foreignKeyCache = [];
+
+    /**
+     * Lazily apply the additive cohorts.supervisor_id migration
+     * (database/cohort_supervisor.sql).
+     *
+     * The Supervisor portal and the Programme Manager "Assign Supervisor"
+     * module query cohorts.supervisor_id, but databases imported before
+     * this module shipped lack the column and fail with:
+     *   Unknown column 'c.supervisor_id' in 'where clause'
+     *
+     * Invoked once per request from includes/bootstrap.php. Guaranteed
+     * never to throw: a schema problem must not take down pages that do
+     * not need the column.
+     */
+    public static function ensureSchema(): void
+    {
+        if (self::$schemaChecked) {
+            return;
+        }
+        self::$schemaChecked = true;
+
+        try {
+            if (!self::columnExists('cohorts', 'supervisor_id')) {
+                Database::query(
+                    "ALTER TABLE `cohorts`
+                       ADD COLUMN `supervisor_id` INT UNSIGNED NULL DEFAULT NULL
+                         COMMENT 'FK to users.id - cohort supervisor (roles.slug = supervisor)'
+                         AFTER `created_by`,
+                       ADD KEY `idx_cohorts_supervisor` (`supervisor_id`)"
+                );
+                error_log('[Cohort] Applied missing migration: cohorts.supervisor_id (database/cohort_supervisor.sql)');
+            }
+
+            // Best-effort referential integrity (mirrors fk_placements_supervisor).
+            if (!self::foreignKeyExists('cohorts', 'fk_cohorts_supervisor')) {
+                Database::query(
+                    "ALTER TABLE `cohorts`
+                       ADD CONSTRAINT `fk_cohorts_supervisor`
+                         FOREIGN KEY (`supervisor_id`) REFERENCES `users` (`id`)
+                         ON UPDATE CASCADE ON DELETE SET NULL"
+                );
+            }
+        } catch (Throwable $e) {
+            // Never break the request: the column may already exist, the DB
+            // user may lack ALTER privileges, or the cohorts table may not
+            // be installed yet.
+            error_log('[Cohort] schema migration skipped: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Whether a column exists (cached per request).
+     */
+    private static function columnExists(string $table, string $column): bool
+    {
+        $key = $table . '.' . $column;
+        if (!array_key_exists($key, self::$columnCache)) {
+            try {
+                $safeTable  = preg_replace('/[^a-z0-9_]/i', '', $table);
+                $safeColumn = preg_replace('/[^a-z0-9_]/i', '', $column);
+                self::$columnCache[$key] = Database::fetchOne(
+                    "SHOW COLUMNS FROM `{$safeTable}` LIKE '{$safeColumn}'"
+                ) !== null;
+            } catch (Throwable $e) {
+                self::$columnCache[$key] = false;
+            }
+        }
+        return self::$columnCache[$key];
+    }
+
+    /**
+     * Whether a named foreign key constraint exists on a table (cached per request).
+     */
+    private static function foreignKeyExists(string $table, string $constraint): bool
+    {
+        $key = $table . '.' . $constraint;
+        if (!array_key_exists($key, self::$foreignKeyCache)) {
+            try {
+                $safeTable      = preg_replace('/[^a-z0-9_]/i', '', $table);
+                $safeConstraint = preg_replace('/[^a-z0-9_]/i', '', $constraint);
+                self::$foreignKeyCache[$key] = Database::fetchOne(
+                    "SELECT CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS
+                     WHERE CONSTRAINT_SCHEMA = DATABASE()
+                       AND TABLE_NAME = '{$safeTable}'
+                       AND CONSTRAINT_NAME = '{$safeConstraint}'
+                     LIMIT 1"
+                ) !== null;
+            } catch (Throwable $e) {
+                self::$foreignKeyCache[$key] = false;
+            }
+        }
+        return self::$foreignKeyCache[$key];
+    }
+
 /**
      * Cohorts for a programme.
      *

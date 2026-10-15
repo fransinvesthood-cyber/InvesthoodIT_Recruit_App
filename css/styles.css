@@ -2423,6 +2423,20 @@ textarea.form-input {
   line-height: 1.5;
 }
 
+/* ----- Auth Notice — Error Variant (invalid/expired reset link) ----- */
+.auth-notice--error {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.auth-notice--error > i {
+  color: #dc2626;
+}
+
+.auth-notice--error strong {
+  color: #b91c1c;
+}
+
 /* ----- Auth Footer Links ----- */
 .auth-footer {
   text-align: center;

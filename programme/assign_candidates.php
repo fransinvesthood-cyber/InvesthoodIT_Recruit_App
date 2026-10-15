@@ -16,6 +16,9 @@
  */
 require_once __DIR__ . '/../includes/bootstrap.php';
 require_role('programme_manager');
+// Author: Vincent | Date: 2026-10-02 | Supervisor audit trail helpers (sv_audit_log).
+// Adjust the path if you keep _audit.php somewhere else (e.g. /includes).
+require_once __DIR__ . '/../supervisor/_audit.php';
 $user = current_user();
 $conn = Database::getConnection();
 $currentPage = 'assign_candidates';
@@ -156,6 +159,75 @@ $search = trim(
     ?? $_POST['search']
     ?? ''
 );
+// ============================================================================
+// Author: Vincent | Date: 2026-10-02
+// Supervisor audit trail: record candidate assignments.
+// A Programme Manager assigns candidates to a cohort; the supervisor who owns
+// that cohort gets an audit entry per newly assigned candidate, naming who did it.
+// How it works without touching the assignment code below:
+//   1) before the assignment runs, snapshot who is already in the cohort;
+//   2) after the request ends (this page redirects and exits), compare again;
+//   3) log only candidates that were posted AND are newly in the cohort.
+// Rolled-back, duplicate and invalid assignments therefore never create entries.
+// ============================================================================
+$auditBeforeIds=[];
+if(($_SERVER['REQUEST_METHOD']??'')==='POST'){
+    try{
+        $auditStmt=$conn->prepare("SELECT user_id FROM cohort_participants WHERE cohort_id = ?");
+        if($auditStmt){
+            $auditStmt->bind_param('i',$cohortId);$auditStmt->execute();
+            $auditRes=$auditStmt->get_result();
+            while($auditRow=$auditRes->fetch_assoc())$auditBeforeIds[(int)$auditRow['user_id']]=true;
+            $auditStmt->close();
+        }
+    }catch(Throwable $ex){error_log('audit (assignment snapshot) failed: '.$ex->getMessage());}
+    register_shutdown_function(function() use ($conn,$cohortId,$user,$cohort,&$auditBeforeIds){
+        try{
+            $posted=[];
+            foreach((array)($_POST['candidate_ids']??[]) as $v){$v=(int)$v;if($v>0)$posted[$v]=$v;}
+            if(!$posted)return;
+
+            $now=[];
+            $s=$conn->prepare("SELECT user_id FROM cohort_participants WHERE cohort_id = ?");
+            if(!$s)return;
+            $s->bind_param('i',$cohortId);$s->execute();$r=$s->get_result();
+            while($x=$r->fetch_assoc())$now[(int)$x['user_id']]=true;
+            $s->close();
+
+            $new=[];
+            foreach($posted as $id){if(isset($now[$id])&&!isset($auditBeforeIds[$id]))$new[]=$id;}
+            if(!$new)return;
+
+            // The supervisor who owns this cohort (nobody to log against if none is set)
+            $s=$conn->prepare("SELECT supervisor_id FROM cohorts WHERE id = ? LIMIT 1");
+            if(!$s)return;
+            $s->bind_param('i',$cohortId);$s->execute();
+            $supId=(int)(($s->get_result()->fetch_assoc()['supervisor_id']??0));$s->close();
+            if($supId<=0)return;
+
+            $names=[];
+            $ph=implode(',',array_fill(0,count($new),'?'));
+            $s=$conn->prepare("SELECT id,first_name,last_name FROM users WHERE id IN ($ph)");
+            if($s){
+                $s->bind_param(str_repeat('i',count($new)),...$new);$s->execute();$r=$s->get_result();
+                while($x=$r->fetch_assoc())$names[(int)$x['id']]=trim(trim((string)$x['first_name']).' '.trim((string)$x['last_name']));
+                $s->close();
+            }
+
+            $actor=trim(trim((string)($user['first_name']??'')).' '.trim((string)($user['last_name']??'')));
+            if($actor==='')$actor=trim((string)($user['name']??$user['full_name']??''));
+            if($actor==='')$actor='#'.(int)($user['id']??$user['user_id']??0);
+
+            foreach($new as $id){
+                $who=($names[$id]??'')!==''?$names[$id]:'Candidate #'.$id;
+                sv_audit_log($supId,'candidate_assigned',
+                    $who.' was assigned to '.(string)$cohort['cohort_name'].' ('.(string)$cohort['programme_name'].') by Programme Manager '.$actor,
+                    'candidate',$id);
+            }
+        }catch(Throwable $ex){error_log('audit (candidate assignment) failed: '.$ex->getMessage());}
+    });
+}
+
 /*
 |--------------------------------------------------------------------------
 | Process Assignment

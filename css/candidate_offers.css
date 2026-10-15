@@ -1,0 +1,62 @@
+/* ================================================
+   Candidate Offers (dashboard section + pages)
+   Reuses interview-card / tag / empty-state system.
+   Scoped to .candidate-offers / #dashboard-offers.
+   ================================================ */
+#dashboard-offers .offer-grid,
+.candidate-offers-page .offer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+#dashboard-offers .offer-card,
+.candidate-offers-page .offer-card {
+  min-width: 0;
+}
+#dashboard-offers .offer-card__meta,
+.candidate-offers-page .offer-card__meta {
+  overflow-wrap: anywhere;
+}
+.offer-notice {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-white);
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+.offer-notice i { margin-top: 0.15rem; color: var(--primary); }
+.offer-notice--action { border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.07); }
+.offer-notice--action i { color: var(--accent); }
+.offer-notice--success { border-color: rgba(16,185,129,.35); background: rgba(16,185,129,.07); }
+.offer-notice--success i { color: var(--success); }
+.offer-notice--muted i { color: var(--text-light); }
+.offer-notice strong { display: block; margin-bottom: 0.15rem; }
+.offer-notice span, .offer-notice div { color: var(--text); }
+.offer-response__actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.6rem; }
+.offer-response__hint { font-size: 0.8rem; color: var(--text-light); margin: 0; }
+.offer-history { display: flex; flex-direction: column; gap: 0.6rem; }
+.offer-history__item {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-white);
+}
+.offer-history__label { font-size: 0.8rem; font-weight: 700; }
+.offer-history__reason { font-size: 0.8rem; color: var(--text-light); margin-top: 0.2rem; }
+body.dark-mode .offer-notice,
+body.dark-mode .offer-history__item { background: #1e293b; border-color: #334155; }
+body.dark-mode .offer-notice span,
+body.dark-mode .offer-notice div { color: #e2e8f0; }
+@media (max-width: 900px) {
+  #dashboard-offers .offer-grid,
+  .candidate-offers-page .offer-grid { grid-template-columns: 1fr; }
+  .offer-response__actions .btn { flex: 1 1 auto; }
+}
+@media (max-width: 480px) {
+  .offer-notice { font-size: 0.8rem; }
+  #dashboard-offers .interview-card__actions { flex-wrap: wrap; }
+}

@@ -38,6 +38,7 @@ class OpportunityController
         self::saveConfig($id, $input);
 
         AuditLog::log($userId, 'Opportunity Created', 'opportunity', $id, 'Opportunity created');
+        try { AdminNotification::forProgrammeEvent('opportunity', (int) $id, (string) ($clean['title'] ?? 'Opportunity')); } catch (Throwable $anEx) { error_log('[Opportunity] admin notification: ' . $anEx->getMessage()); }
         return $id;
     }
 

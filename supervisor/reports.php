@@ -4,6 +4,9 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 require_role('supervisor');
 require_once __DIR__ . '/_helpers.php';
 
+// Author: Vincent | Date: 2026-10-02 | Audit trail helpers (sv_audit_log)
+require_once __DIR__ . '/_audit.php';
+
 /*
 |--------------------------------------------------------------------------
 | User / Page
@@ -324,6 +327,36 @@ $completedCohortRows = array_values(
     )
 );
 
+
+// ============================================================================
+// Author: Vincent | Date: 2026-10-02
+// Audit trail: record report generation.
+// A report counts as "generated" when the supervisor runs it with filters
+// (the Apply button submits programme_id / cohort_id / status). Simply opening
+// the page, or refreshing the same filtered report within 60 seconds, is not
+// logged again, so the trail is not flooded with duplicates.
+// ============================================================================
+if(isset($_GET['programme_id'])||isset($_GET['cohort_id'])||isset($_GET['status'])){
+    try{
+        $audProgName=$programmeId>0?'Programme #'.$programmeId:'All programmes';
+        foreach($programmes as $audP){if((int)$audP['id']===$programmeId){$audProgName=(string)$audP['name'];break;}}
+        $audCohortName=$cohortId>0?'Cohort #'.$cohortId:'All cohorts';
+        foreach($cohorts as $audC){if((int)$audC['id']===$cohortId){$audCohortName=(string)$audC['name'];break;}}
+        $audStatusName=$status!==''?sv_status_label($status):'All statuses';
+        $audSig=$programmeId.'|'.$cohortId.'|'.$status;
+        $audLastRun=(isset($_SESSION)&&is_array($_SESSION['sv_audit_report']??null))?$_SESSION['sv_audit_report']:null;
+        $audDuplicate=$audLastRun&&($audLastRun['sig']??'')===$audSig&&(time()-(int)($audLastRun['at']??0))<60;
+        if(!$audDuplicate){
+            sv_audit_log(
+                $supervisorId,'report_generated',
+                'Generated Cohort Progress report (Programme: '.$audProgName.'; Cohort: '.$audCohortName.'; Status: '.$audStatusName.') - '.count($rows).' cohort(s), '.(int)$total.' candidate(s)',
+                $cohortId>0?'cohort':'report',
+                $cohortId>0?$cohortId:null
+            );
+            if(session_status()===PHP_SESSION_ACTIVE)$_SESSION['sv_audit_report']=['sig'=>$audSig,'at'=>time()];
+        }
+    }catch(Throwable $ex){error_log('audit (report generated) failed: '.$ex->getMessage());}
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -1265,6 +1298,32 @@ html[data-theme="dark"] .sv-report-modal__summary-track {
     </div>
 
 </form>
+
+<!-- =========================================================
+     EXPORT REPORT (added: Exportable Supervisor Reports)
+     Exports the report using the filters currently applied above.
+========================================================= -->
+
+<?php
+$rxQuery = [
+    'programme_id' => $programmeId,
+    'cohort_id'    => $cohortId,
+    'status'       => $status,
+];
+$rxUrl = static fn(string $format): string => url(
+    'supervisor/reports_export.php?' . http_build_query($rxQuery + ['format' => $format])
+);
+?>
+<div class="sv-export-bar" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 18px">
+    <strong style="font-size:12px"><i class="fas fa-download"></i> Export this report</strong>
+    <a class="sv-btn sv-btn--secondary" href="<?= e($rxUrl('csv')) ?>"><i class="fas fa-file-csv"></i> CSV</a>
+    <a class="sv-btn sv-btn--secondary" href="<?= e($rxUrl('xlsx')) ?>"><i class="fas fa-file-excel"></i> Excel</a>
+    <a class="sv-btn sv-btn--secondary" href="<?= e($rxUrl('pdf')) ?>"><i class="fas fa-file-pdf"></i> PDF</a>
+    <small style="color:var(--sv-muted,#667085);font-size:11px">
+        Includes the filters currently applied (<?= number_format(count($rows)) ?> cohort<?= count($rows) === 1 ? '' : 's' ?>).
+    </small>
+</div>
+
 
 
 <!-- =========================================================

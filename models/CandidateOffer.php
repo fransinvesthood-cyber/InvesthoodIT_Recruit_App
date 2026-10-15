@@ -594,6 +594,14 @@ class CandidateOffer
                 error_log('[CandidateOffer] notification (' . $type . ') skipped: ' . $e->getMessage());
             }
         }
+
+        // Mirror every offer event into the unified candidate
+        // notification feed (idempotent — dedupe key per offer event).
+        try {
+            CandidateNotification::mirrorOfferNotifications($candidateId);
+        } catch (Throwable $e) {
+            error_log('[CandidateOffer] unified notification mirror skipped: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -621,6 +629,8 @@ class CandidateOffer
                 'iiisss',
                 [$offerId, $candidateId, $senderId, $type, mb_substr($title, 0, 200), mb_substr($message, 0, 500)]
             );
+            // Mirror into the unified candidate notification feed.
+            CandidateNotification::mirrorOfferNotifications($candidateId);
         } catch (Throwable $e) {
             error_log('[CandidateOffer] recordNotification failed: ' . $e->getMessage());
         }

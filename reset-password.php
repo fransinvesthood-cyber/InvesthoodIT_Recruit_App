@@ -4,20 +4,28 @@
  * INVESTHOOD IT - Reset Password Page
  * ================================================
  * Form to set a new password using a valid reset token.
+ * The token is validated on the backend before the form
+ * is shown; invalid/expired/used links show a clear
+ * message with a path to request a new link.
  */
 
 require_once __DIR__ . '/includes/bootstrap.php';
 
 require_guest();
 
-$token = $_GET['token'] ?? '';
-if (empty($token)) {
-    set_flash('error', 'Invalid Link', 'The password reset link is invalid or missing.');
+$token = trim($_GET['token'] ?? '');
+if ($token === '') {
+    set_flash('error', 'Invalid Link', 'The password reset link is invalid or missing. Please request a new one below.');
     safe_redirect('forgot-password.php');
 }
 
+// Validate token BEFORE rendering the form (no DB claim yet —
+// claiming happens atomically inside AuthController::resetPassword).
+$tokenOk = $token !== ''
+    && preg_match('/^[a-f0-9]{32,128}$/i', $token)
+    && PasswordReset::findValid(Token::hash($token)) !== null;
+
 $errors = $_SESSION['_form_errors'] ?? [];
-$old    = $_SESSION['_form_old'] ?? [];
 unset($_SESSION['_form_errors'], $_SESSION['_form_old']);
 ?>
 <!DOCTYPE html>
@@ -46,7 +54,19 @@ unset($_SESSION['_form_errors'], $_SESSION['_form_old']);
           <p class="auth-card__subtitle">Enter your new password below. Must be at least 8 characters with uppercase, lowercase, number, and special character.</p>
         </div>
 
-        <form class="form" method="POST" action="<?= url('auth/reset_password.php') ?>" novalidate>
+        <?php if (!$tokenOk): ?>
+          <div class="auth-notice auth-notice--error" role="alert">
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>
+              <strong>This reset link is invalid or has expired.</strong>
+              <span>Reset links expire after 30 minutes and can only be used once. Please request a new one.</span>
+            </div>
+          </div>
+          <a href="<?= url('forgot-password.php') ?>" class="btn btn--primary btn--full">
+            <span class="btn__text">Request a New Reset Link</span>
+          </a>
+        <?php else: ?>
+        <form class="form" id="resetPasswordForm" method="POST" action="<?= url('auth/reset_password.php') ?>" novalidate>
           <?= csrf_field() ?>
           <input type="hidden" name="token" value="<?= e($token) ?>">
 
@@ -68,6 +88,7 @@ unset($_SESSION['_form_errors'], $_SESSION['_form_old']);
               </div>
               <span class="password-strength__text"></span>
             </div>
+            <div class="form-error" id="newPasswordError"></div>
             <?= field_error($errors, 'password') ?>
           </div>
 
@@ -79,12 +100,18 @@ unset($_SESSION['_form_errors'], $_SESSION['_form_old']);
               <input type="password" id="confirmNewPassword" name="confirm_password" class="form-input" placeholder="Confirm new password" required autocomplete="new-password" />
               <button type="button" class="password-toggle" aria-label="Toggle password visibility" tabindex="-1"><i class="fas fa-eye"></i></button>
             </div>
+            <div class="form-error" id="confirmNewPasswordError"></div>
             <?= field_error($errors, 'confirm_password') ?>
           </div>
 
-          <button type="submit" class="btn btn--primary btn--full">
+          <p class="auth-card__subtitle" style="font-size:0.8rem;text-align:left;">
+            <i class="fas fa-info-circle"></i> Must be at least 8 characters with an uppercase letter, a lowercase letter, a number, and a special character.
+          </p>
+
+          <button type="submit" class="btn btn--primary btn--full" id="resetPasswordBtn">
             <span class="btn__text">Reset Password</span>
           </button>
+        <?php endif; ?>
 
           <div class="auth-footer">
             <div class="auth-nav">
@@ -92,7 +119,9 @@ unset($_SESSION['_form_errors'], $_SESSION['_form_old']);
               <a href="<?= url('index.php') ?>" class="auth-nav__link">Home <i class="fas fa-arrow-right"></i></a>
             </div>
           </div>
+        <?php if ($tokenOk): ?>
         </form>
+        <?php endif; ?>
       </div>
     </div>
   </main>

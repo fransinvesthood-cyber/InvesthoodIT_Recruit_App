@@ -49,7 +49,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Search & Filter functionality
   var searchInput = document.getElementById('placementSearch');
-  var filterSelects = document.querySelectorAll('.pl-filters__select');
+  // NOTE: only the toolbar filter dropdowns drive page-reload filtering.
+  // Status-update forms added later also use .pl-filters__select for styling,
+  // so they MUST be excluded — otherwise picking a status just reloads the
+  // page (and can POST nothing). Filter selects carry data-filter="1".
+  var filterSelects = document.querySelectorAll('.pl-filters__select[data-filter="1"]');
   var resetBtn = document.getElementById('placementFilterReset');
 
   function debounce(func, wait) {

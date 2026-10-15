@@ -25,6 +25,23 @@ date_default_timezone_set(APP_TIMEZONE);
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/notifications.php';
 
+// --- Early Database + autoloader (needed for DB-backed session timeout) ---
+require_once __DIR__ . '/db.php';
+spl_autoload_register(function (string $class): void {
+    $legacyDirs = [
+        __DIR__ . '/../helpers/',
+        __DIR__ . '/../models/',
+        __DIR__ . '/../controllers/',
+    ];
+    foreach ($legacyDirs as $dir) {
+        $file = $dir . $class . '.php';
+        if (file_exists($file)) {
+            require_once $file;
+            return;
+        }
+    }
+});
+
 // --- Start hardened session ---
 require_once __DIR__ . '/session.php';
 start_session();
@@ -88,6 +105,37 @@ require_once __DIR__ . '/../middleware/guest.php';
 require_once __DIR__ . '/../middleware/role.php';
 require_once __DIR__ . '/../middleware/session_validation.php';
 require_once __DIR__ . '/../middleware/csrf.php';
+
+// --- Maintenance gate (admin bypass, static pages bypass) ---
+// Runs after session + Database are ready. When maintenance_mode
+// is ON, non-admin visitors see a 503 page with the admin message.
+// Admins (and the admin/ + auth/ + settings endpoints themselves)
+// always bypass so nobody gets locked out.
+if (!defined('INVESTHOOD_MAINT_CHECKED')) {
+    define('INVESTHOOD_MAINT_CHECKED', true);
+    try {
+        require_once __DIR__ . '/maintenance.php';
+        investhood_maintenance_gate();
+    } catch (Throwable $maintEx) {
+        error_log('[Maintenance] gate: ' . $maintEx->getMessage());
+    }
+}
+
+// --- Lazy schema migration (cohorts.supervisor_id) ---
+// The Supervisor portal (supervisor/*.php) and the Programme Manager
+// "Assign Supervisor" module (programme/assign_supervisor.php) filter on
+// cohorts.supervisor_id, which databases imported before this module
+// shipped do not have (see database/cohort_supervisor.sql).
+// Cohort::ensureSchema() applies the additive migration once per request
+// and never throws, so pages that do not need the column are unaffected.
+if (!defined('INVESTHOOD_COHORT_SCHEMA_CHECKED')) {
+    define('INVESTHOOD_COHORT_SCHEMA_CHECKED', true);
+    try {
+        Cohort::ensureSchema();
+    } catch (Throwable $schemaEx) {
+        error_log('[SCHEMA] cohorts.supervisor_id migration: ' . $schemaEx->getMessage());
+    }
+}
 
 // --- Custom error handler (no sensitive info leaked) ---
 set_exception_handler(function (Throwable $ex): void {

@@ -56,6 +56,16 @@ function enforce_session_timeout(): void
     }
 
     $timeoutSeconds = SESSION_TIMEOUT_MINUTES * 60;
+    // DB-backed override from System Settings (admin configurable).
+    if (class_exists('SystemSettings', false)) {
+        try {
+            $dbTimeout = SystemSettings::getInt('session_timeout_minutes', 0, 5, 480);
+            if ($dbTimeout > 0) {
+                $timeoutSeconds = $dbTimeout * 60;
+            }
+        } catch (Throwable $ex) {
+        }
+    }
     if (time() - $_SESSION['_last_activity'] > $timeoutSeconds) {
         // Expire the session
         $_SESSION = [];

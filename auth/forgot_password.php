@@ -19,9 +19,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = AuthController::forgotPassword($email);
 
     if ($result['success']) {
-        set_flash('success', 'Reset Link Sent', $result['message']);
+        // Generic confirmation either way — never reveals account existence.
+        set_flash('success', 'Check Your Email', $result['message']);
     } else {
         set_flash('error', 'Request Failed', $result['message']);
+        $_SESSION['_form_old'] = ['email' => $email];
     }
 
     safe_redirect('forgot-password.php');
@@ -52,15 +54,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <p class="auth-card__subtitle">No problem. Enter your email address and we'll send you a link to reset your password.</p>
         </div>
 
-        <form class="form" method="POST" action="<?= url('auth/forgot_password.php') ?>">
+        <form class="form" id="forgotPasswordForm" method="POST" action="<?= url('auth/forgot_password.php') ?>" novalidate>
           <?= csrf_field() ?>
 
           <div class="form-group">
             <label for="email" class="form-label">Email Address <span class="form-label__required">*</span></label>
-            <input type="email" id="email" name="email" class="form-input" placeholder="you@example.com" required autocomplete="email" inputmode="email">
+            <input type="email" id="forgotEmail" name="email" class="form-input" placeholder="you@example.com" required autocomplete="email" inputmode="email" maxlength="100">
+            <div class="form-error" id="forgotEmailError"></div>
           </div>
 
-          <button type="submit" class="btn btn--primary btn--full">Send Reset Link</button>
+          <button type="submit" class="btn btn--primary btn--full" id="forgotPasswordBtn"><span class="btn__text">Send Reset Link</span></button>
 
           <div class="auth-footer">
             <p class="auth-footer__text">

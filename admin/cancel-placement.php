@@ -36,6 +36,25 @@ dbExecute("INSERT INTO placement_status_history (placement_id, field_name, previ
 // Create notification
 dbExecute("INSERT INTO placement_notifications (placement_id, candidate_id, sender_id, notification_type, title, message) VALUES (?, ?, ?, 'placement_cancelled', 'Placement Cancelled', ?)", [$placementId, $placement['candidate_id'], $currentUserId, "Your placement has been cancelled. Reason: $reason"], 'iisss');
 
+// Unified candidate notification feed (best-effort, duplicate-proof).
+// This legacy handler bootstraps php/config/database.php (no autoloader),
+// so the row is inserted with plain SQL. The (user_id, dedupe_key) unique
+// key keeps retried requests duplicate-proof.
+try {
+    dbExecute(
+        "INSERT IGNORE INTO candidate_notifications (user_id, category, title, message, module, record_id, dedupe_key) VALUES (?, 'placement', 'Placement cancelled', ?, 'placement', ?, ?)",
+        [(int) $placement['candidate_id'], "Your placement has been cancelled. Reason: $reason", $placementId, 'placement_cancelled_' . $placementId],
+        'issis'
+    );
+} catch (Throwable $pnEx) { error_log('[PLACEMENTS] unified notification: ' . $pnEx->getMessage()); }
+try {
+    dbExecute(
+        "INSERT IGNORE INTO admin_notifications (category, priority, title, message, module, record_id, dedupe_key) VALUES ('placement', 'critical', ?, ?, 'placement', ?, ?)",
+        ['Placement cancelled #' . $placementId, 'Placement #' . $placementId . ' was cancelled. Reason: ' . $reason, $placementId, 'placement_cancelled_' . $placementId],
+        'ssis'
+    );
+} catch (Throwable $anEx) { error_log('[PLACEMENTS] admin notification: ' . $anEx->getMessage()); }
+
 // Audit log
 dbExecute("INSERT INTO audit_logs (user_id, action, record_type, record_id, reason, ip_address) VALUES (?, 'Placement Cancelled', 'placement', ?, ?, ?)", [$currentUserId, $placementId, $reason, $_SERVER['REMOTE_ADDR'] ?? '::1'], 'iiss');
 

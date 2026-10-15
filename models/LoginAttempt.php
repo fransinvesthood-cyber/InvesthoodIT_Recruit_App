@@ -35,7 +35,14 @@ class LoginAttempt
      */
     public static function countFailedForIp(string $ip): int
     {
-        $windowStart = date('Y-m-d H:i:s', time() - (LOGIN_LOCKOUT_MINUTES * 60));
+        $mins = LOGIN_LOCKOUT_MINUTES;
+        if (class_exists('SystemSettings', false)) {
+            try {
+                $mins = SystemSettings::getInt('login_lockout_minutes', LOGIN_LOCKOUT_MINUTES, 1, 120);
+            } catch (Throwable $ex) {
+            }
+        }
+        $windowStart = date('Y-m-d H:i:s', time() - ($mins * 60));
         $row = Database::fetchOne(
             "SELECT COUNT(*) AS cnt FROM login_attempts
              WHERE ip_address = ? AND successful = 0 AND attempted_at >= ?",
@@ -53,7 +60,14 @@ class LoginAttempt
      */
     public static function countFailedForUser(int $userId): int
     {
-        $windowStart = date('Y-m-d H:i:s', time() - (LOGIN_LOCKOUT_MINUTES * 60));
+        $mins = LOGIN_LOCKOUT_MINUTES;
+        if (class_exists('SystemSettings', false)) {
+            try {
+                $mins = SystemSettings::getInt('login_lockout_minutes', LOGIN_LOCKOUT_MINUTES, 1, 120);
+            } catch (Throwable $ex) {
+            }
+        }
+        $windowStart = date('Y-m-d H:i:s', time() - ($mins * 60));
         $row = Database::fetchOne(
             "SELECT COUNT(*) AS cnt FROM login_attempts
              WHERE user_id = ? AND successful = 0 AND attempted_at >= ?",
@@ -71,7 +85,14 @@ class LoginAttempt
      */
     public static function isIpLocked(string $ip): bool
     {
-        return self::countFailedForIp($ip) >= LOGIN_MAX_ATTEMPTS;
+        $max = LOGIN_MAX_ATTEMPTS;
+        if (class_exists('SystemSettings', false)) {
+            try {
+                $max = SystemSettings::getInt('login_max_attempts', LOGIN_MAX_ATTEMPTS, 3, 20);
+            } catch (Throwable $ex) {
+            }
+        }
+        return self::countFailedForIp($ip) >= $max;
     }
 
     /**

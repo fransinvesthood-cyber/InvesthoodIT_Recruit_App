@@ -669,6 +669,49 @@ class Application
             self::recordStatusHistory($applicationId, $currentStatus, $newStatus, $adminId, $reason);
 
             Database::commit();
+            // ---- 3. Candidate notification (best-effort, honours settings) ----
+            try {
+                $sendIt = true;
+                if (class_exists('SettingsMail', false)) {
+                    $sendIt = SettingsMail::allowed('application_status');
+                }
+                if ($sendIt) {
+                    $notify = Database::fetchOne("SELECT u.email, u.first_name, a.application_reference FROM applications a INNER JOIN users u ON u.id = a.candidate_id WHERE a.id = ?", 'i', [$applicationId]);
+                    if ($notify && !empty($notify['email'])) {
+                        $site = class_exists('SystemSettings', false) ? SystemSettings::get('site_name', APP_NAME) : APP_NAME;
+                        $subject = 'Application update — ' . $site;
+                        $body = '<p>Hello ' . htmlspecialchars((string) ($notify['first_name'] ?? 'there')) . ',</p>'
+                            . '<p>Your application <strong>' . htmlspecialchars((string) ($notify['application_reference'] ?? ('#' . $applicationId))) . '</strong> moved from <strong>' . htmlspecialchars(self::label($currentStatus)) . '</strong> to <strong>' . htmlspecialchars(self::label($newStatus)) . '</strong>.</p>';
+                        Mailer::send((string) $notify['email'], (string) ($notify['first_name'] ?? ''), $subject, $body);
+                    }
+                }
+            } catch (Throwable $notifyEx) {
+                error_log('[Application] status notify: ' . $notifyEx->getMessage());
+            }
+            // ---- 4. In-app notification (best-effort, duplicate-proof) ----
+            try {
+                $row = Database::fetchOne(
+                    "SELECT candidate_id, application_reference FROM applications WHERE id = ?",
+                    'i',
+                    [$applicationId]
+                );
+                if ($row) {
+                    CandidateNotification::forApplicationStatusChange(
+                        (int) $row['candidate_id'],
+                        $applicationId,
+                        (string) ($row['application_reference'] ?? ''),
+                        $currentStatus,
+                        $newStatus,
+                        $reason
+                    );
+                    try {
+                        $aname = Database::fetchOne("SELECT TRIM(CONCAT(first_name,' ',last_name)) AS nm FROM users WHERE id=?", 'i', [(int) $row['candidate_id']]);
+                        AdminNotification::forApplicationStatus($applicationId, $currentStatus, $newStatus, (string) ($aname['nm'] ?? ''));
+                    } catch (Throwable $anEx) { error_log('[Application] admin notification: ' . $anEx->getMessage()); }
+                }
+            } catch (Throwable $notifEx) {
+                error_log('[Application] status notification: ' . $notifEx->getMessage());
+            }
             return true;
         } catch (Exception $e) {
             Database::rollback();

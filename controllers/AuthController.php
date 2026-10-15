@@ -18,6 +18,15 @@ class AuthController
      */
     public static function register(array $input): array
     {
+        // Admin kill-switch: candidate self-registration can be disabled.
+        if (class_exists('SystemSettings', false)) {
+            try {
+                if (!SystemSettings::getBool('registration_enabled', true)) {
+                    return ['success' => false, 'errors' => ['general' => 'Registrations are currently closed. Please try again later or contact support.'], 'user' => null];
+                }
+            } catch (Throwable $ex) {
+            }
+        }
         // ---- 1. Sanitise input ----
         $clean = [
             'first_name'           => Sanitizer::name($input['first_name'] ?? ''),
@@ -111,15 +120,57 @@ class AuthController
             ]);
 
             // ---- 6. Generate verification token & send email ----
-            $token = Token::generate();
-            EmailVerification::create($userId, Token::hash($token));
-            $emailSent = Mailer::sendVerificationEmail($clean['email'], $clean['first_name'], $token);
-
-            if (!$emailSent) {
-                error_log('[Auth] Verification email failed for user ' . $userId);
+            // When verification is not required, activate immediately.
+            $verifyRequired = true;
+            if (class_exists('SystemSettings', false)) {
+                try {
+                    $verifyRequired = SystemSettings::getBool('email_verification_required', true);
+                } catch (Throwable $ex) {
+                }
+            }
+            if (!$verifyRequired) {
+                User::update($userId, ['email_verified_at' => date('Y-m-d H:i:s'), 'status' => STATUS_ACTIVE]);
+            } else {
+                $token = Token::generate();
+                EmailVerification::create($userId, Token::hash($token));
+                $sendIt = true;
+                if (class_exists('SettingsMail', false)) {
+                    try {
+                        $sendIt = SettingsMail::allowed('verification');
+                    } catch (Throwable $ex) {
+                    }
+                }
+                if ($sendIt) {
+                    $emailSent = Mailer::sendVerificationEmail($clean['email'], $clean['first_name'], $token);
+                    if (!$emailSent) {
+                        error_log('[Auth] Verification email failed for user ' . $userId);
+                    }
+                }
             }
 
             Database::commit();
+
+            // Welcome email (honours the registration toggle; the master
+            // mail switch inside Mailer::send is the final backstop).
+            try {
+                $sendWelcome = true;
+                if (class_exists('SettingsMail', false)) {
+                    $sendWelcome = SettingsMail::allowed('registration');
+                }
+                if ($sendWelcome) {
+                    $site = class_exists('SystemSettings', false) ? SystemSettings::get('site_name', APP_NAME) : APP_NAME;
+                    Mailer::send(
+                        $clean['email'],
+                        $clean['first_name'],
+                        'Welcome to ' . $site,
+                        '<p>Hello ' . htmlspecialchars($clean['first_name']) . ',</p>'
+                        . '<p>Welcome to the ' . htmlspecialchars($site) . ' talent community. Your account has been created successfully.</p>'
+                        . '<p>You can now sign in and complete your profile to start applying for opportunities.</p>'
+                    );
+                }
+            } catch (Throwable $welcomeEx) {
+                error_log('[Auth] Welcome email failed: ' . $welcomeEx->getMessage());
+            }
 
             $user = User::find($userId);
             return ['success' => true, 'errors' => [], 'user' => $user];
@@ -151,9 +202,16 @@ class AuthController
             return ['success' => false, 'redirect' => '', 'errors' => ['general' => 'Please enter your email/username and password.']];
         }
 
-        // ---- 2. Brute-force check per IP ----
+        // ---- 2. Brute-force check per IP (limits from System Settings) ----
+        $lockMins = LOGIN_LOCKOUT_MINUTES;
+        if (class_exists('SystemSettings', false)) {
+            try {
+                $lockMins = SystemSettings::getInt('login_lockout_minutes', LOGIN_LOCKOUT_MINUTES, 1, 120);
+            } catch (Throwable $ex) {
+            }
+        }
         if (LoginAttempt::isIpLocked($ip)) {
-            return ['success' => false, 'redirect' => '', 'errors' => ['general' => 'Too many failed attempts. Your IP is temporarily blocked for ' . LOGIN_LOCKOUT_MINUTES . ' minutes.']];
+            return ['success' => false, 'redirect' => '', 'errors' => ['general' => 'Too many failed attempts. Your IP is temporarily blocked for ' . $lockMins . ' minutes.']];
         }
 
         // ---- 3. Locate user by login ----
@@ -168,8 +226,15 @@ class AuthController
         if (!password_verify($password, $user['password_hash'])) {
             LoginAttempt::record((int) $user['id'], $ip, $login, false);
 
-            // Check if account should be locked
-            if (LoginAttempt::countFailedForUser((int) $user['id']) >= LOGIN_MAX_ATTEMPTS) {
+            // Check if account should be locked (threshold from System Settings)
+            $maxAttempts = LOGIN_MAX_ATTEMPTS;
+            if (class_exists('SystemSettings', false)) {
+                try {
+                    $maxAttempts = SystemSettings::getInt('login_max_attempts', LOGIN_MAX_ATTEMPTS, 3, 20);
+                } catch (Throwable $ex) {
+                }
+            }
+            if (LoginAttempt::countFailedForUser((int) $user['id']) >= $maxAttempts) {
                 Security::lockAccount((int) $user['id']);
                 return ['success' => false, 'redirect' => '', 'errors' => ['general' => 'Account temporarily locked due to too many failed attempts. Please reset your password or wait.']];
             }
@@ -177,8 +242,15 @@ class AuthController
             return ['success' => false, 'redirect' => '', 'errors' => ['general' => 'Invalid credentials. Please try again.']];
         }
 
-        // ---- 5. Check email verification ----
-        if ($user['status'] === STATUS_PENDING) {
+        // ---- 5. Check email verification (skipped when admin disables it) ----
+        $verifyRequired = true;
+        if (class_exists('SystemSettings', false)) {
+            try {
+                $verifyRequired = SystemSettings::getBool('email_verification_required', true);
+            } catch (Throwable $ex) {
+            }
+        }
+        if ($verifyRequired && $user['status'] === STATUS_PENDING) {
             return ['success' => false, 'redirect' => '', 'errors' => ['unverified' => 'Please verify your email address before logging in. Check your inbox or <a href="auth/resend_verification.php">resend the verification link</a>.']];
         }
 
@@ -391,6 +463,14 @@ class AuthController
             'status'            => STATUS_ACTIVE,
         ]);
 
+        // In-app account notification (best-effort, duplicate-proof —
+        // re-using a token after verification never raises it again).
+        try {
+            CandidateNotification::forAccountEvent((int) $user['id'], 'email_verified');
+        } catch (Throwable $notifEx) {
+            error_log('[Auth] email verified notification: ' . $notifEx->getMessage());
+        }
+
         return ['success' => true, 'message' => 'Your email has been verified successfully. You can now log in.'];
     }
 
@@ -429,32 +509,56 @@ class AuthController
 
     /**
      * Handle forgot-password request.
+     * Works for every role (admin, staff, candidate) — lookup is by
+     * email only. Always returns a generic message so callers can
+     * never learn whether an address is registered. Applies
+     * per-email + per-IP rate limiting to prevent abuse.
      *
      * @param string $email
-     * @return array
+     * @return array ['success' => bool, 'message' => string, 'rate_limited' => bool]
      */
     public static function forgotPassword(string $email): array
     {
+        $generic = 'If an account exists for that email address, a password reset link has been sent. Please check your inbox (and spam folder). The link expires in 30 minutes.';
         $email = Sanitizer::email($email);
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return ['success' => false, 'message' => 'Please enter a valid email address.'];
+            return ['success' => false, 'message' => 'Please enter a valid email address.', 'rate_limited' => false];
         }
+
+        $ip = client_ip();
+
+        // Rate limit BEFORE any user lookup (identical path either way).
+        if (!PasswordResetRequest::isAllowed($email, $ip)) {
+            PasswordResetRequest::record($email, $ip);
+            return ['success' => true, 'message' => $generic, 'rate_limited' => true];
+        }
+        PasswordResetRequest::record($email, $ip);
 
         $user = User::findByEmail($email);
 
-        // Always return a neutral response to prevent user enumeration
+        // Unknown address: generic success, nothing else.
         if (!$user) {
-            return ['success' => true, 'message' => 'If that email is registered, a password reset link has been sent.'];
+            return ['success' => true, 'message' => $generic, 'rate_limited' => false];
         }
 
-        // Invalidate previous reset tokens
-        PasswordReset::invalidateForUser((int) $user['id']);
+        try {
+            // Invalidate previous reset tokens so only the newest link works.
+            PasswordReset::invalidateForUser((int) $user['id']);
 
-        $token = Token::generate();
-        PasswordReset::create((int) $user['id'], Token::hash($token));
-        Mailer::sendPasswordResetEmail($user['email'], $user['first_name'], $token);
+            // Secure token; store ONLY its SHA-256 hash.
+            $token = Token::generate(32);
+            PasswordReset::create((int) $user['id'], Token::hash($token));
+            // Delivery of the reset email honours the master mail switch
+            // inside Mailer::send; no per-type toggle applies here.
+            $sent = Mailer::sendPasswordResetEmail((string) $user['email'], (string) ($user['first_name'] ?? ''), $token);
+            if (!$sent) {
+                error_log('[Auth] Password-reset email failed for user ' . (int) $user['id']);
+            }
+        } catch (Throwable $ex) {
+            error_log('[Auth] forgotPassword error: ' . $ex->getMessage());
+        }
 
-        return ['success' => true, 'message' => 'If that email is registered, a password reset link has been sent.'];
+        return ['success' => true, 'message' => $generic, 'rate_limited' => false];
     }
 
     /**
@@ -467,47 +571,63 @@ class AuthController
      */
     public static function resetPassword(string $plainToken, string $password, string $confirm): array
     {
-        if ($plainToken === '') {
-            return ['success' => false, 'message' => 'Reset token is missing.', 'errors' => []];
-        }
-
-        $hashed = Token::hash($plainToken);
-        $record = PasswordReset::findValid($hashed);
-
-        if (!$record) {
+        $plainToken = trim($plainToken);
+        if ($plainToken === '' || !preg_match('/^[a-f0-9]{32,128}$/i', $plainToken)) {
             return ['success' => false, 'message' => 'This reset link is invalid or has expired. Please request a new one.', 'errors' => []];
         }
 
-        // Validate password
+        // Validate password FIRST so weak/mismatched attempts do NOT burn the token.
         $errors = [];
         if (strlen($password) < PASSWORD_MIN_LENGTH) {
             $errors['password'] = 'Password must be at least ' . PASSWORD_MIN_LENGTH . ' characters.';
+        } elseif (!preg_match('/[A-Z]/', $password)) {
+            $errors['password'] = 'Password must contain at least one uppercase letter.';
+        } elseif (!preg_match('/[a-z]/', $password)) {
+            $errors['password'] = 'Password must contain at least one lowercase letter.';
+        } elseif (!preg_match('/[0-9]/', $password)) {
+            $errors['password'] = 'Password must contain at least one number.';
+        } elseif (!preg_match('/[^a-zA-Z0-9]/', $password)) {
+            $errors['password'] = 'Password must contain at least one special character.';
         }
-if (!preg_match('/[A-Z]/', $password)) $errors['password'] = 'Password must contain at least one uppercase letter.';
-        if (!preg_match('/[a-z]/', $password)) $errors['password'] = 'Password must contain at least one lowercase letter.';
-        if (!preg_match('/[0-9]/', $password)) $errors['password'] = 'Password must contain at least one number.';
-        if (!preg_match('/[^a-zA-Z0-9]/', $password)) $errors['password'] = 'Password must contain at least one special character.';
         if ($password !== $confirm) {
             $errors['confirm_password'] = 'Passwords do not match.';
         }
-
         if (!empty($errors)) {
             return ['success' => false, 'message' => 'Please fix the validation errors.', 'errors' => $errors];
         }
 
-        // Update password
-        $newHash = password_hash($password, PASSWORD_DEFAULT);
-        User::update((int) $record['user_id'], ['password_hash' => $newHash]);
+        // Atomically claim the token (single UPDATE … WHERE unused AND unexpired).
+        try {
+            $record = PasswordReset::claimValid(Token::hash($plainToken));
+        } catch (Throwable $ex) {
+            error_log('[Auth] resetPassword claim error: ' . $ex->getMessage());
+            return ['success' => false, 'message' => 'We could not update your password right now. Please try again or request a new link.', 'errors' => []];
+        }
+        if (!$record) {
+            return ['success' => false, 'message' => 'This reset link is invalid or has expired. Please request a new one.', 'errors' => []];
+        }
 
-        // Mark token used + invalidate all others
-        PasswordReset::markUsed((int) $record['id']);
-        PasswordReset::invalidateForUser((int) $record['user_id']);
+        $userId = (int) $record['user_id'];
+        try {
+            Database::beginTransaction();
+            $newHash = password_hash($password, PASSWORD_DEFAULT);
+            User::update($userId, ['password_hash' => $newHash]);
+            // Claim already marked this token used; clear any other outstanding ones.
+            PasswordReset::invalidateForUser($userId);
+            // Revoke persistent logins & sessions.
+            RememberMeToken::deleteAllForUser($userId);
+            UserSession::deactivateAllForUser($userId);
+            Database::commit();
+        } catch (Throwable $ex) {
+            try {
+                Database::rollback();
+            } catch (Throwable $ignored) {
+            }
+            error_log('[Auth] resetPassword error for user ' . $userId . ': ' . $ex->getMessage());
+            return ['success' => false, 'message' => 'We could not update your password right now. Please try again or request a new link.', 'errors' => []];
+        }
 
-        // Revoke all remember-me tokens & sessions for security
-        RememberMeToken::deleteAllForUser((int) $record['user_id']);
-        UserSession::deactivateAllForUser((int) $record['user_id']);
-
-        return ['success' => true, 'message' => 'Your password has been reset successfully. You can now log in.', 'errors' => []];
+        return ['success' => true, 'message' => 'Your password has been reset successfully. You can now log in with your new password.', 'errors' => []];
     }
 
     /**

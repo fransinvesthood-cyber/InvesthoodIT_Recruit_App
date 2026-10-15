@@ -211,6 +211,13 @@ class SettingsController
 
         AuditLog::log($userId, 'password_changed', 'user', $userId, 'Password changed from settings.');
 
+        // In-app account notification (best-effort, never blocks the change).
+        try {
+            CandidateNotification::forAccountEvent($userId, 'password_changed', 'from the Settings page.');
+        } catch (Throwable $notifEx) {
+            error_log('[Settings] password notification: ' . $notifEx->getMessage());
+        }
+
         return true;
     }
 

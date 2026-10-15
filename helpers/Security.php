@@ -20,19 +20,31 @@ class Security
     {
         $errors = [];
 
-        if (strlen($password) < PASSWORD_MIN_LENGTH) {
-            $errors[] = 'Password must be at least ' . PASSWORD_MIN_LENGTH . ' characters.';
+        $min = PASSWORD_MIN_LENGTH;
+        $reqU = true; $reqL = true; $reqN = true; $reqS = true;
+        if (class_exists('SystemSettings', false)) {
+            try {
+                $min = SystemSettings::getInt('password_min_length', PASSWORD_MIN_LENGTH, 6, 32);
+                $reqU = SystemSettings::getBool('password_require_uppercase', true);
+                $reqL = SystemSettings::getBool('password_require_lowercase', true);
+                $reqN = SystemSettings::getBool('password_require_number', true);
+                $reqS = SystemSettings::getBool('password_require_special', true);
+            } catch (Throwable $ex) {
+            }
         }
-        if (!preg_match('/[A-Z]/', $password)) {
+        if (strlen($password) < $min) {
+            $errors[] = 'Password must be at least ' . $min . ' characters.';
+        }
+        if ($reqU && !preg_match('/[A-Z]/', $password)) {
             $errors[] = 'Password must contain at least one uppercase letter.';
         }
-        if (!preg_match('/[a-z]/', $password)) {
+        if ($reqL && !preg_match('/[a-z]/', $password)) {
             $errors[] = 'Password must contain at least one lowercase letter.';
         }
-        if (!preg_match('/[0-9]/', $password)) {
+        if ($reqN && !preg_match('/[0-9]/', $password)) {
             $errors[] = 'Password must contain at least one number.';
         }
-        if (!preg_match('/[^a-zA-Z0-9]/', $password)) {
+        if ($reqS && !preg_match('/[^a-zA-Z0-9]/', $password)) {
             $errors[] = 'Password must contain at least one special character.';
         }
 

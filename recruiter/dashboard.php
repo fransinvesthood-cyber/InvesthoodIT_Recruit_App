@@ -594,6 +594,23 @@ require __DIR__ . '/_layout_start.php';
 
 ?>
 
+<section class="rc-pipeline-shortcut" aria-labelledby="rcPipelineShortcutTitle">
+    <div class="rc-pipeline-shortcut__copy">
+        <span class="rc-eyebrow">Recruitment operations</span>
+        <h2 id="rcPipelineShortcutTitle">Candidate Follow-Up &amp; Pipeline</h2>
+        <p>Review submitted applications by recruitment stage, spot applications that may need follow-up, and open the existing candidate records.</p>
+    </div>
+    <a class="rc-pipeline-shortcut__button" href="<?= url('recruiter/follow_up.php') ?>">
+        Open follow-up pipeline <i class="fas fa-arrow-right" aria-hidden="true"></i>
+    </a>
+</section>
+<style>
+.rc-pipeline-shortcut{display:flex;align-items:center;justify-content:space-between;gap:22px;margin:0 0 24px;padding:24px 26px;border:1px solid #dce5f5;border-radius:18px;background:linear-gradient(115deg,#f7faff,#eef3ff)}
+.rc-pipeline-shortcut__copy{max-width:760px}.rc-pipeline-shortcut h2{margin:7px 0 8px;font-size:clamp(19px,2vw,25px);color:#172b4d}.rc-pipeline-shortcut p{margin:0;color:#61718a;line-height:1.6}.rc-pipeline-shortcut__button{display:inline-flex;align-items:center;gap:10px;white-space:nowrap;padding:13px 17px;border-radius:11px;background:#2454d8;color:#fff;text-decoration:none;font-weight:700}.rc-pipeline-shortcut__button:hover{background:#183eae}
+@media(max-width:700px){.rc-pipeline-shortcut{align-items:flex-start;flex-direction:column}.rc-pipeline-shortcut__button{white-space:normal}}
+[data-theme="dark"] .rc-pipeline-shortcut{background:#17243a;border-color:#33435d}. [data-theme="dark"] .rc-pipeline-shortcut h2{color:#f0f5ff}[data-theme="dark"] .rc-pipeline-shortcut p{color:#b6c4da}
+</style>
+
 
 <!-- ================================================================
      DASHBOARD MODAL + CARD STYLES

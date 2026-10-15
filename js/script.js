@@ -627,7 +627,101 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   // ============================================
-  // 14. MODAL HANDLING
+  // 14. FORGOT / RESET PASSWORD FORMS
+  // ============================================
+  // Client-side validation + loading state (mirrors login/register).
+  // Server-side validation in AuthController remains authoritative.
+  (function () {
+    var PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$/;
+    var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    function armButton(btn) {
+      if (btn && !btn.getAttribute('data-label')) {
+        var text = btn.querySelector('.btn__text');
+        btn.setAttribute('data-label', text ? text.textContent : btn.textContent.trim());
+      }
+    }
+    function setLoading(btn, loading, label) {
+      if (!btn) return;
+      btn.disabled = loading;
+      var text = btn.querySelector('.btn__text');
+      if (text) text.textContent = loading ? label : btn.getAttribute('data-label');
+    }
+
+    // ---- Forgot password ----
+    var forgotForm = document.getElementById('forgotPasswordForm');
+    if (forgotForm) {
+      var forgotEmail = document.getElementById('forgotEmail');
+      var forgotErr = document.getElementById('forgotEmailError');
+      var forgotBtn = document.getElementById('forgotPasswordBtn');
+      armButton(forgotBtn);
+      forgotForm.addEventListener('submit', function (e) {
+        var value = forgotEmail ? forgotEmail.value.trim() : '';
+        var msg = '';
+        if (!value) msg = 'Email address is required.';
+        else if (!EMAIL_RE.test(value)) msg = 'Please enter a valid email address.';
+        else if (value.length > 100) msg = 'Email address must not exceed 100 characters.';
+        if (forgotErr) {
+          forgotErr.textContent = msg;
+          forgotErr.style.display = msg ? 'block' : 'none';
+        }
+        if (forgotEmail) forgotEmail.classList.toggle('form-input--error', !!msg);
+        if (msg) { e.preventDefault(); if (forgotEmail) forgotEmail.focus(); return; }
+        setLoading(forgotBtn, true, 'Sending…');
+      });
+      if (forgotEmail) {
+        forgotEmail.addEventListener('input', function () {
+          forgotEmail.classList.remove('form-input--error');
+          if (forgotErr) { forgotErr.textContent = ''; forgotErr.style.display = 'none'; }
+        });
+      }
+    }
+
+    // ---- Reset password ----
+    var resetForm = document.getElementById('resetPasswordForm');
+    if (resetForm) {
+      var newPw = document.getElementById('newPassword');
+      var confirmPw = document.getElementById('confirmNewPassword');
+      var newPwErr = document.getElementById('newPasswordError');
+      var confirmPwErr = document.getElementById('confirmNewPasswordError');
+      var resetBtn = document.getElementById('resetPasswordBtn');
+      armButton(resetBtn);
+
+      function showErr(input, el, msg) {
+        if (el) { el.textContent = msg || ''; el.style.display = msg ? 'block' : 'none'; }
+        if (input) input.classList.toggle('form-input--error', !!msg);
+      }
+      function validateReset() {
+        var pw = newPw ? newPw.value : '';
+        var cpw = confirmPw ? confirmPw.value : '';
+        var pwMsg = '';
+        if (!pw) pwMsg = 'New password is required.';
+        else if (pw.length < 8) pwMsg = 'Password must be at least 8 characters.';
+        else if (!PASSWORD_RE.test(pw)) pwMsg = 'Must include uppercase, lowercase, number, and special character.';
+        var cpwMsg = '';
+        if (!cpw) cpwMsg = 'Please confirm your new password.';
+        else if (pw && cpw !== pw) cpwMsg = 'Passwords do not match.';
+        showErr(newPw, newPwErr, pwMsg);
+        showErr(confirmPw, confirmPwErr, cpwMsg);
+        return !pwMsg && !cpwMsg;
+      }
+      resetForm.addEventListener('submit', function (e) {
+        if (!validateReset()) {
+          e.preventDefault();
+          var firstBad = resetForm.querySelector('.form-input--error');
+          if (firstBad) firstBad.focus();
+          return;
+        }
+        setLoading(resetBtn, true, 'Resetting…');
+      });
+      [newPw, confirmPw].forEach(function (input) {
+        if (input) input.addEventListener('input', function () { validateReset(); });
+      });
+    }
+  })();
+
+  // ============================================
+  // 15. MODAL HANDLING
   // ============================================
   var modalOverlays = document.querySelectorAll('.modal-overlay');
   modalOverlays.forEach(function (overlay) {
@@ -686,16 +780,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-  // ============================================
-  // 16. FORGOT PASSWORD HANDLING (placeholder)
-  // ============================================
-  var forgotLinks = document.querySelectorAll('.forgot-link');
-  forgotLinks.forEach(function (link) {
-    link.addEventListener('click', function (e) {
-      e.preventDefault();
-      createNotification('info', 'Password Reset', 'Password reset functionality will be available soon. Please contact support for assistance.');
-    });
-  });
+  // NOTE: `.forgot-link` is a REAL link to forgot-password.php — no JS
+  // interception. (A previous placeholder showed a "coming soon"
+  // toast and blocked navigation; removed now the flow is live.)
 
   // ============================================
   // 17. GRADUATION CAP ANIMATION

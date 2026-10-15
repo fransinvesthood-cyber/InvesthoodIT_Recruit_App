@@ -305,90 +305,6 @@ document.addEventListener('DOMContentLoaded', function () {
   renderInterviews();
 
   // ============================================
-  // 8. NOTIFICATION CENTRE
-  // ============================================
-  var notifList = document.getElementById('notifList');
-  var notifs = [
-    { id: 1, type: 'opportunity', icon: 'opportunity', title: 'New Opportunity Matched', msg: 'A "Full-Stack Developer Graduate" position matches your profile.', time: '2 hours ago', unread: true },
-    { id: 2, type: 'programme', icon: 'programme', title: 'Programme Update', msg: 'Your Software Engineering programme has a new module available.', time: '5 hours ago', unread: true },
-    { id: 3, type: 'application', icon: 'application', title: 'Application Status Changed', msg: 'Your application moved to Interview stage.', time: '1 day ago', unread: true },
-    { id: 4, type: 'interview', icon: 'interview', title: 'Interview Scheduled', msg: 'Technical Interview confirmed for 24 July 2025.', time: '2 days ago', unread: true },
-    { id: 5, type: 'learning', icon: 'learning', title: 'Learning Milestone', msg: 'You completed "Agile & Scrum Fundamentals"!', time: '3 days ago', unread: false },
-    { id: 6, type: 'announcement', icon: 'announcement', title: 'Platform Announcement', msg: 'New mentorship opportunities are now available.', time: '5 days ago', unread: false }
-  ];
-
-  var notifIconMap = {
-    opportunity: 'fa-briefcase',
-    programme: 'fa-graduation-cap',
-    application: 'fa-file-alt',
-    interview: 'fa-calendar-check',
-    learning: 'fa-book',
-    announcement: 'fa-bullhorn'
-  };
-
-  function renderNotifs(filter) {
-    if (!notifList) return;
-    filter = filter || 'all';
-    var filtered = filter === 'all' ? notifs : notifs.filter(function (n) { return n.type === filter; });
-    if (!filtered.length) {
-      notifList.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-light);">No notifications in this category.</div>';
-      return;
-    }
-    notifList.innerHTML = filtered.map(function (n) {
-      return '<div class="notif-item' + (n.unread ? ' notif-item--unread' : '') + '" data-id="' + n.id + '">' +
-        '<div class="notif-item__icon notif-item__icon--' + n.icon + '"><i class="fas ' + (notifIconMap[n.icon] || 'fa-bell') + '"></i></div>' +
-        '<div class="notif-item__content">' +
-          '<div class="notif-item__title">' + n.title + '</div>' +
-          '<div class="notif-item__message">' + n.msg + '</div>' +
-          '<div class="notif-item__time">' + n.time + '</div>' +
-        '</div>' +
-        '<div class="notif-item__actions">' +
-          (n.unread ? '<button class="notif-item__mark-read" aria-label="Mark as read"><i class="fas fa-check"></i></button>' : '') +
-        '</div>';
-    }).join('');
-
-    // Mark as read
-    notifList.querySelectorAll('.notif-item__mark-read').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        var item = this.closest('.notif-item');
-        var id = parseInt(item.getAttribute('data-id'), 10);
-        var found = notifs.find(function (n) { return n.id === id; });
-        if (found) found.unread = false;
-        item.classList.remove('notif-item--unread');
-        this.remove();
-      });
-    });
-  }
-
-  renderNotifs('all');
-
-  // Filter buttons
-  document.querySelectorAll('.notif-centre__filter').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      document.querySelectorAll('.notif-centre__filter').forEach(function (b) { b.classList.remove('active'); });
-      this.classList.add('active');
-      renderNotifs(this.getAttribute('data-filter'));
-    });
-  });
-
-  // Mark all read
-  var markAllBtn = document.getElementById('markAllRead');
-  if (markAllBtn) {
-    markAllBtn.addEventListener('click', function () {
-      notifs.forEach(function (n) { n.unread = false; });
-      notifList.querySelectorAll('.notif-item--unread').forEach(function (item) {
-        item.classList.remove('notif-item--unread');
-        var markBtn = item.querySelector('.notif-item__mark-read');
-        if (markBtn) markBtn.remove();
-      });
-      if (window.InvesthoodNotifications) {
-        window.InvesthoodNotifications.show('success', 'Done!', 'All notifications marked as read.');
-      }
-    });
-  }
-
-  // ============================================
   // 9. CHART.JS ANALYTICS
   // ============================================
   if (typeof Chart !== 'undefined') {
@@ -446,23 +362,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   // ============================================
-  // 10. NOTIFICATION HEADER BELL CLICK
-  // ============================================
-  var notifHeaderBtn = document.getElementById('notifHeaderBtn');
-  if (notifHeaderBtn) {
-    notifHeaderBtn.addEventListener('click', function () {
-      var target = document.querySelector('[data-section="notifications"]');
-      if (!target) target = document.getElementById('dashboard-notifications');
-      if (target) {
-        var offset = 80;
-        var pos = target.getBoundingClientRect().top + window.scrollY - offset;
-        window.scrollTo({ top: pos, behavior: 'smooth' });
-      }
-    });
-  }
-
-  // ============================================
-  // 11. DASHBOARD SEARCH (header)
+  // 10. DASHBOARD SEARCH (header)
   // ============================================
   var dashSearchInput = document.querySelector('.dash-header__search-input');
   if (dashSearchInput) {
