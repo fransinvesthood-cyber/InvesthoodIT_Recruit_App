@@ -891,7 +891,7 @@ body.sv-modal-open {
 
 
 /* =========================================================
-   DARK MODE
+   DARK MODE (modal)
 ========================================================= */
 
 html[data-theme="dark"]
@@ -945,7 +945,7 @@ html[data-theme="dark"]
 
 
 /* =========================================================
-   MOBILE
+   MODAL MOBILE
 ========================================================= */
 
 @media (max-width: 620px) {
@@ -980,6 +980,355 @@ html[data-theme="dark"]
         width: 100%;
 
         text-align: center;
+    }
+}
+
+
+/* =========================================================
+   NAVBAR MENU BUTTON
+   Force-show on all viewports + match PM portal styling
+========================================================= */
+
+.ux-navbar__menu {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    width: 42px !important;
+    height: 42px !important;
+
+    flex: 0 0 42px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+
+    border: 1px solid rgba(15, 23, 42, .10) !important;
+    border-radius: 11px !important;
+
+    background: #ffffff !important;
+    color: #101828 !important;
+
+    font-size: 15px !important;
+    line-height: 1 !important;
+
+    cursor: pointer;
+
+    transition:
+        background .15s ease,
+        border-color .15s ease,
+        color .15s ease,
+        transform .12s ease;
+}
+
+.ux-navbar__menu i {
+    font-size: 16px !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.ux-navbar__menu:hover {
+    background: #f8fafc !important;
+    border-color: #cbd5e1 !important;
+}
+
+.ux-navbar__menu:active {
+    transform: scale(.96);
+}
+
+.ux-navbar__menu:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, .22);
+    outline-offset: 2px;
+}
+
+.ux-navbar__menu.is-active,
+body.sv-sidebar-collapsed .ux-navbar__menu {
+    background: rgba(37, 99, 235, .10) !important;
+    border-color: rgba(37, 99, 235, .28) !important;
+    color: #1d4ed8 !important;
+}
+
+.ux-navbar__left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 14px !important;
+}
+
+html[data-theme="dark"] .ux-navbar__menu {
+    background: rgba(255, 255, 255, .05) !important;
+    border-color: rgba(255, 255, 255, .10) !important;
+    color: #f8fafc !important;
+}
+
+html[data-theme="dark"] .ux-navbar__menu:hover {
+    background: rgba(255, 255, 255, .10) !important;
+}
+
+html[data-theme="dark"] .ux-navbar__menu.is-active,
+html[data-theme="dark"] body.sv-sidebar-collapsed .ux-navbar__menu {
+    background: rgba(96, 165, 250, .18) !important;
+    border-color: rgba(96, 165, 250, .40) !important;
+    color: #93c5fd !important;
+}
+
+
+/* =========================================================
+   SUPERVISOR SIDEBAR — DESKTOP STATES
+   Forces the sidebar to look exactly like the PM portal
+   in both expanded and collapsed modes.
+========================================================= */
+
+@media (min-width: 1024px) {
+
+    /* Smooth transitions */
+    .sidebar,
+    .ux-main {
+        transition:
+            width .22s ease,
+            min-width .22s ease,
+            max-width .22s ease,
+            flex-basis .22s ease,
+            margin-left .22s ease;
+    }
+
+    /* =====================================================
+       EXPANDED STATE (default) — full PM-style sidebar
+    ===================================================== */
+
+    body:not(.sv-sidebar-collapsed) .sidebar,
+    body:not(.sv-sidebar-collapsed) #portalSidebar,
+    body:not(.sv-sidebar-collapsed) aside.sidebar {
+        width: 260px !important;
+        min-width: 260px !important;
+        max-width: 260px !important;
+        flex: 0 0 260px !important;
+        flex-basis: 260px !important;
+
+        overflow-x: visible !important;
+    }
+
+    body:not(.sv-sidebar-collapsed) .ux-app {
+        grid-template-columns: 260px minmax(0, 1fr) !important;
+    }
+
+    /* --- Logo: icon + text side by side --- */
+
+    body:not(.sv-sidebar-collapsed) .sidebar .logo {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        justify-content: flex-start !important;
+    }
+
+    body:not(.sv-sidebar-collapsed) .sidebar .logo__icon {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex: 0 0 auto !important;
+    }
+
+    body:not(.sv-sidebar-collapsed) .sidebar .logo__text {
+        display: inline !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+
+        width: auto !important;
+        max-width: none !important;
+        overflow: visible !important;
+
+        font-size: 18px !important;
+        font-weight: 800 !important;
+        line-height: 1.2 !important;
+
+        white-space: nowrap !important;
+
+        pointer-events: auto !important;
+    }
+
+    body:not(.sv-sidebar-collapsed) .sidebar .logo__accent {
+        color: #2563eb !important;
+    }
+
+    /* --- Section labels ("SUPERVISOR", "MAIN", ...) --- */
+
+    body:not(.sv-sidebar-collapsed) .sidebar__section-label {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+
+        width: auto !important;
+        height: auto !important;
+        overflow: visible !important;
+
+        font-size: 11px !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+        letter-spacing: .08em !important;
+        white-space: nowrap !important;
+    }
+
+    /* --- Nav links: icon + text --- */
+
+    body:not(.sv-sidebar-collapsed) .sidebar__link {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 12px !important;
+
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        white-space: nowrap !important;
+
+        padding-left: 14px !important;
+        padding-right: 14px !important;
+    }
+
+    body:not(.sv-sidebar-collapsed) .sidebar__link i {
+        flex: 0 0 auto !important;
+        font-size: 16px !important;
+        margin: 0 !important;
+    }
+
+    /* --- User block at bottom --- */
+
+    body:not(.sv-sidebar-collapsed) .sidebar__user {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 10px !important;
+
+        padding-left: 14px !important;
+        padding-right: 14px !important;
+    }
+
+    body:not(.sv-sidebar-collapsed) .sidebar__user-info {
+        display: flex !important;
+        flex-direction: column !important;
+
+        visibility: visible !important;
+        opacity: 1 !important;
+
+        width: auto !important;
+        overflow: visible !important;
+    }
+
+    body:not(.sv-sidebar-collapsed) .sidebar__user-name,
+    body:not(.sv-sidebar-collapsed) .sidebar__user-role {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+
+        white-space: nowrap !important;
+    }
+
+    /* --- Sign Out link --- */
+
+    body:not(.sv-sidebar-collapsed) .sidebar__logout {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 10px !important;
+
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        white-space: nowrap !important;
+
+        padding-left: 14px !important;
+        padding-right: 14px !important;
+    }
+
+    body:not(.sv-sidebar-collapsed) .sidebar__logout i {
+        flex: 0 0 auto !important;
+        font-size: 16px !important;
+        margin: 0 !important;
+    }
+
+    /* --- Hide the mobile close (×) button on desktop --- */
+
+    body:not(.sv-sidebar-collapsed) .sidebar__close {
+        display: none !important;
+    }
+
+    /* =====================================================
+       COLLAPSED STATE — icon rail
+    ===================================================== */
+
+    body.sv-sidebar-collapsed .sidebar,
+    body.sv-sidebar-collapsed #portalSidebar,
+    body.sv-sidebar-collapsed aside.sidebar {
+        width: 76px !important;
+        min-width: 76px !important;
+        max-width: 76px !important;
+        flex: 0 0 76px !important;
+        flex-basis: 76px !important;
+
+        overflow-x: hidden !important;
+    }
+
+    body.sv-sidebar-collapsed .ux-app {
+        grid-template-columns: 76px minmax(0, 1fr) !important;
+    }
+
+    body.sv-sidebar-collapsed .sidebar__link {
+        font-size: 0 !important;
+        justify-content: center !important;
+        gap: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        text-align: center;
+    }
+
+    body.sv-sidebar-collapsed .sidebar__link i {
+        font-size: 17px !important;
+        margin: 0 !important;
+    }
+
+    body.sv-sidebar-collapsed .sidebar .logo__text,
+    body.sv-sidebar-collapsed .sidebar__section-label,
+    body.sv-sidebar-collapsed .sidebar__user-info,
+    body.sv-sidebar-collapsed .sidebar__close {
+        display: none !important;
+    }
+
+    body.sv-sidebar-collapsed .sidebar .logo {
+        justify-content: center !important;
+        gap: 0 !important;
+    }
+
+    body.sv-sidebar-collapsed .sidebar__user {
+        justify-content: center !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    body.sv-sidebar-collapsed .sidebar__logout {
+        font-size: 0 !important;
+        justify-content: center !important;
+        gap: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    body.sv-sidebar-collapsed .sidebar__logout i {
+        font-size: 17px !important;
+        margin: 0 !important;
+    }
+
+    body.sv-sidebar-collapsed .sidebar__menu {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+}
+
+
+/* =========================================================
+   REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar,
+    .ux-main,
+    .ux-navbar__menu {
+        transition: none !important;
     }
 }
 
@@ -2396,259 +2745,234 @@ html[data-theme="dark"]
 
 
 <!-- =========================================================
-     DASHBOARD MODAL JAVASCRIPT
+     DASHBOARD MODAL + SIDEBAR TOGGLE JAVASCRIPT
 ========================================================= -->
 
 <script>
 
 document.addEventListener('DOMContentLoaded', function () {
 
+    /* =====================================================
+       DASHBOARD CARD MODAL
+    ===================================================== */
+
     const modal =
         document.getElementById(
             'svDashboardModal'
         );
 
-    if (!modal) {
-        return;
-    }
+    if (modal) {
 
-
-    const title =
-        document.getElementById(
-            'svDashboardModalTitle'
-        );
-
-    const subtitle =
-        document.getElementById(
-            'svDashboardModalSubtitle'
-        );
-
-    const viewAll =
-        document.getElementById(
-            'svDashboardModalViewAll'
-        );
-
-    const cards =
-        document.querySelectorAll(
-            '[data-sv-modal]'
-        );
-
-    const panels =
-        modal.querySelectorAll(
-            '[data-sv-panel]'
-        );
-
-    const closeButtons =
-        modal.querySelectorAll(
-            '[data-sv-modal-close]'
-        );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Modal Configuration
-    |--------------------------------------------------------------------------
-    */
-
-    const config = {
-
-        assigned: {
-            title: 'Assigned Cohorts',
-            subtitle:
-                'All cohorts currently assigned to your Supervisor account.',
-            url:
-                '<?= e(
-                    url('supervisor/cohorts.php')
-                ) ?>'
-        },
-
-        active: {
-            title: 'Active Cohorts',
-            subtitle:
-                'Cohorts currently marked as active within your assignments.',
-            url:
-                '<?= e(
-                    url('supervisor/cohorts.php?status=active')
-                ) ?>'
-        },
-
-        current: {
-            title: 'Current Candidates',
-            subtitle:
-                'Candidates currently participating across your assigned cohorts.',
-            url:
-                '<?= e(
-                    url('supervisor/candidates.php')
-                ) ?>'
-        },
-
-        completed: {
-            title: 'Completed Candidates',
-            subtitle:
-                'Candidates recorded as completed across your assigned cohorts.',
-            url:
-                '<?= e(
-                    url('supervisor/candidates.php?status=completed')
-                ) ?>'
-        },
-
-        withdrawn: {
-            title: 'Withdrawn Candidates',
-            subtitle:
-                'Candidates recorded as withdrawn from your assigned cohorts.',
-            url:
-                '<?= e(
-                    url('supervisor/candidates.php?status=withdrawn')
-                ) ?>'
-        }
-
-    };
-
-
-    let lastTrigger = null;
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Open Modal
-    |--------------------------------------------------------------------------
-    */
-
-    function openModal(type, trigger) {
-
-        const item = config[type];
-
-        if (!item) {
-            return;
-        }
-
-
-        lastTrigger = trigger || null;
-
-
-        panels.forEach(function (panel) {
-
-            panel.classList.toggle(
-                'is-active',
-                panel.dataset.svPanel === type
+        const title =
+            document.getElementById(
+                'svDashboardModalTitle'
             );
 
-        });
-
-
-        title.textContent =
-            item.title;
-
-        subtitle.textContent =
-            item.subtitle;
-
-        viewAll.href =
-            item.url;
-
-
-        modal.classList.add(
-            'is-open'
-        );
-
-        modal.setAttribute(
-            'aria-hidden',
-            'false'
-        );
-
-        document.body.classList.add(
-            'sv-modal-open'
-        );
-
-
-        const closeButton =
-            modal.querySelector(
-                '.sv-dashboard-modal__close'
+        const subtitle =
+            document.getElementById(
+                'svDashboardModalSubtitle'
             );
 
-        if (closeButton) {
-            closeButton.focus();
-        }
-
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Close Modal
-    |--------------------------------------------------------------------------
-    */
-
-    function closeModal() {
-
-        modal.classList.remove(
-            'is-open'
-        );
-
-        modal.setAttribute(
-            'aria-hidden',
-            'true'
-        );
-
-        document.body.classList.remove(
-            'sv-modal-open'
-        );
-
-
-        panels.forEach(function (panel) {
-            panel.classList.remove(
-                'is-active'
+        const viewAll =
+            document.getElementById(
+                'svDashboardModalViewAll'
             );
-        });
 
+        const cards =
+            document.querySelectorAll(
+                '[data-sv-modal]'
+            );
 
-        if (
-            lastTrigger
-            && typeof lastTrigger.focus
-                === 'function'
-        ) {
-            lastTrigger.focus();
-        }
+        const panels =
+            modal.querySelectorAll(
+                '[data-sv-panel]'
+            );
 
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Card Click
-    |--------------------------------------------------------------------------
-    */
-
-    cards.forEach(function (card) {
-
-        card.addEventListener(
-            'click',
-            function () {
-
-                openModal(
-                    card.dataset.svModal,
-                    card
-                );
-
-            }
-        );
+        const closeButtons =
+            modal.querySelectorAll(
+                '[data-sv-modal-close]'
+            );
 
 
         /*
-        |--------------------------------------------------------------------------
-        | Keyboard Accessibility
-        |--------------------------------------------------------------------------
+        |--------------------------------------------------
+        | Modal Configuration
+        |--------------------------------------------------
         */
 
-        card.addEventListener(
-            'keydown',
-            function (event) {
+        const config = {
 
-                if (
-                    event.key === 'Enter'
-                    || event.key === ' '
-                ) {
+            assigned: {
+                title: 'Assigned Cohorts',
+                subtitle:
+                    'All cohorts currently assigned to your Supervisor account.',
+                url:
+                    '<?= e(
+                        url('supervisor/cohorts.php')
+                    ) ?>'
+            },
 
-                    event.preventDefault();
+            active: {
+                title: 'Active Cohorts',
+                subtitle:
+                    'Cohorts currently marked as active within your assignments.',
+                url:
+                    '<?= e(
+                        url('supervisor/cohorts.php?status=active')
+                    ) ?>'
+            },
+
+            current: {
+                title: 'Current Candidates',
+                subtitle:
+                    'Candidates currently participating across your assigned cohorts.',
+                url:
+                    '<?= e(
+                        url('supervisor/candidates.php')
+                    ) ?>'
+            },
+
+            completed: {
+                title: 'Completed Candidates',
+                subtitle:
+                    'Candidates recorded as completed across your assigned cohorts.',
+                url:
+                    '<?= e(
+                        url('supervisor/candidates.php?status=completed')
+                    ) ?>'
+            },
+
+            withdrawn: {
+                title: 'Withdrawn Candidates',
+                subtitle:
+                    'Candidates recorded as withdrawn from your assigned cohorts.',
+                url:
+                    '<?= e(
+                        url('supervisor/candidates.php?status=withdrawn')
+                    ) ?>'
+            }
+
+        };
+
+
+        let lastTrigger = null;
+
+
+        /*
+        |--------------------------------------------------
+        | Open Modal
+        |--------------------------------------------------
+        */
+
+        function openModal(type, trigger) {
+
+            const item = config[type];
+
+            if (!item) {
+                return;
+            }
+
+
+            lastTrigger = trigger || null;
+
+
+            panels.forEach(function (panel) {
+
+                panel.classList.toggle(
+                    'is-active',
+                    panel.dataset.svPanel === type
+                );
+
+            });
+
+
+            title.textContent =
+                item.title;
+
+            subtitle.textContent =
+                item.subtitle;
+
+            viewAll.href =
+                item.url;
+
+
+            modal.classList.add(
+                'is-open'
+            );
+
+            modal.setAttribute(
+                'aria-hidden',
+                'false'
+            );
+
+            document.body.classList.add(
+                'sv-modal-open'
+            );
+
+
+            const closeButton =
+                modal.querySelector(
+                    '.sv-dashboard-modal__close'
+                );
+
+            if (closeButton) {
+                closeButton.focus();
+            }
+
+        }
+
+
+        /*
+        |--------------------------------------------------
+        | Close Modal
+        |--------------------------------------------------
+        */
+
+        function closeModal() {
+
+            modal.classList.remove(
+                'is-open'
+            );
+
+            modal.setAttribute(
+                'aria-hidden',
+                'true'
+            );
+
+            document.body.classList.remove(
+                'sv-modal-open'
+            );
+
+
+            panels.forEach(function (panel) {
+                panel.classList.remove(
+                    'is-active'
+                );
+            });
+
+
+            if (
+                lastTrigger
+                && typeof lastTrigger.focus
+                    === 'function'
+            ) {
+                lastTrigger.focus();
+            }
+
+        }
+
+
+        /*
+        |--------------------------------------------------
+        | Card Click
+        |--------------------------------------------------
+        */
+
+        cards.forEach(function (card) {
+
+            card.addEventListener(
+                'click',
+                function () {
 
                     openModal(
                         card.dataset.svModal,
@@ -2656,52 +2980,227 @@ document.addEventListener('DOMContentLoaded', function () {
                     );
 
                 }
+            );
+
+
+            /*
+            |--------------------------------------------------
+            | Keyboard Accessibility
+            |--------------------------------------------------
+            */
+
+            card.addEventListener(
+                'keydown',
+                function (event) {
+
+                    if (
+                        event.key === 'Enter'
+                        || event.key === ' '
+                    ) {
+
+                        event.preventDefault();
+
+                        openModal(
+                            card.dataset.svModal,
+                            card
+                        );
+
+                    }
+
+                }
+            );
+
+        });
+
+
+        /*
+        |--------------------------------------------------
+        | Close Buttons / Backdrop
+        |--------------------------------------------------
+        */
+
+        closeButtons.forEach(
+            function (button) {
+
+                button.addEventListener(
+                    'click',
+                    closeModal
+                );
 
             }
         );
 
-    });
+
+        /*
+        |--------------------------------------------------
+        | Escape Key
+        |--------------------------------------------------
+        */
+
+        document.addEventListener(
+            'keydown',
+            function (event) {
+
+                if (
+                    event.key === 'Escape'
+                    && modal.classList.contains(
+                        'is-open'
+                    )
+                ) {
+                    closeModal();
+                }
+
+            }
+        );
+
+    }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | Close Buttons / Backdrop
-    |--------------------------------------------------------------------------
-    */
+    /* =====================================================
+       SIDEBAR SHOW / HIDE TOGGLE
+       Reuses #uxMenuButton from navbar.php.
+       - Desktop: toggles body.sv-sidebar-collapsed
+       - Mobile:  lets existing PM sidebar JS handle it
+    ===================================================== */
 
-    closeButtons.forEach(
-        function (button) {
+    (function initSidebarToggle() {
 
-            button.addEventListener(
-                'click',
-                closeModal
+        'use strict';
+
+        const STORAGE_KEY = 'sv_sidebar_collapsed';
+        const DESKTOP_BP  = 1024;
+        const body        = document.body;
+
+        const button =
+            document.getElementById('uxMenuButton') ||
+            document.querySelector('.ux-navbar__menu');
+
+        if (!button) {
+            return; // no navbar on this page
+        }
+
+        const sidebar =
+            document.getElementById('portalSidebar') ||
+            document.querySelector('aside.sidebar');
+
+        if (!sidebar) {
+            return; // no sidebar on this page
+        }
+
+        const isCollapsed = () =>
+            body.classList.contains('sv-sidebar-collapsed');
+
+        const syncButtonState = () => {
+
+            button.classList.toggle('is-active', isCollapsed());
+
+            button.setAttribute(
+                'aria-expanded',
+                String(!isCollapsed())
             );
 
-        }
-    );
+        };
 
+        const persist = () => {
 
-    /*
-    |--------------------------------------------------------------------------
-    | Escape Key
-    |--------------------------------------------------------------------------
-    */
+            try {
+                localStorage.setItem(
+                    STORAGE_KEY,
+                    isCollapsed() ? '1' : '0'
+                );
+            } catch (_) {}
 
-    document.addEventListener(
-        'keydown',
-        function (event) {
+        };
 
-            if (
-                event.key === 'Escape'
-                && modal.classList.contains(
-                    'is-open'
-                )
-            ) {
-                closeModal();
-            }
+        /*
+        |--------------------------------------------------
+        | Restore saved state on desktop load
+        |--------------------------------------------------
+        */
 
-        }
-    );
+        (function restore() {
+
+            if (window.innerWidth < DESKTOP_BP) return;
+
+            try {
+                if (localStorage.getItem(STORAGE_KEY) === '1') {
+                    body.classList.add('sv-sidebar-collapsed');
+                }
+            } catch (_) {}
+
+            syncButtonState();
+
+        })();
+
+        /*
+        |--------------------------------------------------
+        | Intercept clicks on desktop only.
+        | Capture phase + stopImmediatePropagation so the
+        | mobile handler from original_pm_sidebar.js does
+        | NOT also fire on desktop.
+        |--------------------------------------------------
+        */
+
+        button.addEventListener(
+            'click',
+            function (event) {
+
+                if (window.innerWidth < DESKTOP_BP) {
+                    return; // mobile: let PM sidebar handle it
+                }
+
+                event.preventDefault();
+                event.stopImmediatePropagation();
+
+                body.classList.toggle('sv-sidebar-collapsed');
+
+                persist();
+                syncButtonState();
+
+            },
+            true // capture phase
+        );
+
+        /*
+        |--------------------------------------------------
+        | Keep state coherent across breakpoints
+        |--------------------------------------------------
+        */
+
+        let resizeTimer;
+
+        window.addEventListener('resize', () => {
+
+            clearTimeout(resizeTimer);
+
+            resizeTimer = setTimeout(() => {
+
+                if (window.innerWidth < DESKTOP_BP) {
+
+                    body.classList.remove('sv-sidebar-collapsed');
+                    syncButtonState();
+
+                } else {
+
+                    try {
+                        if (
+                            localStorage.getItem(STORAGE_KEY) === '1'
+                        ) {
+                            body.classList.add(
+                                'sv-sidebar-collapsed'
+                            );
+                        }
+                    } catch (_) {}
+
+                    syncButtonState();
+
+                }
+
+            }, 120);
+
+        });
+
+    })();
 
 });
 

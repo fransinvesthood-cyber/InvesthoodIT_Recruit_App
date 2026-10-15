@@ -488,6 +488,429 @@ if ($scopeMode !== 'none') {
     }
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Assessment & Interview Monitoring
+|--------------------------------------------------------------------------
+| Self-contained: auto-detects optional tables and degrades gracefully.
+*/
+
+/* --- Table detection ------------------------------------------------ */
+
+$monTables = [];
+
+if ($monRes = $conn->query('SHOW TABLES')) {
+    while ($monRow = $monRes->fetch_row()) {
+        $monTables[] = $monRow[0];
+    }
+    $monRes->free();
+}
+
+$monPickTable = static function (array $names) use ($monTables): ?string {
+    foreach ($names as $needle) {
+        foreach ($monTables as $t) {
+            if (strcasecmp($t, $needle) === 0) {
+                return $t;
+            }
+        }
+    }
+    return null;
+};
+
+$tblAssessments    = $monPickTable(['assessments', 'programme_assessments']);
+$tblAssessmentLink = $monPickTable([
+    'assessment_submissions',
+    'candidate_assessments',
+    'assessment_results',
+    'assessment_participants',
+]);
+$tblInterviews     = $monPickTable([
+    'interviews',
+    'programme_interviews',
+    'interview_sessions',
+]);
+$tblInterviewLink  = $monPickTable([
+    'interview_schedules',
+    'candidate_interviews',
+    'interview_participants',
+    'interview_slots',
+]);
+
+$assessmentAvailable = (bool) ($tblAssessments && $tblAssessmentLink);
+$interviewAvailable  = (bool) ($tblInterviews  && $tblInterviewLink);
+
+$monitoringAvailable = $scopeMode !== 'none'
+    && ($assessmentAvailable || $interviewAvailable);
+
+/* --- Metric defaults ------------------------------------------------ */
+
+$assessmentMetrics = [
+    'total'            => 0,
+    'pending'          => 0,
+    'overdue'          => 0,
+    'due_soon'         => 0,
+    'awaiting_grading' => 0,
+    'completed'        => 0,
+    'follow_up'        => 0,
+];
+
+$interviewMetrics = [
+    'total'     => 0,
+    'upcoming'  => 0,
+    'today'     => 0,
+    'this_week' => 0,
+    'no_show'   => 0,
+    'completed' => 0,
+    'follow_up' => 0,
+];
+
+$assessmentRows = [];
+$interviewRows  = [];
+
+$monNow         = time();
+$monWeekFromNow = strtotime('+7 days');
+$monTodayYmd    = date('Y-m-d');
+
+/* --- Load assessments ---------------------------------------------- */
+
+if ($monitoringAvailable && $assessmentAvailable && $scopeMode !== 'none') {
+
+    $sql = "
+        SELECT
+            a.id            AS assessment_id,
+            a.title         AS assessment_title,
+            a.type          AS assessment_type,
+            a.due_date      AS assessment_due_date,
+            a.status        AS assessment_status,
+
+            s.id            AS submission_id,
+            s.status        AS submission_status,
+            s.submitted_at  AS submission_submitted_at,
+            s.graded_at     AS submission_graded_at,
+
+            u.id            AS candidate_id,
+            u.first_name,
+            u.last_name,
+            u.email,
+
+            c.id            AS cohort_id,
+            c.name          AS cohort_name,
+
+            p.id            AS programme_id,
+            p.name          AS programme_name
+
+        FROM `{$tblAssessments}` a
+
+        INNER JOIN `{$tblAssessmentLink}` s
+            ON s.assessment_id = a.id
+
+        INNER JOIN users u
+            ON u.id = s.user_id
+
+        INNER JOIN cohorts c
+            ON c.id = a.cohort_id
+
+        INNER JOIN programmes p
+            ON p.id = c.programme_id
+
+        WHERE {$scopeCondition}
+
+        ORDER BY
+            a.due_date ASC,
+            u.first_name ASC,
+            u.last_name ASC
+    ";
+
+    if ($stmt = $conn->prepare($sql)) {
+
+        $stmt->bind_param('i', $officerId);
+
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) {
+                $assessmentRows[] = $r;
+            }
+        }
+
+        $stmt->close();
+    }
+
+    $assessmentMetrics['total'] = count($assessmentRows);
+
+    foreach ($assessmentRows as $r) {
+
+        $st        = strtolower((string) ($r['submission_status'] ?? ''));
+        $submitted = !empty($r['submission_submitted_at']);
+        $graded    = !empty($r['submission_graded_at'])
+                  || in_array($st, ['graded', 'completed', 'passed', 'failed'], true);
+
+        $dueTs = !empty($r['assessment_due_date'])
+            ? strtotime((string) $r['assessment_due_date'])
+            : null;
+
+        if ($graded) {
+            $assessmentMetrics['completed']++;
+            continue;
+        }
+
+        if ($submitted) {
+            $assessmentMetrics['awaiting_grading']++;
+            continue;
+        }
+
+        if ($dueTs !== null && $dueTs < $monNow) {
+            $assessmentMetrics['overdue']++;
+            $assessmentMetrics['follow_up']++;
+        } elseif ($dueTs !== null && $dueTs <= $monWeekFromNow) {
+            $assessmentMetrics['due_soon']++;
+            $assessmentMetrics['pending']++;
+        } else {
+            $assessmentMetrics['pending']++;
+        }
+    }
+}
+
+/* --- Load interviews ----------------------------------------------- */
+
+if ($monitoringAvailable && $interviewAvailable && $scopeMode !== 'none') {
+
+    // Detect optional link-level scheduled_at column
+    $linkCols = [];
+    if ($lcRes = $conn->query("SHOW COLUMNS FROM `{$tblInterviewLink}`")) {
+        while ($lcRow = $lcRes->fetch_assoc()) {
+            $linkCols[] = $lcRow['Field'];
+        }
+        $lcRes->free();
+    }
+
+    $linkScheduleCol = null;
+    foreach (['scheduled_at', 'slot_at', 'starts_at', 'interview_at'] as $cand) {
+        foreach ($linkCols as $lc) {
+            if (strcasecmp($lc, $cand) === 0) {
+                $linkScheduleCol = $lc;
+                break 2;
+            }
+        }
+    }
+
+    $schedExpr = $linkScheduleCol
+        ? "COALESCE(s.`{$linkScheduleCol}`, i.scheduled_at)"
+        : "i.scheduled_at";
+
+    $sql = "
+        SELECT
+            i.id             AS interview_id,
+            i.title          AS interview_title,
+            i.status         AS interview_status,
+
+            s.id             AS schedule_id,
+            s.status         AS schedule_status,
+            s.outcome        AS schedule_outcome,
+
+            {$schedExpr}     AS effective_scheduled_at,
+
+            u.id             AS candidate_id,
+            u.first_name,
+            u.last_name,
+            u.email,
+
+            c.id             AS cohort_id,
+            c.name           AS cohort_name,
+
+            p.id             AS programme_id,
+            p.name           AS programme_name
+
+        FROM `{$tblInterviews}` i
+
+        INNER JOIN `{$tblInterviewLink}` s
+            ON s.interview_id = i.id
+
+        INNER JOIN users u
+            ON u.id = s.user_id
+
+        INNER JOIN cohorts c
+            ON c.id = i.cohort_id
+
+        INNER JOIN programmes p
+            ON p.id = c.programme_id
+
+        WHERE {$scopeCondition}
+
+        ORDER BY
+            effective_scheduled_at ASC,
+            u.first_name ASC
+    ";
+
+    if ($stmt = $conn->prepare($sql)) {
+
+        $stmt->bind_param('i', $officerId);
+
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) {
+                $interviewRows[] = $r;
+            }
+        }
+
+        $stmt->close();
+    }
+
+    $interviewMetrics['total'] = count($interviewRows);
+
+    foreach ($interviewRows as $r) {
+
+        $st = strtolower((string) ($r['schedule_status'] ?? ''));
+
+        $ts = !empty($r['effective_scheduled_at'])
+            ? strtotime((string) $r['effective_scheduled_at'])
+            : null;
+
+        if (in_array($st, ['completed', 'done', 'passed'], true)) {
+            $interviewMetrics['completed']++;
+            continue;
+        }
+
+        if ($st === 'no_show') {
+            $interviewMetrics['no_show']++;
+            $interviewMetrics['follow_up']++;
+            continue;
+        }
+
+        if ($st === 'scheduled' && $ts !== null) {
+            if ($ts >= $monNow) {
+                $interviewMetrics['upcoming']++;
+                if (date('Y-m-d', $ts) === $monTodayYmd) {
+                    $interviewMetrics['today']++;
+                }
+                if ($ts <= $monWeekFromNow) {
+                    $interviewMetrics['this_week']++;
+                }
+            } else {
+                // Scheduled in the past but never completed
+                $interviewMetrics['follow_up']++;
+            }
+        }
+    }
+}
+
+$followUpCount = (int) (
+    ($assessmentMetrics['follow_up'] ?? 0)
+    + ($interviewMetrics['follow_up'] ?? 0)
+);
+
+/* --- Previews for the dashboard panels ----------------------------- */
+
+$upcomingInterviewsPreview = [];
+
+foreach ($interviewRows as $r) {
+
+    if (count($upcomingInterviewsPreview) >= 5) {
+        break;
+    }
+
+    $st = strtolower((string) ($r['schedule_status'] ?? ''));
+    $ts = !empty($r['effective_scheduled_at'])
+        ? strtotime((string) $r['effective_scheduled_at'])
+        : null;
+
+    if ($st === 'scheduled' && $ts !== null && $ts >= $monNow) {
+        $upcomingInterviewsPreview[] = $r;
+    }
+}
+
+$overdueAssessmentsPreview = [];
+
+foreach ($assessmentRows as $r) {
+
+    if (count($overdueAssessmentsPreview) >= 5) {
+        break;
+    }
+
+    $st        = strtolower((string) ($r['submission_status'] ?? ''));
+    $submitted = !empty($r['submission_submitted_at']);
+    $graded    = !empty($r['submission_graded_at'])
+              || in_array($st, ['graded', 'completed'], true);
+    $dueTs     = !empty($r['assessment_due_date'])
+              ? strtotime((string) $r['assessment_due_date'])
+              : null;
+
+    if ($dueTs !== null && $dueTs < $monNow && !$submitted && !$graded) {
+        $overdueAssessmentsPreview[] = $r;
+    }
+}
+
+/* --- Modal lists ---------------------------------------------------- */
+
+$assessmentModalItems = array_values(array_filter(
+    $assessmentRows,
+    static function ($r) {
+        $st        = strtolower((string) ($r['submission_status'] ?? ''));
+        $submitted = !empty($r['submission_submitted_at']);
+        $graded    = !empty($r['submission_graded_at'])
+                  || in_array($st, ['graded', 'completed'], true);
+        return !$submitted && !$graded;
+    }
+));
+
+$interviewModalItems = array_values(array_filter(
+    $interviewRows,
+    static function ($r) {
+        return strtolower((string) ($r['schedule_status'] ?? '')) === 'scheduled';
+    }
+));
+
+/* --- Local formatting helpers -------------------------------------- */
+
+if (!function_exists('po_mon_relative')) {
+    function po_mon_relative($date): string
+    {
+        if (empty($date)) {
+            return '—';
+        }
+
+        $ts = strtotime((string) $date);
+
+        if ($ts === false) {
+            return '—';
+        }
+
+        $now  = time();
+        $days = (int) round(($ts - $now) / 86400);
+
+        if (date('Y-m-d', $ts) === date('Y-m-d', $now)) {
+            return 'Today';
+        }
+        if ($days === 1)  return 'Tomorrow';
+        if ($days === -1) return 'Yesterday';
+        if ($days > 1)    return 'In ' . $days . ' days';
+        if ($days < -1)   return abs($days) . ' days overdue';
+
+        return 'Today';
+    }
+}
+
+if (!function_exists('po_mon_status_label')) {
+    function po_mon_status_label($status): string
+    {
+        $status = strtolower(trim((string) $status));
+
+        $map = [
+            'no_show'     => 'No Show',
+            'not_started' => 'Not Started',
+            'in_progress' => 'In Progress',
+            'due_soon'    => 'Due Soon',
+        ];
+
+        if (isset($map[$status])) {
+            return $map[$status];
+        }
+
+        return po_status_label($status);
+    }
+}
+
+
 /*
 |--------------------------------------------------------------------------
 | First Name
@@ -1277,6 +1700,319 @@ require __DIR__ . '/_layout_start.php';
 </section>
 
 
+<!-- =========================================================
+     ASSESSMENT & INTERVIEW MONITORING
+========================================================= -->
+
+<section class="po-card po-monitoring">
+
+    <div class="po-card__header">
+
+        <div>
+
+            <h3>
+                Assessment &amp; Interview Monitoring
+            </h3>
+
+            <p>
+                Outstanding assessments, upcoming interviews
+                and candidates requiring follow-up across
+                your portfolio.
+            </p>
+
+        </div>
+
+    </div>
+
+    <?php if (!$monitoringAvailable): ?>
+
+        <div class="po-empty">
+
+            <div class="po-empty__icon">
+
+                <i class="fas fa-clipboard-check"></i>
+
+            </div>
+
+            <strong>
+                Monitoring not configured
+            </strong>
+
+            <span>
+                No assessment or interview tables are
+                available for this Programme Officer workspace.
+            </span>
+
+        </div>
+
+    <?php else: ?>
+
+        <!-- METRIC CARDS -->
+
+        <div class="po-monitoring__metrics">
+
+            <article
+                class="
+                    po-monitoring-metric
+                    po-monitoring-metric--amber
+                    po-stat--interactive
+                "
+                tabindex="0"
+                role="button"
+                data-po-modal="assessments"
+                aria-label="View pending assessments"
+            >
+                <span class="po-monitoring-metric__icon">
+                    <i class="fas fa-clipboard-list"></i>
+                </span>
+                <div>
+                    <strong><?= number_format((int) $assessmentMetrics['pending']) ?></strong>
+                    <span>Pending Assessments</span>
+                    <small>
+                        <?= number_format((int) $assessmentMetrics['due_soon']) ?>
+                        due this week
+                    </small>
+                </div>
+            </article>
+
+            <article
+                class="
+                    po-monitoring-metric
+                    po-monitoring-metric--red
+                    po-stat--interactive
+                "
+                tabindex="0"
+                role="button"
+                data-po-modal="assessments"
+                aria-label="View overdue assessments"
+            >
+                <span class="po-monitoring-metric__icon">
+                    <i class="fas fa-triangle-exclamation"></i>
+                </span>
+                <div>
+                    <strong><?= number_format((int) $assessmentMetrics['overdue']) ?></strong>
+                    <span>Overdue Assessments</span>
+                    <small>Past due date</small>
+                </div>
+            </article>
+
+            <article
+                class="
+                    po-monitoring-metric
+                    po-monitoring-metric--blue
+                    po-stat--interactive
+                "
+                tabindex="0"
+                role="button"
+                data-po-modal="interviews"
+                aria-label="View upcoming interviews"
+            >
+                <span class="po-monitoring-metric__icon">
+                    <i class="fas fa-calendar-check"></i>
+                </span>
+                <div>
+                    <strong><?= number_format((int) $interviewMetrics['upcoming']) ?></strong>
+                    <span>Upcoming Interviews</span>
+                    <small>
+                        <?= number_format((int) $interviewMetrics['this_week']) ?>
+                        this week
+                    </small>
+                </div>
+            </article>
+
+            <article
+                class="
+                    po-monitoring-metric
+                    po-monitoring-metric--purple
+                    po-stat--interactive
+                "
+                tabindex="0"
+                role="button"
+                data-po-modal="assessments"
+                aria-label="View candidates requiring follow-up"
+            >
+                <span class="po-monitoring-metric__icon">
+                    <i class="fas fa-user-clock"></i>
+                </span>
+                <div>
+                    <strong><?= number_format($followUpCount) ?></strong>
+                    <span>Follow-ups Needed</span>
+                    <small>Overdue or missed</small>
+                </div>
+            </article>
+
+        </div>
+
+
+        <!-- TWO COLUMN PANELS -->
+
+        <div class="po-monitoring__grid">
+
+            <!-- UPCOMING INTERVIEWS -->
+
+            <div class="po-monitoring-panel">
+
+                <h4>Upcoming Interviews</h4>
+                <p>Next scheduled candidate interviews.</p>
+
+                <?php if (!$upcomingInterviewsPreview): ?>
+
+                    <div class="po-empty po-empty--compact">
+
+                        <div class="po-empty__icon">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+
+                        <strong>No upcoming interviews</strong>
+                        <span>No interviews are currently scheduled.</span>
+
+                    </div>
+
+                <?php else: ?>
+
+                    <div class="po-monitoring-list">
+
+                        <?php foreach ($upcomingInterviewsPreview as $row): ?>
+
+                            <?php
+                            $fn = trim((string) ($row['first_name'] ?? ''));
+                            $ln = trim((string) ($row['last_name'] ?? ''));
+                            $name = trim($fn . ' ' . $ln) ?: 'Candidate';
+                            ?>
+
+                            <a
+                                class="po-monitoring-row"
+                                href="<?= url(
+                                    'programme_officer/candidate_view.php?id='
+                                    . (int) $row['candidate_id']
+                                    . '&cohort_id='
+                                    . (int) $row['cohort_id']
+                                ) ?>"
+                            >
+                                <span class="po-dashboard-modal__avatar">
+                                    <?= e(po_initials($fn, $ln)) ?>
+                                </span>
+
+                                <span class="po-monitoring-row__main">
+                                    <strong><?= e($name) ?></strong>
+                                    <small>
+                                        <?= e($row['interview_title'] ?? 'Interview') ?>
+                                        ·
+                                        <?= e($row['programme_name'] ?? '') ?>
+                                    </small>
+                                </span>
+
+                                <span class="po-monitoring-row__meta">
+                                    <span class="po-monitoring-row__date">
+                                        <?= e(po_mon_relative(
+                                            $row['effective_scheduled_at'] ?? null
+                                        )) ?>
+                                    </span>
+                                    <span class="po-status po-status--<?= e(
+                                        po_status_class($row['schedule_status'] ?? '')
+                                    ) ?>">
+                                        <?= e(po_mon_status_label(
+                                            $row['schedule_status'] ?? ''
+                                        )) ?>
+                                    </span>
+                                </span>
+                            </a>
+
+                        <?php endforeach; ?>
+
+                    </div>
+
+                <?php endif; ?>
+
+            </div>
+
+
+            <!-- OVERDUE ASSESSMENTS -->
+
+            <div class="po-monitoring-panel">
+
+                <h4>Overdue Assessments</h4>
+                <p>Candidates who missed an assessment deadline.</p>
+
+                <?php if (!$overdueAssessmentsPreview): ?>
+
+                    <div class="po-empty po-empty--compact">
+
+                        <div class="po-empty__icon">
+                            <i class="fas fa-circle-check"></i>
+                        </div>
+
+                        <strong>No overdue assessments</strong>
+                        <span>Everyone is on track.</span>
+
+                    </div>
+
+                <?php else: ?>
+
+                    <div class="po-monitoring-list">
+
+                        <?php foreach ($overdueAssessmentsPreview as $row): ?>
+
+                            <?php
+                            $fn = trim((string) ($row['first_name'] ?? ''));
+                            $ln = trim((string) ($row['last_name'] ?? ''));
+                            $name = trim($fn . ' ' . $ln) ?: 'Candidate';
+                            ?>
+
+                            <a
+                                class="po-monitoring-row"
+                                href="<?= url(
+                                    'programme_officer/candidate_view.php?id='
+                                    . (int) $row['candidate_id']
+                                    . '&cohort_id='
+                                    . (int) $row['cohort_id']
+                                ) ?>"
+                            >
+                                <span class="po-dashboard-modal__avatar">
+                                    <?= e(po_initials($fn, $ln)) ?>
+                                </span>
+
+                                <span class="po-monitoring-row__main">
+                                    <strong><?= e($name) ?></strong>
+                                    <small>
+                                        <?= e($row['assessment_title'] ?? 'Assessment') ?>
+                                        ·
+                                        <?= e($row['cohort_name'] ?? '') ?>
+                                    </small>
+                                </span>
+
+                                <span class="po-monitoring-row__meta">
+                                    <span
+                                        class="
+                                            po-monitoring-row__date
+                                            po-monitoring-row__date--overdue
+                                        "
+                                    >
+                                        <?= e(po_mon_relative(
+                                            $row['assessment_due_date'] ?? null
+                                        )) ?>
+                                    </span>
+                                    <span class="po-status po-status--danger">
+                                        Overdue
+                                    </span>
+                                </span>
+                            </a>
+
+                        <?php endforeach; ?>
+
+                    </div>
+
+                <?php endif; ?>
+
+            </div>
+
+        </div>
+
+    <?php endif; ?>
+
+</section>
+
+
 
 <!-- =========================================================
      DASHBOARD DETAIL MODAL
@@ -1479,6 +2215,150 @@ require __DIR__ . '/_layout_start.php';
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>
+
+
+            <!-- ASSESSMENT MODAL PANEL -->
+            <div class="po-dashboard-modal__panel" data-po-panel="assessments">
+
+                <?php if (!$assessmentModalItems): ?>
+
+                    <div class="po-dashboard-modal__empty">
+                        <i class="fas fa-clipboard-check"></i>
+                        <strong>No outstanding assessments</strong>
+                        <span>Every candidate is up to date.</span>
+                    </div>
+
+                <?php else: ?>
+
+                    <div class="po-dashboard-modal__list">
+
+                        <?php foreach ($assessmentModalItems as $row): ?>
+
+                            <?php
+                            $fn = trim((string) ($row['first_name'] ?? ''));
+                            $ln = trim((string) ($row['last_name'] ?? ''));
+                            $name = trim($fn . ' ' . $ln) ?: 'Candidate';
+
+                            $dueTs = !empty($row['assessment_due_date'])
+                                ? strtotime((string) $row['assessment_due_date'])
+                                : null;
+
+                            $isOverdue = $dueTs !== null && $dueTs < time();
+                            ?>
+
+                            <a
+                                class="po-dashboard-modal__row"
+                                href="<?= url(
+                                    'programme_officer/candidate_view.php?id='
+                                    . (int) $row['candidate_id']
+                                    . '&cohort_id='
+                                    . (int) $row['cohort_id']
+                                ) ?>"
+                            >
+                                <span class="po-dashboard-modal__avatar">
+                                    <?= e(po_initials($fn, $ln)) ?>
+                                </span>
+
+                                <span class="po-dashboard-modal__row-main">
+                                    <strong><?= e($name) ?></strong>
+                                    <small>
+                                        <?= e($row['assessment_title'] ?? 'Assessment') ?>
+                                        ·
+                                        <?= e($row['programme_name'] ?? '') ?>
+                                        ·
+                                        <?= e(po_date($row['assessment_due_date'] ?? null)) ?>
+                                    </small>
+                                </span>
+
+                                <span class="po-status po-status--<?= $isOverdue
+                                    ? 'danger'
+                                    : e(po_status_class($row['submission_status'] ?? '')) ?>">
+                                    <?= $isOverdue
+                                        ? 'Overdue'
+                                        : e(po_mon_status_label(
+                                            $row['submission_status'] ?? ''
+                                        )) ?>
+                                </span>
+
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+
+                        <?php endforeach; ?>
+
+                    </div>
+
+                <?php endif; ?>
+
+            </div>
+
+
+            <!-- INTERVIEW MODAL PANEL -->
+            <div class="po-dashboard-modal__panel" data-po-panel="interviews">
+
+                <?php if (!$interviewModalItems): ?>
+
+                    <div class="po-dashboard-modal__empty">
+                        <i class="fas fa-calendar-check"></i>
+                        <strong>No scheduled interviews</strong>
+                        <span>No candidate interviews are currently scheduled.</span>
+                    </div>
+
+                <?php else: ?>
+
+                    <div class="po-dashboard-modal__list">
+
+                        <?php foreach ($interviewModalItems as $row): ?>
+
+                            <?php
+                            $fn = trim((string) ($row['first_name'] ?? ''));
+                            $ln = trim((string) ($row['last_name'] ?? ''));
+                            $name = trim($fn . ' ' . $ln) ?: 'Candidate';
+                            ?>
+
+                            <a
+                                class="po-dashboard-modal__row"
+                                href="<?= url(
+                                    'programme_officer/candidate_view.php?id='
+                                    . (int) $row['candidate_id']
+                                    . '&cohort_id='
+                                    . (int) $row['cohort_id']
+                                ) ?>"
+                            >
+                                <span class="po-dashboard-modal__avatar">
+                                    <?= e(po_initials($fn, $ln)) ?>
+                                </span>
+
+                                <span class="po-dashboard-modal__row-main">
+                                    <strong><?= e($name) ?></strong>
+                                    <small>
+                                        <?= e($row['interview_title'] ?? 'Interview') ?>
+                                        ·
+                                        <?= e($row['programme_name'] ?? '') ?>
+                                        ·
+                                        <?= e(po_datetime(
+                                            $row['effective_scheduled_at'] ?? null
+                                        )) ?>
+                                    </small>
+                                </span>
+
+                                <span class="po-status po-status--<?= e(
+                                    po_status_class($row['schedule_status'] ?? '')
+                                ) ?>">
+                                    <?= e(po_mon_status_label(
+                                        $row['schedule_status'] ?? ''
+                                    )) ?>
+                                </span>
+
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+
+                        <?php endforeach; ?>
+
+                    </div>
+
+                <?php endif; ?>
+
+            </div>
 
         </div>
 
@@ -1696,6 +2576,161 @@ require __DIR__ . '/_layout_start.php';
 }
 body.po-dashboard-modal-open { overflow: hidden; }
 
+/* =========================================================
+   Assessment & Interview Monitoring
+========================================================= */
+
+.po-monitoring__metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--po-border-light);
+}
+
+.po-monitoring-metric {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--po-border);
+    border-radius: 14px;
+    background: var(--po-soft);
+    cursor: pointer;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.po-monitoring-metric:hover,
+.po-monitoring-metric:focus-visible {
+    transform: translateY(-2px);
+    border-color: var(--po-primary);
+    box-shadow: var(--po-shadow-lg);
+    outline: none;
+}
+.po-monitoring-metric__icon {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 11px;
+    background: var(--po-primary-soft);
+    color: var(--po-primary);
+    font-size: .875rem;
+}
+.po-monitoring-metric--amber  .po-monitoring-metric__icon { background: #fef3c7; color: #b45309; }
+.po-monitoring-metric--red    .po-monitoring-metric__icon { background: #fee2e2; color: #b91c1c; }
+.po-monitoring-metric--blue   .po-monitoring-metric__icon { background: #dbeafe; color: #1d4ed8; }
+.po-monitoring-metric--purple .po-monitoring-metric__icon { background: #ede9fe; color: #6d28d9; }
+
+.po-monitoring-metric strong {
+    display: block;
+    color: var(--po-text);
+    font-size: 1.25rem !important;
+    line-height: 1.1;
+}
+.po-monitoring-metric span {
+    display: block;
+    margin-top: 2px;
+    color: var(--po-text);
+    font-size: .8125rem !important;
+    font-weight: 600;
+}
+.po-monitoring-metric small {
+    display: block;
+    margin-top: 4px;
+    color: var(--po-muted);
+    font-size: .6875rem !important;
+}
+
+.po-monitoring__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.po-monitoring-panel { padding: 18px 20px; }
+.po-monitoring-panel + .po-monitoring-panel {
+    border-left: 1px solid var(--po-border-light);
+}
+.po-monitoring-panel h4 {
+    margin: 0 0 4px;
+    color: var(--po-text);
+    font-size: .9375rem !important;
+}
+.po-monitoring-panel > p {
+    margin: 0 0 12px;
+    color: var(--po-muted);
+    font-size: .75rem !important;
+}
+
+.po-monitoring-list { display: grid; gap: 8px; }
+
+.po-monitoring-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--po-border-light);
+    border-radius: 12px;
+    background: var(--po-surface);
+    color: var(--po-text);
+    text-decoration: none;
+    transition: border-color .15s ease, background .15s ease;
+}
+.po-monitoring-row:hover {
+    border-color: var(--po-primary);
+    background: var(--po-soft);
+}
+.po-monitoring-row__main { min-width: 0; flex: 1; }
+.po-monitoring-row__main strong {
+    display: block;
+    overflow: hidden;
+    color: var(--po-text);
+    font-size: .8125rem !important;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.po-monitoring-row__main small {
+    display: block;
+    margin-top: 3px;
+    overflow: hidden;
+    color: var(--po-muted);
+    font-size: .6875rem !important;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.po-monitoring-row__meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    flex: 0 0 auto;
+}
+.po-monitoring-row__date {
+    color: var(--po-muted);
+    font-size: .6875rem !important;
+    font-weight: 600;
+}
+.po-monitoring-row__date--overdue { color: #b91c1c; }
+
+.po-empty--compact { padding: 24px 12px; }
+
+@media (max-width: 900px) {
+    .po-monitoring__metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .po-monitoring__grid {
+        grid-template-columns: 1fr;
+    }
+    .po-monitoring-panel + .po-monitoring-panel {
+        border-left: 0;
+        border-top: 1px solid var(--po-border-light);
+    }
+}
+@media (max-width: 520px) {
+    .po-monitoring__metrics {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 640px) {
     .po-dashboard-modal {
         padding: 10px;
@@ -1769,6 +2804,16 @@ body.po-dashboard-modal-open { overflow: hidden; }
             title: 'Completed Candidates',
             subtitle: 'Candidates whose current participant status is Completed.',
             url: <?= json_encode(url('programme_officer/candidates.php?status=completed')) ?>
+        },
+        assessments: {
+            title: 'Outstanding Assessments',
+            subtitle: 'Pending and overdue assessments across your programmes.',
+            url: <?= json_encode(url('programme_officer/candidates.php')) ?>
+        },
+        interviews: {
+            title: 'Scheduled Interviews',
+            subtitle: 'Upcoming candidate interviews across your programmes.',
+            url: <?= json_encode(url('programme_officer/candidates.php')) ?>
         }
     };
 
