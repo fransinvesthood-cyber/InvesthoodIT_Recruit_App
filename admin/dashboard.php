@@ -943,21 +943,6 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
           <!-- Executive Stats Grid -->
           <div class="admin-executive-grid" id="adminExecutiveGrid">
             <?php $adminPending = []; try { $adminPending = AdminNotification::pendingTasks(); } catch (Throwable $e) { $adminPending = []; } ?>
-            <?php if (!empty($adminPending) && array_sum(array_map('intval', $adminPending)) > 0): ?>
-            <div class="admin-exec-card" style="border-color:var(--primary);">
-              <div class="admin-exec-card__header"><div class="admin-exec-card__icon admin-exec-card__icon--primary"><i class="fas fa-bell"></i></div><span class="admin-exec-card__change up"><?= (int) ($adminNotifUnread ?? 0) ?> unread</span></div>
-              <span class="admin-exec-card__number" data-count="<?= (int) array_sum(array_map('intval', $adminPending)) ?>">0</span>
-              <span class="admin-exec-card__label">Pending Admin Tasks</span>
-              <div class="admin-exec-card__footer" style="flex-direction:column;align-items:stretch;gap:0.35rem;">
-                <span class="admin-exec-card__period"><i class="fas fa-file-alt"></i> <?= (int) ($adminPending['applications'] ?? 0) ?> applications awaiting review — <a href="<?= url('admin/applications.php') ?>">Review</a></span>
-                <span class="admin-exec-card__period"><i class="fas fa-calendar-check"></i> <?= (int) ($adminPending['interviews'] ?? 0) ?> interviews awaiting outcomes — <a href="<?= url('admin/interviews.php') ?>">View</a></span>
-                <span class="admin-exec-card__period"><i class="fas fa-user-check"></i> <?= (int) ($adminPending['selection'] ?? 0) ?> selection decisions pending — <a href="<?= url('admin/selection.php') ?>">Decide</a></span>
-                <span class="admin-exec-card__period"><i class="fas fa-envelope-open-text"></i> <?= (int) ($adminPending['offers'] ?? 0) ?> offers requiring action — <a href="<?= url('admin/offers.php') ?>">Manage</a></span>
-                <span class="admin-exec-card__period"><i class="fas fa-handshake"></i> <?= (int) ($adminPending['placements'] ?? 0) ?> placements awaiting confirmation — <a href="<?= url('admin/placements.php') ?>">Confirm</a></span>
-                <a href="<?= url('admin/notifications.php') ?>" class="admin-exec-card__link">View all notifications <i class="fas fa-arrow-right"></i></a>
-              </div>
-            </div>
-            <?php endif; ?>
             <div class="admin-exec-card">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--primary"><i class="fas fa-users"></i></div>

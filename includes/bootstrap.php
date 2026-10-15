@@ -121,6 +121,22 @@ if (!defined('INVESTHOOD_MAINT_CHECKED')) {
     }
 }
 
+// --- Lazy schema migration (cohorts.supervisor_id) ---
+// The Supervisor portal (supervisor/*.php) and the Programme Manager
+// "Assign Supervisor" module (programme/assign_supervisor.php) filter on
+// cohorts.supervisor_id, which databases imported before this module
+// shipped do not have (see database/cohort_supervisor.sql).
+// Cohort::ensureSchema() applies the additive migration once per request
+// and never throws, so pages that do not need the column are unaffected.
+if (!defined('INVESTHOOD_COHORT_SCHEMA_CHECKED')) {
+    define('INVESTHOOD_COHORT_SCHEMA_CHECKED', true);
+    try {
+        Cohort::ensureSchema();
+    } catch (Throwable $schemaEx) {
+        error_log('[SCHEMA] cohorts.supervisor_id migration: ' . $schemaEx->getMessage());
+    }
+}
+
 // --- Custom error handler (no sensitive info leaked) ---
 set_exception_handler(function (Throwable $ex): void {
     error_log('[EXCEPTION] ' . $ex->getMessage() . ' @ ' . $ex->getFile() . ':' . $ex->getLine());
