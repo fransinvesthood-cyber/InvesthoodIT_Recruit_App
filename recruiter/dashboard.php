@@ -20,6 +20,159 @@ if ($recruiterId <= 0) {
     exit('Invalid Recruiter account.');
 }
 
+/* ==================================================================
+ | Smarter Shortlists — inline helpers
+ * ==================================================================*/
+
+if (!function_exists('dash_has_column')) {
+    function dash_has_column(mysqli $conn, string $table, string $column): bool {
+        static $cache = [];
+        $key = $table . '.' . $column;
+        if (array_key_exists($key, $cache)) return $cache[$key];
+
+        $stmt = $conn->prepare(
+            "SELECT 1 FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = ? AND COLUMN_NAME = ?
+             LIMIT 1"
+        );
+        if (!$stmt) return $cache[$key] = false;
+        $stmt->bind_param('ss', $table, $column);
+        $stmt->execute();
+        $cache[$key] = (bool)$stmt->get_result()->fetch_row();
+        $stmt->close();
+        return $cache[$key];
+    }
+}
+
+if (!function_exists('dash_consent_status')) {
+    function dash_consent_status(mysqli $conn, int $cid): array {
+        $out = ['valid' => false, 'status' => 'none'];
+        if ($cid <= 0 || !rc_has_table($conn, 'candidate_consents')) return $out;
+
+        $stmt = $conn->prepare(
+            "SELECT status, expires_at FROM candidate_consents
+             WHERE candidate_id = ?
+               AND consent_type = 'recruiter_discovery'
+             ORDER BY (status = 'consented') DESC,
+                      (expires_at IS NULL) DESC,
+                      expires_at DESC
+             LIMIT 1"
+        );
+        if (!$stmt) return $out;
+
+        $stmt->bind_param('i', $cid);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if (!$row) return $out;
+        $expired = !empty($row['expires_at']) && strtotime((string)$row['expires_at']) <= time();
+        $out['status'] = (string)$row['status'];
+        $out['valid']  = ($row['status'] === 'consented') && !$expired;
+        return $out;
+    }
+}
+
+if (!function_exists('dash_candidate_skills')) {
+    function dash_candidate_skills(mysqli $conn, int $cid): array {
+        if ($cid <= 0 ||
+            !rc_has_table($conn, 'candidate_skills') ||
+            !rc_has_table($conn, 'skills')) return [];
+
+        $stmt = $conn->prepare(
+            "SELECT s.name, cs.verification_status
+             FROM candidate_skills cs
+             INNER JOIN skills s ON s.id = cs.skill_id
+             WHERE cs.user_id = ? AND s.is_active = 1
+             ORDER BY s.name ASC"
+        );
+        if (!$stmt) return [];
+        $stmt->bind_param('i', $cid);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $out = [];
+        while ($r = $res->fetch_assoc()) {
+            $out[] = [
+                'name'     => (string)$r['name'],
+                'verified' => strtolower((string)$r['verification_status']) === 'verified',
+            ];
+        }
+        $stmt->close();
+        return $out;
+    }
+}
+
+if (!function_exists('dash_parse_criteria')) {
+    function dash_parse_criteria(?string $json): array {
+        $c = json_decode((string)$json, true);
+        if (!is_array($c)) $c = [];
+        return [
+            'skill'    => trim((string)($c['skill']    ?? '')),
+            'province' => trim((string)($c['province'] ?? '')),
+            'city'     => trim((string)($c['city']     ?? '')),
+        ];
+    }
+}
+
+if (!function_exists('dash_match_candidate')) {
+    function dash_match_candidate(array $cand, array $skills, array $criteria): array {
+        $index = [];
+        foreach ($skills as $s) $index[strtolower($s['name'])] = $s;
+
+        $matched = [];
+        $missing = [];
+
+        $skillReq = $criteria['skill'] ?? '';
+        if ($skillReq !== '') {
+            foreach (preg_split('/[,;|]+/', $skillReq) ?: [] as $part) {
+                $part = trim($part);
+                if ($part === '') continue;
+                $key = strtolower($part);
+                if (isset($index[$key])) {
+                    $matched[] = ['name' => $index[$key]['name'], 'verified' => $index[$key]['verified']];
+                } else {
+                    $missing[] = $part;
+                }
+            }
+        }
+
+        $provinceMatch = null;
+        if (!empty($criteria['province'])) {
+            $provinceMatch = strcasecmp(
+                trim((string)($cand['province'] ?? '')),
+                $criteria['province']
+            ) === 0;
+        }
+
+        $cityMatch = null;
+        if (!empty($criteria['city'])) {
+            $cityMatch = strcasecmp(
+                trim((string)($cand['city'] ?? '')),
+                $criteria['city']
+            ) === 0;
+        }
+
+        $verifiedCount = 0;
+        foreach ($skills as $s) if ($s['verified']) $verifiedCount++;
+
+        $total = count($matched) + count($missing);
+        $score = $total > 0 ? (int)round((count($matched) / $total) * 100) : 100;
+
+        return [
+            'matched'        => $matched,
+            'missing'        => $missing,
+            'province_match' => $provinceMatch,
+            'city_match'     => $cityMatch,
+            'verified_count' => $verifiedCount,
+            'score'          => $score,
+            'met'            => empty($missing)
+                                && ($provinceMatch !== false)
+                                && ($cityMatch !== false),
+        ];
+    }
+}
+
 /*
 |--------------------------------------------------------------------------
 | Dashboard Statistics
@@ -492,6 +645,7 @@ if (rc_has_table($conn, 'recruiter_shortlists')) {
                 rs.id,
                 rs.name,
                 rs.client_name,
+                rs.search_criteria_json,
                 rs.status,
                 rs.taxonomy_version,
                 rs.created_at,
@@ -512,6 +666,7 @@ if (rc_has_table($conn, 'recruiter_shortlists')) {
                 rs.id,
                 rs.name,
                 rs.client_name,
+                rs.search_criteria_json,
                 rs.status,
                 rs.taxonomy_version,
                 rs.created_at,
@@ -529,6 +684,7 @@ if (rc_has_table($conn, 'recruiter_shortlists')) {
                 rs.id,
                 rs.name,
                 rs.client_name,
+                rs.search_criteria_json,
                 rs.status,
                 rs.taxonomy_version,
                 rs.created_at,
@@ -539,6 +695,16 @@ if (rc_has_table($conn, 'recruiter_shortlists')) {
             FROM recruiter_shortlists rs
 
             WHERE rs.recruiter_id = ?
+
+            GROUP BY
+                rs.id,
+                rs.name,
+                rs.client_name,
+                rs.search_criteria_json,
+                rs.status,
+                rs.taxonomy_version,
+                rs.created_at,
+                rs.updated_at
 
             ORDER BY
                 rs.updated_at DESC,
@@ -586,13 +752,217 @@ $taxonomy = rc_taxonomy_version($conn);
 
 /*
 |--------------------------------------------------------------------------
+| Inline CSV export — dashboard.php?export_shortlist=ID
+|--------------------------------------------------------------------------
+*/
+
+$exportShortlistId = (int)($_GET['export_shortlist'] ?? 0);
+
+if ($exportShortlistId > 0
+    && rc_has_table($conn, 'recruiter_shortlists')
+    && rc_has_table($conn, 'recruiter_shortlist_candidates')) {
+
+    $stmt = $conn->prepare(
+        "SELECT id, name, client_name, search_criteria_json, taxonomy_version
+         FROM recruiter_shortlists
+         WHERE id = ? AND recruiter_id = ?
+         LIMIT 1"
+    );
+    $stmt->bind_param('ii', $exportShortlistId, $recruiterId);
+    $stmt->execute();
+    $exportSl = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$exportSl) {
+        http_response_code(403);
+        exit('Shortlist not found or access denied.');
+    }
+
+    $stmt = $conn->prepare(
+        "SELECT rsc.candidate_id AS user_id,
+                u.first_name, u.last_name, u.province,
+                u.qualification_level, u.professional_title, u.employment_status
+         FROM recruiter_shortlist_candidates rsc
+         INNER JOIN users u ON u.id = rsc.candidate_id
+         INNER JOIN roles r ON r.id = u.role_id
+         WHERE rsc.shortlist_id = ? AND r.slug = 'candidate'
+         ORDER BY rsc.added_at DESC"
+    );
+    $stmt->bind_param('i', $exportShortlistId);
+    $stmt->execute();
+    $exportRes = $stmt->get_result();
+    $exportCandidates = [];
+    while ($r = $exportRes->fetch_assoc()) $exportCandidates[] = $r;
+    $stmt->close();
+
+    $criteria  = dash_parse_criteria($exportSl['search_criteria_json'] ?? null);
+    $rowsOut   = [];
+    $blocked   = 0;
+
+    foreach ($exportCandidates as $c) {
+        $cid     = (int)$c['user_id'];
+        $consent = dash_consent_status($conn, $cid);
+        if (!$consent['valid']) { $blocked++; continue; }
+
+        $skills = dash_candidate_skills($conn, $cid);
+        $match  = dash_match_candidate($c, $skills, $criteria);
+
+        $verified = [];
+        foreach ($skills as $s) if ($s['verified']) $verified[] = $s['name'];
+
+        $rowsOut[] = [
+            'Name'               => trim($c['first_name'] . ' ' . $c['last_name']),
+            'Professional Title' => (string)$c['professional_title'],
+            'Province'           => (string)$c['province'],
+            'Qualification'      => (string)$c['qualification_level'],
+            'Employment Status'  => (string)$c['employment_status'],
+            'Verified Skills'    => implode(' | ', $verified),
+            'Match %'            => $match['score'],
+            'Meets Criteria'     => $match['met'] ? 'Yes' : 'No',
+            'Missing Skills'     => implode(' | ', $match['missing']),
+        ];
+    }
+
+    rc_activity(
+        $conn,
+        $recruiterId,
+        'shortlist_export',
+        'Exported shortlist "' . $exportSl['name'] . '" — '
+            . count($rowsOut) . ' exported, '
+            . $blocked . ' blocked (no consent)',
+        'recruiter_shortlist',
+        $exportShortlistId
+    );
+
+    $safe = trim(
+        preg_replace('/[^A-Za-z0-9\-_]+/', '_', (string)$exportSl['name']),
+        '_'
+    );
+    if ($safe === '') $safe = 'shortlist';
+    $filename = 'shortlist_' . $safe . '_' . date('Ymd_His') . '.csv';
+
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Pragma: no-cache');
+
+    $out = fopen('php://output', 'w');
+    fwrite($out, "\xEF\xBB\xBF");
+
+    fputcsv($out, ['Shortlist', $exportSl['name']]);
+    fputcsv($out, ['Client',    $exportSl['client_name'] ?: '—']);
+    fputcsv($out, ['Taxonomy',  $exportSl['taxonomy_version']]);
+    fputcsv($out, ['Generated', date('Y-m-d H:i:s')]);
+    fputcsv($out, ['Notice',
+        'Only candidates with valid recruiter-discovery consent are included. '
+        . 'Candidates without consent were excluded (' . $blocked . ').']);
+    fputcsv($out, []);
+
+    if ($rowsOut) {
+        fputcsv($out, array_keys($rowsOut[0]));
+        foreach ($rowsOut as $row) {
+            foreach ($row as $k => $v) {
+                $v = (string)$v;
+                if ($v !== '' && strpbrk($v[0], "=+-@\t\r") !== false) {
+                    $v = "'" . $v;
+                }
+                $row[$k] = $v;
+            }
+            fputcsv($out, $row);
+        }
+    } else {
+        fputcsv($out, ['No candidates with valid consent to export.']);
+    }
+
+    fclose($out);
+    exit;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Inline compare — dashboard.php?compare_shortlist=ID#compare
+|--------------------------------------------------------------------------
+*/
+
+$compareShortlistId = (int)($_GET['compare_shortlist'] ?? 0);
+$compareShortlist   = null;
+$compareCandidates  = [];
+
+if ($compareShortlistId > 0
+    && rc_has_table($conn, 'recruiter_shortlists')
+    && rc_has_table($conn, 'recruiter_shortlist_candidates')) {
+
+    $stmt = $conn->prepare(
+        "SELECT id, name, client_name, search_criteria_json, taxonomy_version
+         FROM recruiter_shortlists
+         WHERE id = ? AND recruiter_id = ?
+         LIMIT 1"
+    );
+    $stmt->bind_param('ii', $compareShortlistId, $recruiterId);
+    $stmt->execute();
+    $compareShortlist = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if ($compareShortlist) {
+
+        $criteriaCmp = dash_parse_criteria($compareShortlist['search_criteria_json'] ?? null);
+
+        $stmt = $conn->prepare(
+            "SELECT rsc.candidate_id AS user_id,
+                    u.first_name, u.last_name, u.province,
+                    u.qualification_level, u.professional_title
+             FROM recruiter_shortlist_candidates rsc
+             INNER JOIN users u ON u.id = rsc.candidate_id
+             INNER JOIN roles r ON r.id = u.role_id
+             WHERE rsc.shortlist_id = ? AND r.slug = 'candidate'
+             ORDER BY rsc.added_at DESC"
+        );
+        $stmt->bind_param('i', $compareShortlistId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+
+        while ($r = $res->fetch_assoc()) {
+            $cid     = (int)$r['user_id'];
+            $consent = dash_consent_status($conn, $cid);
+            $skills  = $consent['valid'] ? dash_candidate_skills($conn, $cid) : [];
+
+            $r['consent_valid'] = $consent['valid'];
+            $r['skills']        = $skills;
+            $r['match']         = dash_match_candidate($r, $skills, $criteriaCmp);
+
+            $compareCandidates[] = $r;
+        }
+        $stmt->close();
+
+        usort(
+            $compareCandidates,
+            fn($a, $b) => $b['match']['score'] <=> $a['match']['score']
+        );
+
+        rc_activity(
+            $conn,
+            $recruiterId,
+            'shortlist_compared',
+            'Compared ' . count($compareCandidates) . ' candidates in shortlist #' . $compareShortlistId,
+            'recruiter_shortlist',
+            $compareShortlistId
+        );
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
 | Layout
 |--------------------------------------------------------------------------
 */
 
 require __DIR__ . '/_layout_start.php';
-
 ?>
+
+
+<!-- ================================================================
+     PIPELINE SHORTCUT
+================================================================ -->
 
 <section class="rc-pipeline-shortcut" aria-labelledby="rcPipelineShortcutTitle">
     <div class="rc-pipeline-shortcut__copy">
@@ -604,12 +974,6 @@ require __DIR__ . '/_layout_start.php';
         Open follow-up pipeline <i class="fas fa-arrow-right" aria-hidden="true"></i>
     </a>
 </section>
-<style>
-.rc-pipeline-shortcut{display:flex;align-items:center;justify-content:space-between;gap:22px;margin:0 0 24px;padding:24px 26px;border:1px solid #dce5f5;border-radius:18px;background:linear-gradient(115deg,#f7faff,#eef3ff)}
-.rc-pipeline-shortcut__copy{max-width:760px}.rc-pipeline-shortcut h2{margin:7px 0 8px;font-size:clamp(19px,2vw,25px);color:#172b4d}.rc-pipeline-shortcut p{margin:0;color:#61718a;line-height:1.6}.rc-pipeline-shortcut__button{display:inline-flex;align-items:center;gap:10px;white-space:nowrap;padding:13px 17px;border-radius:11px;background:#2454d8;color:#fff;text-decoration:none;font-weight:700}.rc-pipeline-shortcut__button:hover{background:#183eae}
-@media(max-width:700px){.rc-pipeline-shortcut{align-items:flex-start;flex-direction:column}.rc-pipeline-shortcut__button{white-space:normal}}
-[data-theme="dark"] .rc-pipeline-shortcut{background:#17243a;border-color:#33435d}. [data-theme="dark"] .rc-pipeline-shortcut h2{color:#f0f5ff}[data-theme="dark"] .rc-pipeline-shortcut p{color:#b6c4da}
-</style>
 
 
 <!-- ================================================================
@@ -617,6 +981,12 @@ require __DIR__ . '/_layout_start.php';
 ================================================================ -->
 
 <style>
+
+.rc-pipeline-shortcut{display:flex;align-items:center;justify-content:space-between;gap:22px;margin:0 0 24px;padding:24px 26px;border:1px solid #dce5f5;border-radius:18px;background:linear-gradient(115deg,#f7faff,#eef3ff)}
+.rc-pipeline-shortcut__copy{max-width:760px}.rc-pipeline-shortcut h2{margin:7px 0 8px;font-size:clamp(19px,2vw,25px);color:#172b4d}.rc-pipeline-shortcut p{margin:0;color:#61718a;line-height:1.6}.rc-pipeline-shortcut__button{display:inline-flex;align-items:center;gap:10px;white-space:nowrap;padding:13px 17px;border-radius:11px;background:#2454d8;color:#fff;text-decoration:none;font-weight:700}.rc-pipeline-shortcut__button:hover{background:#183eae}
+@media(max-width:700px){.rc-pipeline-shortcut{align-items:flex-start;flex-direction:column}.rc-pipeline-shortcut__button{white-space:normal}}
+[data-theme="dark"] .rc-pipeline-shortcut{background:#17243a;border-color:#33435d}. [data-theme="dark"] .rc-pipeline-shortcut h2{color:#f0f5ff}[data-theme="dark"] .rc-pipeline-shortcut p{color:#b6c4da}
+
 
 .rc-stat-card--interactive {
     position: relative;
@@ -984,6 +1354,71 @@ html[data-theme="dark"] .rc-modal-badge {
 
 }
 
+
+/* ================================================================
+   SMARTER SHORTLISTS
+================================================================ */
+
+.rc-shortlist-smart {
+    padding: 20px 4px;
+    border-bottom: 1px solid rgba(127,127,127,.13);
+}
+.rc-shortlist-smart:last-child { border-bottom: 0; }
+
+.rc-shortlist-smart__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.rc-shortlist-smart__head strong { display: block; font-size: 16px; }
+.rc-shortlist-smart__head span  { display: block; opacity: .7; font-size: 12px; margin-top: 3px; }
+
+.rc-shortlist-smart__metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.rc-shortlist-smart__metrics > div {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(127,127,127,.08);
+    text-align: center;
+}
+.rc-shortlist-smart__metrics span   {
+    display: block;
+    font-size: 11px;
+    opacity: .7;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.rc-shortlist-smart__metrics strong { display: block; font-size: 20px; margin-top: 2px; }
+.rc-shortlist-smart__metrics .rc-good { background: rgba(20,184,123,.14); }
+.rc-shortlist-smart__metrics .rc-warn { background: rgba(230,162,24,.14); }
+
+.rc-shortlist-smart__criteria {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.rc-shortlist-smart__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.rc-chip--danger { background: rgba(210,75,75,.14) !important; }
+
+.rc-compare-table th:first-child {
+    width: 160px;
+    background: rgba(127,127,127,.05);
+}
+.rc-compare-table td small { display: block; opacity: .7; margin-top: 3px; }
+
 </style>
 
 
@@ -1326,6 +1761,397 @@ html[data-theme="dark"] .rc-modal-badge {
     </a>
 
 </div>
+
+
+<!-- ================================================================
+     SMARTER SHORTLISTS OVERVIEW
+================================================================ -->
+
+<?php if (
+    rc_has_table($conn, 'recruiter_shortlists') &&
+    rc_has_table($conn, 'recruiter_shortlist_candidates')
+): ?>
+
+<section class="rc-card rc-space" id="smart-shortlists">
+
+    <div class="rc-card__header">
+        <div>
+            <span class="rc-eyebrow">Smarter Shortlists</span>
+            <h3>Manage, compare and export — inline</h3>
+            <p>
+                Each shortlist stores the search context used to build it.
+                Match scores are computed against that context using each
+                candidate's verified skills, province, and consent status.
+            </p>
+        </div>
+        <a class="rc-btn rc-btn--secondary rc-btn--small"
+           href="<?= url('recruiter/shortlists.php') ?>">
+            <i class="fas fa-plus"></i> New shortlist
+        </a>
+    </div>
+
+    <div class="rc-card__body">
+
+        <?php if (!$modalData['shortlists']): ?>
+
+            <div class="rc-empty">
+                <i class="fas fa-list-check"></i>
+                <strong>No shortlists yet</strong>
+                <span>Create your first shortlist from the Shortlists page.</span>
+            </div>
+
+        <?php else: ?>
+
+            <?php foreach ($modalData['shortlists'] as $sl):
+
+                $criteriaSl = dash_parse_criteria($sl['search_criteria_json'] ?? null);
+                $hasCriteria =
+                    $criteriaSl['skill'] !== '' ||
+                    $criteriaSl['province'] !== '' ||
+                    $criteriaSl['city'] !== '';
+
+                $metCount       = 0;
+                $partialCount   = 0;
+                $unmetCount     = 0;
+                $consentedCount = 0;
+                $blockedCount   = 0;
+
+                $stmt = $conn->prepare("
+                    SELECT rsc.candidate_id AS user_id,
+                           u.first_name, u.last_name,
+                           u.province, u.qualification_level
+                    FROM recruiter_shortlist_candidates rsc
+                    INNER JOIN users u ON u.id = rsc.candidate_id
+                    INNER JOIN roles r ON r.id = u.role_id
+                    WHERE rsc.shortlist_id = ? AND r.slug = 'candidate'
+                ");
+                $stmt->bind_param('i', $sl['id']);
+                $stmt->execute();
+                $res = $stmt->get_result();
+
+                while ($row = $res->fetch_assoc()) {
+                    $cid     = (int)$row['user_id'];
+                    $consent = dash_consent_status($conn, $cid);
+
+                    if (!$consent['valid']) {
+                        $blockedCount++;
+                        continue;
+                    }
+
+                    $consentedCount++;
+                    $skills = dash_candidate_skills($conn, $cid);
+                    $m      = dash_match_candidate($row, $skills, $criteriaSl);
+
+                    if ($m['met']) {
+                        $metCount++;
+                    } elseif ($m['score'] >= 50) {
+                        $partialCount++;
+                    } else {
+                        $unmetCount++;
+                    }
+                }
+                $stmt->close();
+
+                $candidateCount = (int)$sl['candidate_count'];
+            ?>
+
+                <article class="rc-shortlist-smart">
+
+                    <div class="rc-shortlist-smart__head">
+                        <div>
+                            <strong><?= e($sl['name']) ?></strong>
+                            <span>
+                                <?= e($sl['client_name'] ?: 'No client specified') ?>
+                                · Taxonomy <?= e($sl['taxonomy_version']) ?>
+                            </span>
+                        </div>
+                        <span class="rc-status">
+                            <?= e(rc_label((string)$sl['status'])) ?>
+                        </span>
+                    </div>
+
+                    <div class="rc-shortlist-smart__metrics">
+                        <div>
+                            <span>Total</span>
+                            <strong><?= number_format($candidateCount) ?></strong>
+                        </div>
+                        <div>
+                            <span>Consented</span>
+                            <strong><?= number_format($consentedCount) ?></strong>
+                        </div>
+                        <div class="<?= $blockedCount ? 'rc-warn' : '' ?>">
+                            <span>Blocked</span>
+                            <strong><?= number_format($blockedCount) ?></strong>
+                        </div>
+                        <?php if ($hasCriteria): ?>
+                            <div class="<?= $metCount ? 'rc-good' : '' ?>">
+                                <span>Meets</span>
+                                <strong><?= number_format($metCount) ?></strong>
+                            </div>
+                            <div>
+                                <span>Partial</span>
+                                <strong><?= number_format($partialCount) ?></strong>
+                            </div>
+                            <div>
+                                <span>Unmet</span>
+                                <strong><?= number_format($unmetCount) ?></strong>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <?php if ($hasCriteria): ?>
+                        <div class="rc-shortlist-smart__criteria">
+                            <span class="rc-eyebrow">Match context</span>
+
+                            <?php if ($criteriaSl['skill'] !== ''): ?>
+                                <span class="rc-chip">
+                                    <i class="fas fa-certificate"></i>
+                                    <?= e($criteriaSl['skill']) ?>
+                                </span>
+                            <?php endif; ?>
+
+                            <?php if ($criteriaSl['province'] !== ''): ?>
+                                <span class="rc-chip">
+                                    <i class="fas fa-location-dot"></i>
+                                    <?= e($criteriaSl['province']) ?>
+                                </span>
+                            <?php endif; ?>
+
+                            <?php if ($criteriaSl['city'] !== ''): ?>
+                                <span class="rc-chip">
+                                    <i class="fas fa-city"></i>
+                                    <?= e($criteriaSl['city']) ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="rc-shortlist-smart__actions">
+                        <a class="rc-btn rc-btn--secondary rc-btn--small"
+                           href="<?= url('recruiter/shortlist_view.php?id=' . (int)$sl['id']) ?>">
+                            <i class="fas fa-folder-open"></i> Open
+                        </a>
+
+                        <a class="rc-btn rc-btn--secondary rc-btn--small"
+                           href="<?= url('recruiter/dashboard.php?compare_shortlist=' . (int)$sl['id']) ?>#compare">
+                            <i class="fas fa-code-compare"></i> Compare
+                        </a>
+
+                        <a class="rc-btn rc-btn--primary rc-btn--small"
+                           href="<?= url('recruiter/dashboard.php?export_shortlist=' . (int)$sl['id']) ?>">
+                            <i class="fas fa-file-csv"></i> Export CSV
+                        </a>
+                    </div>
+
+                </article>
+
+            <?php endforeach; ?>
+
+        <?php endif; ?>
+
+    </div>
+
+</section>
+
+<?php endif; ?>
+
+
+<!-- ================================================================
+     INLINE COMPARE (dashboard.php?compare_shortlist=ID)
+================================================================ -->
+
+<?php if ($compareShortlist): ?>
+
+<section class="rc-card rc-space" id="compare">
+
+    <div class="rc-card__header">
+        <div>
+            <span class="rc-eyebrow">Side-by-side comparison</span>
+            <h3><?= e($compareShortlist['name']) ?></h3>
+            <p>
+                <?= e($compareShortlist['client_name'] ?: 'No client specified') ?>
+                · Taxonomy <?= e($compareShortlist['taxonomy_version']) ?>
+            </p>
+        </div>
+        <a class="rc-btn rc-btn--secondary rc-btn--small"
+           href="<?= url('recruiter/dashboard.php#smart-shortlists') ?>">
+            <i class="fas fa-xmark"></i> Close
+        </a>
+    </div>
+
+    <?php if (!$compareCandidates): ?>
+
+        <div class="rc-card__body">
+            <div class="rc-empty">
+                <i class="fas fa-code-compare"></i>
+                <strong>No candidates to compare</strong>
+                <span>This shortlist has no candidates yet.</span>
+            </div>
+        </div>
+
+    <?php else: ?>
+
+        <div class="rc-table-wrap">
+            <table class="rc-table rc-compare-table">
+                <thead>
+                    <tr>
+                        <th>Attribute</th>
+                        <?php foreach ($compareCandidates as $c): ?>
+                            <th>
+                                <strong>
+                                    <?= $c['consent_valid']
+                                        ? e(trim($c['first_name'] . ' ' . $c['last_name']))
+                                        : '<i class="fas fa-lock"></i> Consent required' ?>
+                                </strong>
+                                <?php if ($c['consent_valid']): ?>
+                                    <span class="rc-status <?= $c['match']['met'] ? 'rc-status--success' : '' ?>">
+                                        Match <?= (int)$c['match']['score'] ?>%
+                                    </span>
+                                <?php endif; ?>
+                            </th>
+                        <?php endforeach; ?>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    <tr>
+                        <th>Consent</th>
+                        <?php foreach ($compareCandidates as $c): ?>
+                            <td>
+                                <?php if ($c['consent_valid']): ?>
+                                    <span class="rc-status rc-status--success">Valid</span>
+                                <?php else: ?>
+                                    <span class="rc-status rc-status--danger">Unavailable</span>
+                                <?php endif; ?>
+                            </td>
+                        <?php endforeach; ?>
+                    </tr>
+
+                    <tr>
+                        <th>Professional Title</th>
+                        <?php foreach ($compareCandidates as $c): ?>
+                            <td><?= $c['consent_valid']
+                                ? e($c['professional_title'] ?: '—')
+                                : '<i class="fas fa-lock"></i>' ?></td>
+                        <?php endforeach; ?>
+                    </tr>
+
+                    <tr>
+                        <th>Province</th>
+                        <?php foreach ($compareCandidates as $c): ?>
+                            <td><?= $c['consent_valid']
+                                ? e($c['province'] ?: '—')
+                                : '<i class="fas fa-lock"></i>' ?></td>
+                        <?php endforeach; ?>
+                    </tr>
+
+                    <tr>
+                        <th>Qualification</th>
+                        <?php foreach ($compareCandidates as $c): ?>
+                            <td><?= $c['consent_valid']
+                                ? e($c['qualification_level'] ?: '—')
+                                : '<i class="fas fa-lock"></i>' ?></td>
+                        <?php endforeach; ?>
+                    </tr>
+
+                    <tr>
+                        <th>Verified Skills</th>
+                        <?php foreach ($compareCandidates as $c): ?>
+                            <td>
+                                <?php if (!$c['consent_valid']): ?>
+                                    <i class="fas fa-lock"></i>
+                                <?php else:
+                                    $v = array_values(array_filter(
+                                        $c['skills'], fn($s) => $s['verified']
+                                    ));
+                                ?>
+                                    <?php if ($v): ?>
+                                        <?= number_format(count($v)) ?>
+                                        <small><?= e(implode(', ', array_column($v, 'name'))) ?></small>
+                                    <?php else: ?>
+                                        None
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                            </td>
+                        <?php endforeach; ?>
+                    </tr>
+
+                    <tr>
+                        <th>Matched</th>
+                        <?php foreach ($compareCandidates as $c): ?>
+                            <td>
+                                <?php if (!$c['consent_valid']): ?>—
+                                <?php elseif ($c['match']['matched']): ?>
+                                    <?php foreach ($c['match']['matched'] as $m): ?>
+                                        <span class="rc-chip">
+                                            <i class="fas <?= $m['verified'] ? 'fa-certificate' : 'fa-check' ?>"></i>
+                                            <?= e($m['name']) ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                <?php else: ?>—<?php endif; ?>
+                            </td>
+                        <?php endforeach; ?>
+                    </tr>
+
+                    <tr>
+                        <th>Missing</th>
+                        <?php foreach ($compareCandidates as $c): ?>
+                            <td>
+                                <?php if (!$c['consent_valid']): ?>—
+                                <?php elseif ($c['match']['missing']): ?>
+                                    <?php foreach ($c['match']['missing'] as $m): ?>
+                                        <span class="rc-chip rc-chip--danger">
+                                            <i class="fas fa-xmark"></i> <?= e($m) ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <span class="rc-status rc-status--success">None</span>
+                                <?php endif; ?>
+                            </td>
+                        <?php endforeach; ?>
+                    </tr>
+
+                    <tr>
+                        <th>Overall</th>
+                        <?php foreach ($compareCandidates as $c): ?>
+                            <td>
+                                <?php if ($c['match']['met']): ?>
+                                    <span class="rc-status rc-status--success">Meets criteria</span>
+                                <?php else: ?>
+                                    <span class="rc-status">Partial match</span>
+                                <?php endif; ?>
+                            </td>
+                        <?php endforeach; ?>
+                    </tr>
+
+                    <tr>
+                        <th>Action</th>
+                        <?php foreach ($compareCandidates as $c): ?>
+                            <td>
+                                <?php if ($c['consent_valid']): ?>
+                                    <a class="rc-btn rc-btn--secondary rc-btn--small"
+                                       href="<?= url('recruiter/candidate_view.php?id=' . (int)$c['user_id']) ?>">
+                                        Open
+                                    </a>
+                                <?php else: ?>
+                                    <span class="rc-status rc-status--danger">
+                                        <i class="fas fa-lock"></i> Blocked
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+                        <?php endforeach; ?>
+                    </tr>
+
+                </tbody>
+            </table>
+        </div>
+
+    <?php endif; ?>
+
+</section>
+
+<?php endif; ?>
 
 
 <!-- ================================================================
