@@ -1,80 +1,33 @@
 <?php
-/**
- * ================================================
- * INVESTHOOD IT - Information Officer Dashboard
- * ================================================
- * Role: Information Officer
- */
-
 require_once __DIR__ . '/../includes/bootstrap.php';
-
 require_role('information_officer');
-
 $user = current_user();
-$flashes = render_flashes();
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Information Officer Dashboard | Investhood IT</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
-  <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
-</head>
-<body class="dashboard-page">
-  <div class="dashboard">
-    <aside class="sidebar">
-      <div class="sidebar__header">
-        <a href="<?= url('index.php') ?>" class="logo">
-          <span class="logo__icon"><i class="fas fa-code"></i></span>
-          <span class="logo__text">Investhood <span class="logo__accent">IT</span></span>
-        </a>
-      </div>
-      <nav class="sidebar__nav">
-        <div class="sidebar__section-label">Information Officer</div>
-        <ul class="sidebar__menu">
-          <li><a href="#" class="sidebar__link active"><i class="fas fa-th-large"></i> Dashboard</a></li>
-          <li><a href="#" class="sidebar__link"><i class="fas fa-shield-alt"></i> Privacy</a></li>
-          <li><a href="#" class="sidebar__link"><i class="fas fa-file-contract"></i> Policies</a></li>
-          <li><a href="#" class="sidebar__link"><i class="fas fa-history"></i> Audit Log</a></li>
-        </ul>
-      </nav>
-      <div class="sidebar__footer">
-        <div class="sidebar__user">
-          <div class="sidebar__user-avatar"><img src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Info+Officer') ?>&background=1a56db&color=fff&size=80" alt=""></div>
-          <div class="sidebar__user-info">
-            <span class="sidebar__user-name"><?= e($user['fullname'] ?? 'Information Officer') ?></span>
-            <span class="sidebar__user-role">Information Officer</span>
-          </div>
-        </div>
-        <a href="<?= url('auth/logout.php') ?>" class="sidebar__logout"><i class="fas fa-sign-out-alt"></i> Sign Out</a>
-      </div>
-    </aside>
-    <main class="dashboard__main">
-      <header class="dash-header">
-        <div class="dash-header__left">
-          <h1>Information Officer Dashboard</h1>
-        </div>
-        <div class="dash-header__right">
-          <div class="dash-header__user">
-            <img src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Info+Officer') ?>&background=1a56db&color=fff&size=80" alt="" class="dash-header__avatar">
-          </div>
-        </div>
-      </header>
-      <div class="dash-content">
-        <div class="welcome-card">
-          <div class="welcome-card__bg"></div>
-          <div class="welcome-card__content">
-            <h1 class="welcome-card__greeting">Welcome, <span class="text-gradient"><?= e($user['fullname'] ?? 'Information Officer') ?></span></h1>
-            <p>Manage privacy policies, consent records, and ensure regulatory compliance.</p>
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
-</body>
-</html>
+$db = Database::getConnection();
+function iod_e($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
+function iod_has($db, $table) {
+    $s = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name=?');
+    if (!$s) return false;
+    $s->bind_param('s', $table); $s->execute(); $ok = (bool)$s->get_result()->fetch_row(); $s->close(); return $ok;
+}
+function iod_count($db, $table, $where = '1=1') {
+    if (!iod_has($db, $table)) return null;
+    $r = $db->query('SELECT COUNT(*) AS n FROM `' . $table . '` WHERE ' . $where);
+    return $r ? (int)$r->fetch_assoc()['n'] : null;
+}
+$cards = [
+ ['Open data-subject requests', 'io_data_subject_requests', "status NOT IN ('completed','rejected','closed')", 'requests.php'],
+ ['Open privacy incidents', 'io_privacy_incidents', "status NOT IN ('closed','resolved')", 'incidents.php'],
+ ['Access reviews pending', 'io_access_reviews', "status IN ('pending','in_progress')", 'access_reviews.php'],
+ ['Retention reviews due', 'io_retention_reviews', "status IN ('pending','review') AND due_date IS NOT NULL AND due_date<=CURDATE()", 'retention.php'],
+];
+$consents = null;
+if (iod_has($db, 'candidate_consents')) { $r = $db->query("SELECT COUNT(*) n FROM candidate_consents WHERE status='consented' AND (expires_at IS NULL OR expires_at>NOW())"); if ($r) $consents=(int)$r->fetch_assoc()['n']; }
+$name = trim((string)($user['full_name'] ?? $user['name'] ?? $user['username'] ?? 'Information Officer'));
+$links = ['requests.php'=>'Data Subject Requests','incidents.php'=>'Privacy Incidents','consents.php'=>'Consent Monitoring','access_reviews.php'=>'Access Reviews','retention.php'=>'Retention Reviews','audit.php'=>'Audit Trail','reports.php'=>'Reports','settings.php'=>'Settings'];
+?><!doctype html><html lang="en" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Information Officer Dashboard | Investhood IT</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>
+:root{--bg:#f4f7fb;--card:#fff;--tx:#172235;--mut:#69778b;--line:#e2e8f0;--ac:#2458d3;--soft:#eaf1ff}html[data-theme=dark]{--bg:#101722;--card:#182332;--tx:#edf2f8;--mut:#a7b3c4;--line:#2c394a;--ac:#8eb3ff;--soft:#243653;color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px Inter,Arial}.wrap{max-width:1250px;margin:auto;padding:28px 20px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.eyebrow{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.4px;color:var(--ac)}h1{font-size:clamp(27px,4vw,36px);margin:8px 0}.muted{color:var(--mut);line-height:1.6}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn,.link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border:1px solid var(--line);border-radius:10px;padding:10px 13px;background:var(--card);color:var(--tx);font:600 12px Inter;cursor:pointer}.btn.primary{background:var(--ac);color:#fff;border-color:var(--ac)}.banner{margin:22px 0;padding:22px;border-radius:18px;background:linear-gradient(120deg,var(--soft),var(--card));border:1px solid var(--line)}.banner p{max-width:760px}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:18px 0}.metric,.panel,.module{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:18px}.metric .label{font-size:12px;color:var(--mut);font-weight:600;line-height:1.5}.metric .num{font-size:32px;font-weight:800;margin:12px 0}.metric a{color:var(--ac);font-size:12px;font-weight:700;text-decoration:none}.section-title{margin:28px 0 12px;font-size:18px}.modules{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.module{text-decoration:none;color:var(--tx);transition:transform .15s,border-color .15s}.module:hover{transform:translateY(-2px);border-color:var(--ac)}.module .icon{width:38px;height:38px;border-radius:11px;background:var(--soft);display:grid;place-items:center;font-size:18px;margin-bottom:13px}.module strong{display:block;margin-bottom:7px}.module span{color:var(--mut);font-size:12px;line-height:1.55}.bottom{display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-top:18px}.panel h2{font-size:16px;margin:0 0 12px}.checklist{margin:0;padding-left:18px;color:var(--mut);line-height:1.9}.note{background:var(--soft);border-radius:10px;padding:13px;line-height:1.6}.footer{padding:22px 0;color:var(--mut);font-size:11px}@media(max-width:950px){.cards,.modules{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.wrap{padding:18px 12px}.cards,.modules,.bottom{grid-template-columns:1fr}.metric .num{font-size:28px}}
+</style></head><body><main class="wrap"><header class="top"><div><div class="eyebrow">Investhood IT · Governance & Compliance</div><h1>Information Officer Dashboard</h1><div class="muted">Welcome, <?=iod_e($name)?>. Monitor privacy workflows, access governance and retention reviews.</div></div><div class="actions"><button class="btn" id="themeToggle" type="button">Toggle theme</button><a class="btn primary" href="<?=iod_e(url('privacy/reports.php'))?>">View reports</a></div></header>
+<section class="banner"><div class="eyebrow">Privacy operations</div><h2>Keep information governance on track</h2><p class="muted">Use this workspace to register data-subject requests, document privacy incidents, monitor consent records and schedule access and retention reviews. The dashboard reports only records available in the connected database.</p><div class="actions"><a class="btn primary" href="<?=iod_e(url('privacy/requests.php'))?>">+ Register a request</a><a class="btn" href="<?=iod_e(url('privacy/incidents.php'))?>">Report an incident</a></div></section>
+<section class="cards"><?php foreach($cards as $c): $n=iod_count($db,$c[1],$c[2]); ?><article class="metric"><div class="label"><?=iod_e($c[0])?></div><div class="num"><?=$n===null?'—':number_format($n)?></div><a href="<?=iod_e(url('privacy/'.$c[3]))?>"><?=$n===null?'Database table not installed':'Open register'?> →</a></article><?php endforeach; ?><article class="metric"><div class="label">Currently consented records*</div><div class="num"><?=$consents===null?'—':number_format($consents)?></div><a href="<?=iod_e(url('privacy/consents.php'))?>">Review consent overview →</a></article></section>
+<h2 class="section-title">Information Officer modules</h2><section class="modules"><?php $items=[['requests.php','▤','Data Subject Requests','Register and review access, correction and other requests.'],['incidents.php','!','Privacy Incidents','Document suspected or confirmed privacy incidents.'],['consents.php','✓','Consent Monitoring','View consent status summaries; candidates control their own consent.'],['access_reviews.php','⌕','Access Reviews','Plan periodic reviews of role and privileged access.'],['retention.php','◷','Retention Reviews','Track retention decisions, due dates and legal holds.'],['audit.php','≡','Audit Trail','Review activity logged by this portal.'],['reports.php','▥','Reports & Metrics','View current operational counts and print reports.'],['settings.php','⚙','Governance Guidance','Review operational control and policy checklist.']];foreach($items as $it):?><a class="module" href="<?=iod_e(url('privacy/'.$it[0]))?>"><div class="icon"><?=iod_e($it[1])?></div><strong><?=iod_e($it[2])?></strong><span><?=iod_e($it[3])?></span></a><?php endforeach;?></section>
+<section class="bottom"><article class="panel"><h2>Operational reminders</h2><ul class="checklist"><li>Prioritise requests approaching their approved due dates.</li><li>Escalate incidents using the organisation's approved response procedure.</li><li>Review access with system owners and document outcomes.</li><li>Check legal holds before approving any retention disposition.</li></ul></article><article class="panel"><h2>Important notes</h2><div class="note">Counts show database records, not proof of regulatory compliance. Consent monitoring is read-only. This module does not automatically delete records, notify regulators or affected individuals, or replace your organisation's approved procedures.</div><p class="muted">*Consent count is shown only when the candidate consent table is available.</p></article></section><footer class="footer">Information Officer workspace · Use authorised access and follow approved privacy policies.</footer></main><script>const root=document.documentElement;try{if(localStorage.getItem('io-theme')==='dark')root.dataset.theme='dark'}catch(e){}document.getElementById('themeToggle').addEventListener('click',()=>{root.dataset.theme=root.dataset.theme==='dark'?'light':'dark';try{localStorage.setItem('io-theme',root.dataset.theme)}catch(e){}});</script></body></html>
