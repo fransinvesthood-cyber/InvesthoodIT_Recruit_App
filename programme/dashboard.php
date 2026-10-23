@@ -910,7 +910,7 @@ if ($displayName === '') {
         rel="stylesheet"
         href="<?= url(
             'css/programme_manager_enhancements.css'
-        ) ?>?v=20260919names"
+        ) ?>?v=20261021"
     >
 
     <link
@@ -931,14 +931,14 @@ if ($displayName === '') {
         rel="stylesheet"
         href="<?= url(
             'css/original_pm_sidebar_compat.css'
-        ) ?>"
+        ) ?>?v=20261021"
     >
 
     <link
         rel="stylesheet"
         href="<?= url(
             'css/pm_dashboard_cards_fix.css'
-        ) ?>?v=20260919names"
+        ) ?>?v=20261021"
     >
 
 
@@ -2939,13 +2939,13 @@ html[data-theme="dark"] .pm-chatbot__dialog{background:#1e293b;border-color:#334
 <script
     src="<?= url(
         'js/programme_manager_enhancements.js'
-    ) ?>?v=20260919names"
+    ) ?>?v=20261021"
 ></script>
 
 <script
     src="<?= url(
         'js/original_pm_sidebar.js'
-    ) ?>?v=20260919names"
+    ) ?>?v=20261021"
 ></script>
 
 

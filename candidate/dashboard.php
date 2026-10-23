@@ -275,6 +275,7 @@ $flashes = render_flashes();
           <li><a href="#dashboard-interviews" class="sidebar__link" data-section="interviews"><i class="fas fa-calendar-check"></i> Interviews</a></li>
           <li><a href="#dashboard-offers" class="sidebar__link" data-section="offers"><i class="fas fa-envelope-open-text"></i> Offers</a></li>
 <li><a href="#dashboard-notifications" class="sidebar__link" data-section="notifications"><i class="fas fa-bell"></i> Notifications</a></li>
+          <li><a href="<?= url('communications/announcements.php') ?>" class="sidebar__link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
 <li><a href="#dashboard-analytics" class="sidebar__link" data-section="analytics"><i class="fas fa-chart-line"></i> Analytics</a></li>
         </ul>
 

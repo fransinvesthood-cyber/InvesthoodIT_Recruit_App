@@ -253,7 +253,7 @@ if ($stmt) {
         rel="stylesheet"
         href="<?= url('css/styles.css') ?>"
     >
-  <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260920">
+  <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20261021">
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
@@ -647,7 +647,8 @@ if ($stmt) {
         </div>
     </main>
 </div>
-<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260920"></script>
+<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20261021"></script>
 <script src="<?= url('js/programme_reports.js') ?>?v=20260923"></script>
+<script src="<?= url('js/original_pm_sidebar.js') ?>?v=20261021"></script>
 </body>
 </html>
