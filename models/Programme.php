@@ -63,20 +63,26 @@ class Programme
 
     /**
      * Participants across all cohorts of a programme.
+     * Counts cohort participants (selected/onboarded/active) and active
+     * placements, deduplicating candidates that appear in both.
      *
      * @param int $programmeId
-     * @return int  Count of selected/onboarded/active participants
+     * @return int  Count of selected/onboarded/active participants plus active placements
      */
     public static function participantCount(int $programmeId): int
     {
         $row = Database::fetchOne(
-            "SELECT COUNT(cp.id) AS cnt
-             FROM cohorts c
-             JOIN cohort_participants cp ON cp.cohort_id = c.id
-               AND cp.status IN ('selected','onboarded','active')
-             WHERE c.programme_id = ?",
-            'i',
-            [$programmeId]
+            "SELECT COUNT(DISTINCT candidate_id) AS cnt FROM (
+                SELECT cp.user_id AS candidate_id
+                 FROM cohort_participants cp
+                 INNER JOIN cohorts c ON c.id = cp.cohort_id
+                 WHERE c.programme_id = ? AND cp.status IN ('selected','onboarded','active')
+                UNION
+                SELECT p.candidate_id FROM placements p
+                 WHERE p.programme_id = ? AND p.status = 'active'
+            ) AS combined",
+            'ii',
+            [$programmeId, $programmeId]
         );
         return (int) ($row['cnt'] ?? 0);
     }
