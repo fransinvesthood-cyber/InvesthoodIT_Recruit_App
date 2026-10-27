@@ -23,7 +23,7 @@ class Opportunity
 
     /**
      * All opportunities joined with their programme and cohort.
-     * Includes real application count from opportunity_applications table.
+     * Includes real application count from applications table.
      *
      * @return array
      */
@@ -41,7 +41,7 @@ class Opportunity
              LEFT JOIN cohorts c ON c.id = o.cohort_id
              LEFT JOIN (
                  SELECT opportunity_id, COUNT(*) AS real_applications
-                 FROM opportunity_applications
+                 FROM applications
                  GROUP BY opportunity_id
              ) app_counts ON app_counts.opportunity_id = o.id
              ORDER BY o.created_at DESC"
@@ -50,7 +50,7 @@ class Opportunity
 
     /**
      * Find a single opportunity with programme/cohort context.
-     * Includes real application count from opportunity_applications table.
+     * Includes real application count from applications table.
      *
      * @param int $id
      * @return array|null
@@ -69,7 +69,7 @@ class Opportunity
              LEFT JOIN cohorts c ON c.id = o.cohort_id
              LEFT JOIN (
                  SELECT opportunity_id, COUNT(*) AS real_applications
-                 FROM opportunity_applications
+                 FROM applications
                  GROUP BY opportunity_id
              ) app_counts ON app_counts.opportunity_id = o.id
              WHERE o.id = ?
@@ -98,7 +98,7 @@ class Opportunity
 
     /**
      * Aggregate positions / applications statistics.
-     * Uses real application count from opportunity_applications table.
+     * Uses real application count from applications table.
      *
      * @return array ['total_positions'=>int, 'total_applications'=>int, 'avg_applications'=>float]
      */
@@ -111,7 +111,7 @@ class Opportunity
              FROM opportunities o
              LEFT JOIN (
                  SELECT opportunity_id, COUNT(*) AS real_applications
-                 FROM opportunity_applications
+                 FROM applications
                  GROUP BY opportunity_id
              ) app_counts ON app_counts.opportunity_id = o.id"
         );
@@ -127,10 +127,10 @@ class Opportunity
 
     /**
      * Application statistics for an opportunity.
-     * Zeroed until the Application module is implemented.
+     * Counts are queried live from the applications table grouped by status.
      *
      * @param int $id
-     * @return array
+     * @return array ['applications'=>int, 'under_review'=>int, 'shortlisted'=>int, 'interview'=>int, 'selected'=>int, 'rejected'=>int]
      */
     public static function applicationStats(int $id): array
     {
@@ -142,7 +142,51 @@ class Opportunity
             'selected'     => 0,
             'rejected'     => 0,
         ];
-        // Future: join opportunity_applications table here.
+
+        try {
+            $rows = Database::fetchAll(
+                "SELECT status, COUNT(*) AS cnt
+                 FROM applications
+                 WHERE opportunity_id = ?
+                 GROUP BY status",
+                'i',
+                [$id]
+            );
+
+            $total = 0;
+            foreach ($rows as $row) {
+                $status = (string) ($row['status'] ?? '');
+                $count  = (int) ($row['cnt'] ?? 0);
+                $total += $count;
+
+                switch ($status) {
+                    case 'under_review':
+                        $stats['under_review'] += $count;
+                        break;
+                    case 'shortlisted':
+                        $stats['shortlisted'] += $count;
+                        break;
+                    case 'interview_scheduled':
+                    case 'interview_required':
+                    case 'interview_completed':
+                        $stats['interview'] += $count;
+                        break;
+                    case 'selected':
+                    case 'offer_accepted':
+                        $stats['selected'] += $count;
+                        break;
+                    case 'rejected':
+                    case 'offer_declined':
+                    case 'withdrawn':
+                        $stats['rejected'] += $count;
+                        break;
+                }
+            }
+            $stats['applications'] = $total;
+        } catch (Throwable $e) {
+            // Table may not exist yet (migration not run) — stats stay zeroed.
+        }
+
         return $stats;
     }
 

@@ -1940,3 +1940,125 @@ body.pm-report-modal-open {
         text-align: left;
     }
 }
+
+
+/* 2026-10-21: Reports summary-card layout hardening */
+.pm-report-card {
+    display: flex !important;
+    align-items: stretch;
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    min-height: 190px;
+    padding: 0;
+    text-align: left;
+    white-space: normal;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+.pm-report-card .welcome-card__content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding: clamp(1.15rem, 2vw, 1.6rem);
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+.pm-report-card .welcome-card__content h3,
+.pm-report-card .welcome-card__content p {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+.pm-report-card .welcome-card__content h3 {
+    margin: 0 0 .6rem;
+    line-height: 1.35;
+}
+.pm-report-card .welcome-card__content p {
+    margin: 0;
+    line-height: 1.55;
+}
+.pm-report-card .overview-card__number {
+    margin-top: auto !important;
+    padding-top: 1rem;
+    line-height: 1.15;
+    white-space: normal;
+}
+@media (max-width: 640px) {
+    .pm-report-card { min-height: 0; }
+    .pm-report-card .welcome-card__content { padding: 1rem; }
+}
+
+
+/* Click-through behaviour for Programme Manager summary cards */
+.pm-candidate-summary-link {
+    display: flex;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.pm-candidate-summary-link:hover,
+.pm-candidate-summary-link:focus-visible {
+    color: inherit;
+    text-decoration: none;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, .10);
+    outline: none;
+}
+.pm-candidate-summary-link:focus-visible { outline: 3px solid rgba(37,99,235,.45); outline-offset: 3px; }
+.pm-performance-kpi--link { display:flex; flex-direction:column; color:inherit; text-decoration:none; cursor:pointer; transition:transform .18s ease,box-shadow .18s ease; }
+.pm-performance-kpi--link:hover,.pm-performance-kpi--link:focus-visible { color:inherit; text-decoration:none; transform:translateY(-2px); box-shadow:0 12px 28px rgba(15,23,42,.10); }
+.pm-performance-kpi--link:focus-visible { outline:3px solid rgba(37,99,235,.45); outline-offset:3px; }
+
+
+/* 2026-10-25: Compact Programme Reports KPI cards (the wide report cards keep their own sizing). */
+.pm-report-stat-grid > .pm-report-card {
+    min-height: 112px;
+    height: auto;
+    padding: 1rem;
+    align-items: center;
+    gap: .85rem;
+}
+.pm-report-stat-grid > .pm-report-card .overview-card__icon {
+    flex: 0 0 42px;
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    font-size: 1rem;
+}
+.pm-report-stat-grid > .pm-report-card .overview-card__info {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    gap: .25rem;
+}
+.pm-report-stat-grid > .pm-report-card .overview-card__number {
+    margin-top: 0 !important;
+    padding-top: 0;
+    font-size: clamp(1.25rem, 1.8vw, 1.75rem);
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+}
+.pm-report-stat-grid > .pm-report-card .overview-card__label {
+    display: block;
+    max-width: 100%;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+    .pm-report-stat-grid > .pm-report-card { min-height: 96px; padding: .8rem; gap: .6rem; }
+    .pm-report-stat-grid > .pm-report-card .overview-card__icon { flex-basis: 36px; width: 36px; min-width: 36px; height: 36px; font-size: .9rem; }
+}

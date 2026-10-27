@@ -564,7 +564,7 @@ foreach ($activeCohortRows as $ac) {
 // Real dynamic application statistics (from MySQL, not hard-coded)
 // ------------------------------------------------------------
 $appStatusCounts = Application::adminCountByStatus();
-$totalAppCount   = array_sum($appStatusCounts);
+$totalAppCount   = (int) ($appStatusCounts['total'] ?? 0);
 
 // Pipeline stage counts (grouped for the dashboard pipeline)
 $appSubmitted    = (int) ($appStatusCounts['submitted'] ?? 0);
@@ -833,7 +833,7 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
           <li><a href="#admin-executive" class="sidebar__link active" data-section="executive"><i class="fas fa-th-large"></i> Executive Overview</a></li>
           <li><a href="#admin-analytics" class="sidebar__link" data-section="analytics"><i class="fas fa-chart-pie"></i> Analytics</a></li>
           <li><a href="#admin-alerts" class="sidebar__link" data-section="alerts"><i class="fas fa-exclamation-triangle"></i> Alerts <span class="alert-badge-sidebar">6</span></a></li>
-          <li><a href="<?= url('admin/notifications.php') ?>" class="sidebar__link"><i class="fas fa-bell"></i> Notifications<?php if ((int) ($adminNotifUnread ?? 0) > 0): ?> <span class="alert-badge-sidebar"><?= ((int) ($adminNotifUnread ?? 0)) > 99 ? '99+' : (int) ($adminNotifUnread ?? 0) ?></span><?php endif; ?></a></li>
+          <li><a href="#admin-notifications" class="sidebar__link" data-section="notifications"><i class="fas fa-bell"></i> Notifications<?php if ((int) ($adminNotifUnread ?? 0) > 0): ?> <span class="alert-badge-sidebar"><?= ((int) ($adminNotifUnread ?? 0)) > 99 ? '99+' : (int) ($adminNotifUnread ?? 0) ?></span><?php endif; ?></a></li>
         </ul>
 
 <div class="sidebar__section-label">Management</div>
@@ -3431,6 +3431,65 @@ $talentSkillsCategories = (int) ($talentSkillsCategoriesRow['cnt'] ?? 0);
               <span>Sign Out</span>
             </a>
           </div>
+        </section>
+
+        <!-- =============================================
+             SECTION: NOTIFICATIONS
+             ============================================= -->
+        <section class="dash-section admin-section" id="admin-notifications" data-section="notifications">
+          <div class="section__header" style="text-align:left;margin-bottom:1rem;">
+            <span class="section__badge">Notifications Centre</span>
+            <h2 class="section__title" style="font-size:1.5rem;">Notifications</h2>
+            <p class="section__text" style="font-size:0.9rem;">System activity and alerts requiring your attention.</p>
+          </div>
+
+          <?php
+          $notifRecords = [];
+          $notifUnread = 0;
+          try {
+              $notifResult = AdminNotification::forAdmin((int) current_user_id(), ['status' => 'all', 'category' => '', 'q' => ''], 1, 10);
+              $notifRecords = $notifResult['records'] ?? [];
+              $notifUnread = (int) ($notifResult['unread'] ?? 0);
+          } catch (Throwable $e) {
+              error_log('[Admin Dashboard] notifications section: ' . $e->getMessage());
+          }
+          ?>
+
+          <div class="notif-centre__tools" style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;">
+            <span class="notif-centre__count"><?= $notifUnread ?> unread of <?= count($notifRecords) ?> shown</span>
+            <?php if ($notifUnread > 0): ?>
+              <button type="button" class="btn btn--ghost btn--sm" data-notif-mark-all><i class="fas fa-check-double"></i> Mark All Read</button>
+            <?php endif; ?>
+          </div>
+
+          <a href="<?= url('admin/notifications.php') ?>" class="btn btn--primary btn--sm" style="width:100%;margin-top:0.5rem;"><i class="fas fa-bell"></i> Manage All Notifications</a>
+
+          <?php if (empty($notifRecords)): ?>
+            <div class="empty-state" style="text-align:center;padding:3rem 1rem;">
+              <div class="empty-state__icon"><i class="fas fa-bell-slash"></i></div>
+              <h3 class="empty-state__title">No notifications</h3>
+              <p class="empty-state__text">You're all caught up. New alerts will appear here.</p>
+            </div>
+          <?php else: ?>
+            <div class="notif-list" id="adminNotifList">
+            <?php foreach ($notifRecords as $n):
+                $nc = AdminNotification::normaliseCategory((string) $n['category']);
+                $nu = (int) $n['is_read'] === 0;
+                $np = AdminNotification::normalisePriority((string) ($n['priority'] ?? 'info'));
+                $nu2 = url(AdminNotification::destinationUrl($n['module'] ?? null, isset($n['record_id']) ? (int) $n['record_id'] : null));
+            ?>
+              <div class="notif-item<?= $nu ? ' notif-item--unread' : '' ?>" data-notif-id="<?= (int) $n['id'] ?>" data-notif-url="<?= e($nu2) ?>">
+                <div class="notif-item__icon notif-item__icon--<?= e($nc) ?>"><i class="fas <?= e(AdminNotification::categoryIcon($nc)) ?>"></i></div>
+                <div class="notif-item__content">
+                  <div class="notif-item__head"><a class="notif-item__title" href="<?= e($nu2) ?>" data-notif-open><?= e($n['title']) ?></a><span class="notif-item__tag notif-item__tag--<?= e($nc) ?>"><?= e(AdminNotification::categoryLabel($nc)) ?></span><span class="notif-priority notif-priority--<?= e($np) ?>"><?= e($np) ?></span><?php if ($nu): ?><span class="notif-item__unread-dot"></span><?php endif; ?></div>
+                  <div class="notif-item__message"><?= e($n['message']) ?></div>
+                  <div class="notif-item__time"><?= e(time_ago((string) $n['created_at'])) ?></div>
+                </div>
+                <div class="notif-item__actions"><?php if ($nu): ?><button type="button" class="notif-item__mark-read" data-notif-mark-read title="Mark as read"><i class="fas fa-check"></i></button><?php endif; ?><button type="button" class="notif-item__delete" data-notif-delete title="Delete"><i class="fas fa-trash-alt"></i></button></div>
+              </div>
+            <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
         </section>
 
       </div><!-- // dash-content -->

@@ -43,6 +43,19 @@ if (!empty($candidateProvince)) {
 // Fetch personalized opportunities (limit to 6 for dashboard)
 $recentOpportunities = CandidateOpportunitiesController::searchOpportunities($personalizedFilters, 1, 6)['opportunities'];
 
+// Exclude closed opportunities (status closed/archived or application period already expired)
+$today = date('Y-m-d');
+$recentOpportunities = array_values(array_filter($recentOpportunities, function ($opp) use ($today) {
+    $status = $opp['status'] ?? '';
+    if (in_array($status, ['closed', 'archived'], true)) {
+        return false;
+    }
+    if (!empty($opp['application_close_date']) && $opp['application_close_date'] < $today) {
+        return false;
+    }
+    return true;
+}));
+
 // Get saved opportunity IDs for quick lookup
 $savedOpportunityIds = [];
 foreach ($savedOpportunities as $saved) {
@@ -176,23 +189,36 @@ $totalApplicationCount = count($allApplications);
 
 // Define the application progress stages for the timeline
 $progressStages = [
-    'submitted' => 1,
-    'eligibility_review' => 2,
-    'screened' => 3,
-    'assessment' => 4,
-    'interview' => 5,
-    'waitlisted' => 6,
-    'selected' => 7,
+    'draft'               => 0,
+    'submitted'           => 1,
+    'under_review'        => 2,
+    'shortlisted'         => 3,
+    'assessment'          => 4,
+    'interview_scheduled' => 5,
+    'interview_required'  => 5,
+    'interview_completed' => 6,
+    'selected'            => 7,
+    'waitlisted'          => 6,
+    'offer_sent'          => 8,
+    'offer_accepted'      => 9,
+    'offer_declined'      => 8,
+    'on_hold'             => 0,
+    'rejected'            => 0,
+    'withdrawn'           => 0,
 ];
 
 // Define all timeline steps for display
 $timelineSteps = [
     ['key' => 'submitted', 'label' => 'Submitted'],
-    ['key' => 'eligibility_review', 'label' => 'Review'],
-    ['key' => 'screened', 'label' => 'Screened'],
+    ['key' => 'under_review', 'label' => 'Under Review'],
+    ['key' => 'shortlisted', 'label' => 'Shortlisted'],
     ['key' => 'assessment', 'label' => 'Assessment'],
-    ['key' => 'interview', 'label' => 'Interview'],
-    ['key' => 'selected', 'label' => 'Decision'],
+    ['key' => 'interview_scheduled', 'label' => 'Interview Scheduled'],
+    ['key' => 'interview_completed', 'label' => 'Interview Completed'],
+    ['key' => 'selected', 'label' => 'Selected'],
+    ['key' => 'waitlisted', 'label' => 'Waitlisted'],
+    ['key' => 'offer_sent', 'label' => 'Offer Sent'],
+    ['key' => 'offer_accepted', 'label' => 'Offer Accepted'],
 ];
 
 $flashes = render_flashes();
@@ -249,6 +275,7 @@ $flashes = render_flashes();
           <li><a href="#dashboard-interviews" class="sidebar__link" data-section="interviews"><i class="fas fa-calendar-check"></i> Interviews</a></li>
           <li><a href="#dashboard-offers" class="sidebar__link" data-section="offers"><i class="fas fa-envelope-open-text"></i> Offers</a></li>
 <li><a href="#dashboard-notifications" class="sidebar__link" data-section="notifications"><i class="fas fa-bell"></i> Notifications</a></li>
+          <li><a href="<?= url('communications/announcements.php') ?>" class="sidebar__link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
 <li><a href="#dashboard-analytics" class="sidebar__link" data-section="analytics"><i class="fas fa-chart-line"></i> Analytics</a></li>
         </ul>
 
@@ -640,7 +667,7 @@ $flashes = render_flashes();
                 $appCloseDate = $app['application_close_date'] ?? '';
                 $appId = (int) ($app['id'] ?? 0);
                 $appOppId = (int) ($app['opportunity_id'] ?? 0);
-                $isTerminal = in_array($appStatus, ['selected', 'rejected', 'withdrawn', 'expired'], true);
+                $isTerminal = in_array($appStatus, ['selected', 'offer_accepted', 'rejected', 'withdrawn', 'offer_declined', 'expired'], true);
                 $isRejected = in_array($appStatus, ['rejected', 'withdrawn'], true);
                 $currentStage = $progressStages[$appStatus] ?? 0;
                 $totalStages = count($timelineSteps);
@@ -685,7 +712,19 @@ $flashes = render_flashes();
                   </div>
                   <div class="app-card__progress">
                     <div class="app-card__progress-bar"><div class="app-card__progress-fill" style="width:<?= (int) $progressPercent ?>%"></div></div>
-                    <span class="app-card__progress-label"><?php if ($isRejected): ?><strong style="color:#ef4444;"><?= e($appStatusLabel) ?></strong><?php elseif ($appStatus === 'selected'): ?><strong style="color:var(--success);">Congratulations! Selected</strong><?php else: ?>Current: <strong><?= e($appStatusLabel) ?></strong> &middot; <?= (int) $progressPercent ?>% complete<?php endif; ?></span>
+                    <span class="app-card__progress-label">
+                      <?php if ($isRejected): ?>
+                        <span class="app-progress-stage"><i class="fas fa-times-circle"></i> Rejected: <?= e($appStatusLabel) ?></span>
+                      <?php elseif ($appStatus === 'selected'): ?>
+                        <span class="app-progress-stage app-progress-stage--success"><i class="fas fa-check-circle"></i> Stage: <?= e($appStatusLabel) ?></span>
+                      <?php elseif ($appStatus === 'offer_accepted'): ?>
+                        <span class="app-progress-stage app-progress-stage--success"><i class="fas fa-check-circle"></i> Stage: <?= e($appStatusLabel) ?></span>
+                      <?php elseif ($isTerminal): ?>
+                        <span class="app-progress-stage app-progress-stage--terminal"><i class="fas fa-flag"></i> Stage: <?= e($appStatusLabel) ?></span>
+                      <?php else: ?>
+                        <span class="app-progress-stage">Stage: <strong><?= e($appStatusLabel) ?></strong></span> &middot; <span class="app-progress-pct"><strong><?= (int) $progressPercent ?>%</strong> complete</span>
+                      <?php endif; ?>
+                    </span>
                   </div>
                   <?php else: ?>
                   <div class="app-card__progress">

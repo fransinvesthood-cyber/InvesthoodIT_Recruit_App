@@ -1170,7 +1170,7 @@ function candidate_status_class($status)
             }
         }
     </style>
-    <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260920">
+    <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20261021">
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
@@ -1224,7 +1224,8 @@ function candidate_status_class($status)
                 style="margin-top:2rem;"
             >
                 <!-- Total -->
-                <div class="overview-card">
+                <a class="overview-card pm-candidate-summary-link" href="<?= url('programme/candidates.php') ?>" aria-label="Open candidates: all statuses">
+
                     <div class="overview-card__icon overview-card__icon--primary">
                         <i class="fas fa-users"></i>
                     </div>
@@ -1236,9 +1237,10 @@ function candidate_status_class($status)
                             Total Candidates
                         </span>
                     </div>
-                </div>
+                </a>
                 <!-- Selected -->
-                <div class="overview-card">
+                <a class="overview-card pm-candidate-summary-link" href="<?= url('programme/candidates.php?status=selected') ?>" aria-label="Open candidates: selected">
+
                     <div class="overview-card__icon overview-card__icon--amber">
                         <i class="fas fa-user-clock"></i>
                     </div>
@@ -1250,9 +1252,10 @@ function candidate_status_class($status)
                             Selected
                         </span>
                     </div>
-                </div>
+                </a>
                 <!-- Onboarded -->
-                <div class="overview-card">
+                <a class="overview-card pm-candidate-summary-link" href="<?= url('programme/candidates.php?status=onboarded') ?>" aria-label="Open candidates: onboarded">
+
                     <div class="overview-card__icon overview-card__icon--cyan">
                         <i class="fas fa-user-plus"></i>
                     </div>
@@ -1264,9 +1267,10 @@ function candidate_status_class($status)
                             Onboarded
                         </span>
                     </div>
-                </div>
+                </a>
                 <!-- Active -->
-                <div class="overview-card">
+                <a class="overview-card pm-candidate-summary-link" href="<?= url('programme/candidates.php?status=active') ?>" aria-label="Open candidates: active">
+
                     <div class="overview-card__icon overview-card__icon--cyan">
                         <i class="fas fa-user-check"></i>
                     </div>
@@ -1278,9 +1282,10 @@ function candidate_status_class($status)
                             Active
                         </span>
                     </div>
-                </div>
+                </a>
                 <!-- Completed -->
-                <div class="overview-card">
+                <a class="overview-card pm-candidate-summary-link" href="<?= url('programme/candidates.php?status=completed') ?>" aria-label="Open candidates: completed">
+
                     <div class="overview-card__icon overview-card__icon--primary">
                         <i class="fas fa-graduation-cap"></i>
                     </div>
@@ -1292,9 +1297,10 @@ function candidate_status_class($status)
                             Completed
                         </span>
                     </div>
-                </div>
+                </a>
                 <!-- Withdrawn -->
-                <div class="overview-card">
+                <a class="overview-card pm-candidate-summary-link" href="<?= url('programme/candidates.php?status=withdrawn') ?>" aria-label="Open candidates: withdrawn">
+
                     <div class="overview-card__icon overview-card__icon--amber">
                         <i class="fas fa-user-minus"></i>
                     </div>
@@ -1306,7 +1312,7 @@ function candidate_status_class($status)
                             Withdrawn
                         </span>
                     </div>
-                </div>
+                </a>
             </div>
 
             <!-- =================================================
@@ -1863,7 +1869,7 @@ function candidate_status_class($status)
     </section>
 </div>
 
-<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260920"></script>
+<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20261021"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -2013,5 +2019,6 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+<script src="<?= url('js/original_pm_sidebar.js') ?>?v=20261021"></script>
 </body>
 </html>

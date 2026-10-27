@@ -3947,6 +3947,33 @@ body.dark-mode {
   color: var(--text-lighter);
 }
 
+.app-progress-stage {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.app-progress-stage--success {
+  color: var(--success);
+}
+
+.app-progress-stage--terminal {
+  color: #ef4444;
+}
+
+.app-progress-pct {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.app-card__progress-fill {
+  transition: width 0.6s ease;
+}
+
 .app-card__footer {
   display: flex;
   gap: 0.5rem;

@@ -253,7 +253,7 @@ if ($stmt) {
         rel="stylesheet"
         href="<?= url('css/styles.css') ?>"
     >
-  <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260920">
+  <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20261021">
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
@@ -296,7 +296,7 @@ if ($stmt) {
                  PROGRAMME STATISTICS
             ================================================== -->
             <div
-                class="overview-grid"
+                class="overview-grid pm-report-stat-grid"
                 style="margin-top:2rem;"
             >
                 <button type="button" class="overview-card pm-report-card" data-report-key="total_programmes" aria-label="View details for Total Programmes">
@@ -356,7 +356,7 @@ if ($stmt) {
                  COHORT / CANDIDATE STATISTICS
             ================================================== -->
             <div
-                class="overview-grid"
+                class="overview-grid pm-report-stat-grid"
                 style="margin-top:1rem;"
             >
                 <button type="button" class="overview-card pm-report-card" data-report-key="total_cohorts" aria-label="View details for Total Cohorts">
@@ -647,7 +647,8 @@ if ($stmt) {
         </div>
     </main>
 </div>
-<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260920"></script>
+<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20261021"></script>
 <script src="<?= url('js/programme_reports.js') ?>?v=20260923"></script>
+<script src="<?= url('js/original_pm_sidebar.js') ?>?v=20261021"></script>
 </body>
 </html>
