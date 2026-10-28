@@ -40,10 +40,11 @@ class CandidateNotification
         'offer'       => ['label' => 'Selection & Offers',         'icon' => 'fa-envelope-open-text', 'tone' => 'offer'],
         'placement'   => ['label' => 'Placements',                 'icon' => 'fa-map-marker-alt',     'tone' => 'placement'],
         'account'     => ['label' => 'Account & System',           'icon' => 'fa-user-shield',        'tone' => 'account'],
+        'learning'    => ['label' => 'Learning & Skills',            'icon' => 'fa-book-open',          'tone' => 'account'],
     ];
 
     /** @var string[] Destination modules a notification can link to */
-    public const MODULES = ['application', 'interview', 'offer', 'opportunity', 'placement', 'settings', 'notifications'];
+    public const MODULES = ['application', 'interview', 'offer', 'opportunity', 'placement', 'settings', 'notifications', 'learning'];
 
     /** @var bool Lazily applied schema guard (per request) */
     private static bool $schemaChecked = false;
@@ -154,6 +155,10 @@ class CandidateNotification
                 return 'candidate/dashboard.php#dashboard-placements';
             case 'settings':
                 return 'candidate/settings.php';
+            case 'learning':
+                return $recordId > 0
+                    ? 'candidate/course.php?id=' . $recordId
+                    : 'candidate/learning.php';
             default:
                 return 'candidate/notifications.php';
         }
@@ -927,6 +932,48 @@ class CandidateNotification
             error_log('[CandidateNotification] syncOpportunityEvents (new opportunities) failed: ' . $e->getMessage());
         }
     }
+    /**
+     * Notifications for the authenticated candidate's learning activity
+     * (assignment changes + lesson completion events).
+     */
+    public static function forLearning(int $candidateId, int $limit = 6): array
+    {
+        if ($candidateId <= 0) {
+            return [];
+        }
+        self::ensureSchema();
+        try {
+            return Database::fetchAll(
+                "SELECT n.*
+                 FROM candidate_notifications n
+                 WHERE n.category = 'learning'
+                   AND n.user_id = ?
+                 ORDER BY n.created_at DESC, n.id DESC
+                 LIMIT ?",
+                'ii',
+                [$candidateId, $limit]
+            );
+        } catch (Throwable $e) {
+            error_log('[CandidateNotification] forLearning failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Queue a learning notification (assignment, deadline, completion).
+     * Idempotent via dedupe key.
+     */
+    public static function addLearningNotification(
+        int $candidateId,
+        string $category,
+        string $title,
+        string $message,
+        int $recordId,
+        string $dedupeKey
+    ): bool {
+        return self::create($candidateId, 'learning', $title, $message, 'learning', $recordId, $dedupeKey);
+    }
+
 }
 
 

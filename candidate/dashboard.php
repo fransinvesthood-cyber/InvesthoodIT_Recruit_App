@@ -67,6 +67,20 @@ $appStats = Application::countByStatus($userId);
 $draftApplications = (int) ($appStats['draft'] ?? 0);
 $activeApplications = (int) ($appStats['total'] ?? 0) - (int) ($appStats['rejected'] ?? 0);
 $interviewInvitations = (int) ($appStats['under_review'] ?? 0);
+// ---- Learning integration ----
+try {
+    $learningStats = CandidateLearningController::index($userId);
+    $learningAssignments = $learningStats['assignments'];
+    $learningOverall = $learningStats['overall_progress'];
+    $learningStatsCounts = $learningStats['stats'];
+} catch (Throwable $e) {
+    error_log('[Candidate Dashboard] Learning load failed for user ' . $userId . ': ' . $e->getMessage());
+    $learningStats = ['assignments' => [], 'overall_progress' => 0, 'stats' => ['total' => 0, 'assigned' => 0, 'in_progress' => 0, 'completed' => 0, 'overdue' => 0]];
+    $learningAssignments = [];
+    $learningOverall = 0;
+    $learningStatsCounts = ['total' => 0, 'assigned' => 0, 'in_progress' => 0, 'completed' => 0, 'overdue' => 0];
+}
+
 
 // Offers integration (Stage 12) — live data from Admin Selection & Offers.
 $offerSummary = ['stats' => ['total' => 0, 'pending' => 0, 'accepted' => 0, 'declined' => 0, 'expired' => 0, 'withdrawn' => 0], 'recent' => null, 'recentList' => [], 'deadlines' => [], 'notifications' => [], 'unread' => 0, 'expired' => 0];
@@ -1019,6 +1033,7 @@ $flashes = render_flashes();
           <div class="section__header" style="text-align:left;margin-bottom:1.5rem;">
             <h2 class="section__title" style="font-size:1.5rem;">Learning & Skills <span class="text-gradient">Development</span></h2>
           </div>
+          <a href="<?= url('candidate/learning.php') ?>" class="btn btn--primary" style="margin-bottom:1.5rem;"><i class="fas fa-graduation-cap"></i> Start Learning</a>
           <div class="learning-grid">
             <div class="learning-card">
               <div class="learning-card__header">
