@@ -296,7 +296,7 @@ if ($stmt) {
                  PROGRAMME STATISTICS
             ================================================== -->
             <div
-                class="overview-grid"
+                class="overview-grid pm-report-stat-grid"
                 style="margin-top:2rem;"
             >
                 <button type="button" class="overview-card pm-report-card" data-report-key="total_programmes" aria-label="View details for Total Programmes">
@@ -356,7 +356,7 @@ if ($stmt) {
                  COHORT / CANDIDATE STATISTICS
             ================================================== -->
             <div
-                class="overview-grid"
+                class="overview-grid pm-report-stat-grid"
                 style="margin-top:1rem;"
             >
                 <button type="button" class="overview-card pm-report-card" data-report-key="total_cohorts" aria-label="View details for Total Cohorts">
