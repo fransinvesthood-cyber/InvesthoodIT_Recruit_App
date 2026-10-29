@@ -41,14 +41,12 @@ class CandidateLearningController
         $search   = trim((string) ($input['search'] ?? ''));
         $category = trim((string) ($input['category'] ?? ''));
         $status   = strtolower(trim((string) ($input['status'] ?? 'all')));
-        if (!in_array($status, LearningProgramme::ALL_STATUSES, true)) {
-            $status = 'assigned';
+        if ($status !== 'all' && !in_array($status, LearningProgramme::ALL_STATUSES, true)) {
+            $status = 'all';
         }
         $sort = in_array((string) ($input['sort'] ?? 'assigned_at'), ['title', 'due_date', 'assigned_at'], true)
             ? (string) ($input['sort'] ?? 'assigned_at')
             : 'assigned_at';
-        $category = $category === '' ? 'general' : $category;
-
         return [
             'search'  => $search,
             'category' => $category,
@@ -139,7 +137,7 @@ class CandidateLearningController
             return ['success' => false, 'message' => 'Unauthenticated.'];
         }
         $result = LearningProgramme::markLessonComplete($assignmentId, $lessonId, $candidateId);
-        if ($result === false) {
+        if ($result === null) {
             return ['success' => false, 'message' => 'Failed to update progress.'];
         }
 
@@ -151,7 +149,7 @@ class CandidateLearningController
                 $candidateId,
                 'assignment_completed',
                 'Lesson completed',
-                'One of your lessons in <strong>' . e($assignment['title'] ?? 'the course') . '</strong> is complete.',
+                'One of your lessons in ' . ($assignment['title'] ?? 'the course') . ' is complete.',
                 $assignmentId,
                 'lesson_complete_' . $assignmentId . '_' . $lessonId
             );

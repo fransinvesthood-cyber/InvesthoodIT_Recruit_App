@@ -44,6 +44,7 @@ class LearningProgramme
         if ($checked) {
             return;
         }
+
         $checked = true;
 
         $tables = Database::fetchAll("SHOW TABLES");
@@ -190,6 +191,137 @@ class LearningProgramme
     // --------------------------------------------------------
 
     /**
+     * All catalogue records for administrators, including archived programmes.
+     */
+    public static function allForAdmin(array $filters = []): array
+    {
+        self::ensureSchema();
+        $where = ['1 = 1'];
+        $types = '';
+        $params = [];
+        $search = trim((string) ($filters['search'] ?? ''));
+        $status = trim((string) ($filters['status'] ?? 'all'));
+        if ($search !== '') {
+            $where[] = '(lp.title LIKE ? OR lp.category LIKE ? OR lp.provider LIKE ?)';
+            $types .= 'sss';
+            $like = '%' . $search . '%';
+            array_push($params, $like, $like, $like);
+        }
+        if (in_array($status, ['active', 'archived'], true)) {
+            $where[] = 'lp.status = ?';
+            $types .= 's';
+            $params[] = $status;
+        }
+        return Database::fetchAll(
+            'SELECT lp.*, COUNT(DISTINCT cla.id) AS assignment_count, COUNT(DISTINCT cl.id) AS lesson_count
+             FROM learning_programmes lp
+             LEFT JOIN candidate_learning_assignments cla ON cla.programme_id = lp.id
+             LEFT JOIN course_lessons cl ON cl.programme_id = lp.id
+             WHERE ' . implode(' AND ', $where) . '
+             GROUP BY lp.id ORDER BY lp.updated_at DESC, lp.id DESC',
+            $types,
+            $params
+        );
+    }
+
+    /**
+     * All assignments for administrators, with candidate identity and progress.
+     */
+    public static function assignmentsForAdmin(array $filters = []): array
+    {
+        self::ensureSchema();
+        $where = ['1 = 1'];
+        $types = '';
+        $params = [];
+        $status = trim((string) ($filters['status'] ?? 'all'));
+        $programmeId = (int) ($filters['programme_id'] ?? 0);
+        if (in_array($status, self::ALL_STATUSES, true)) {
+            $where[] = 'cla.status = ?';
+            $types .= 's';
+            $params[] = $status;
+        }
+        if ($programmeId > 0) {
+            $where[] = 'cla.programme_id = ?';
+            $types .= 'i';
+            $params[] = $programmeId;
+        }
+        $rows = Database::fetchAll(
+            'SELECT cla.id AS assignment_id, cla.programme_id, cla.candidate_id,
+                    cla.assigned_at, cla.due_date, cla.status, cla.started_at, cla.completed_at,
+                    lp.title, lp.category, u.first_name, u.last_name, u.email,
+                    COUNT(DISTINCT cl.id) AS total_lessons,
+                    COUNT(DISTINCT CASE WHEN cl.is_required = 1 THEN cl.id END) AS required_lessons,
+                    COUNT(DISTINCT CASE WHEN cp.completed = 1 THEN cl.id END) AS completed_lessons
+             FROM candidate_learning_assignments cla
+             INNER JOIN learning_programmes lp ON lp.id = cla.programme_id
+             INNER JOIN users u ON u.id = cla.candidate_id
+             LEFT JOIN course_lessons cl ON cl.programme_id = lp.id
+             LEFT JOIN candidate_lesson_progress cp ON cp.assignment_id = cla.id
+                 AND cp.lesson_id = cl.id AND cp.completed = 1
+             WHERE ' . implode(' AND ', $where) . '
+             GROUP BY cla.id
+             ORDER BY cla.due_date IS NULL, cla.due_date ASC, cla.assigned_at DESC
+             LIMIT 250',
+            $types,
+            $params
+        );
+        $now = new DateTime('now', new DateTimeZone(date_default_timezone_get()));
+        foreach ($rows as &$row) {
+            $required = (int) $row['total_lessons'];
+            $completed = (int) $row['completed_lessons'];
+            $row['progress'] = $required > 0 ? (int) round(($completed / $required) * 100)
+                : ((string) $row['status'] === self::STATUS_COMPLETED ? 100 : 0);
+            $due = !empty($row['due_date']) ? new DateTime($row['due_date'], new DateTimeZone(date_default_timezone_get())) : null;
+            $row['computed_status'] = self::computeStatus(
+                (string) $row['status'],
+                $row['due_date'] ?? null,
+                $row['started_at'] ?? null,
+                $row['progress'],
+                $required,
+                $completed
+            );
+            $row['is_overdue'] = $due !== null && $due < $now && $row['computed_status'] !== self::STATUS_COMPLETED;
+        }
+        unset($row);
+        return $rows;
+    }
+
+    /**
+     * Aggregate learning metrics for the administrator dashboard.
+     */
+    public static function adminStats(): array
+    {
+        self::ensureSchema();
+        $row = Database::fetchOne(
+            "SELECT
+                (SELECT COUNT(*) FROM learning_programmes WHERE status = 'active') AS programmes,
+                (SELECT COUNT(*) FROM candidate_learning_assignments) AS assignments,
+                (SELECT COUNT(DISTINCT candidate_id) FROM candidate_learning_assignments) AS learners"
+        );
+        $stats = array_merge([
+            'programmes' => 0,
+            'assignments' => 0,
+            'learners' => 0,
+            'in_progress' => 0,
+            'completed' => 0,
+            'overdue' => 0,
+        ], array_map('intval', $row ?: []));
+
+        foreach (self::assignmentsForAdmin() as $assignment) {
+            $status = $assignment['computed_status'] ?? self::STATUS_ASSIGNED;
+            if ($status === self::STATUS_COMPLETED) {
+                $stats['completed']++;
+            } elseif ($status === self::STATUS_IN_PROGRESS) {
+                $stats['in_progress']++;
+            } elseif ($status === self::STATUS_OVERDUE) {
+                $stats['overdue']++;
+            }
+        }
+
+        return $stats;
+    }
+
+    /**
      * All active learning programmes, newest first.
      */
     public static function allActive(): array
@@ -238,7 +370,7 @@ class LearningProgramme
             "INSERT INTO learning_programmes
               (title, slug, description, objectives, category, provider, duration_hours, status)
              VALUES (?, ?, ?, ?, ?, ?, ?, 'active')",
-            'ssssssis',
+            'ssssssi',
             [
                 $data['title'],
                 $slug,
@@ -417,12 +549,12 @@ class LearningProgramme
             $params[] = $like;
             $params[] = $like;
         }
-        if ($category !== '') {
+        if ($category !== '' && $category !== 'general') {
             $where[] = 'lp.category = ?';
             $types .= 's';
             $params[] = $category;
         }
-        if ($status !== '' && in_array($status, self::ALL_STATUSES, true)) {
+        if ($status !== '' && $status !== 'all' && in_array($status, self::ALL_STATUSES, true)) {
             $where[] = 'cla.status = ?';
             $types .= 's';
             $params[] = $status;
@@ -446,7 +578,7 @@ class LearningProgramme
                    lp.provider, lp.duration_hours, lp.status AS programme_status,
                    COUNT(DISTINCT cl.id) AS total_lessons,
                    COUNT(DISTINCT CASE WHEN cl.is_required = 1 THEN cl.id END) AS required_lessons,
-                   COUNT(DISTINCT CASE WHEN cl.is_required = 1 AND cp.id IS NOT NULL THEN cl.id END) AS completed_required_lessons
+                   COUNT(DISTINCT CASE WHEN cp.id IS NOT NULL THEN cl.id END) AS completed_required_lessons
             FROM candidate_learning_assignments cla
             INNER JOIN learning_programmes lp ON lp.id = cla.programme_id
             LEFT JOIN course_lessons cl ON cl.programme_id = lp.id
@@ -469,7 +601,7 @@ class LearningProgramme
         $now = new DateTime('now', new DateTimeZone(date_default_timezone_get()));
         $out = [];
         foreach ($rows as $row) {
-            $required = (int) ($row['required_lessons'] ?? 0);
+            $required = (int) ($row['total_lessons'] ?? 0);
             $completedRequired = (int) ($row['completed_required_lessons'] ?? 0);
             $progress = $required > 0
                 ? (int) round(($completedRequired / $required) * 100)
@@ -479,7 +611,9 @@ class LearningProgramme
                 (string) $row['status'],
                 $row['due_date'] ?? null,
                 $row['started_at'] ?? null,
-                $progress
+                $progress,
+                $required,
+                $completedRequired
             );
 
             $due = $row['due_date'] ? new DateTime($row['due_date'], new DateTimeZone(date_default_timezone_get())) : null;
@@ -626,7 +760,7 @@ class LearningProgramme
 
     /**
      * Mark a lesson complete for a candidate (candidate side).
-     * Returns the new progress percentage, or false on failure.
+     * Returns the new progress percentage, or null on failure.
      *
      * Prevents duplicates via the unique (assignment_id, lesson_id) key and
      * only updates when the lesson actually changed state.
@@ -640,11 +774,11 @@ class LearningProgramme
             'ii', [$assignmentId, $candidateId]
         );
         if (!$assignment) {
-            return false;
+            return null;
         }
         $lesson = self::findLesson($lessonId, (int) $assignment['programme_id']);
         if (!$lesson) {
-            return false;
+            return null;
         }
 
         $conn = Database::getConnection();
@@ -698,11 +832,16 @@ class LearningProgramme
                 $types, $params
             );
 
+            $conn->commit();
+
             if ($newStatus === self::STATUS_COMPLETED) {
-                self::awardProgrammeSkills((int) $assignment['programme_id'], $candidateId);
+                try {
+                    self::awardProgrammeSkills((int) $assignment['programme_id'], $candidateId);
+                } catch (Throwable $e) {
+                    error_log('[LearningProgramme] Programme skill award failed after completion: ' . $e->getMessage());
+                }
             }
 
-            $conn->commit();
             return [
                 'progress' => $progress,
                 'status' => $newStatus,
@@ -713,7 +852,7 @@ class LearningProgramme
         } catch (Throwable $e) {
             $conn->rollback();
             error_log('[LearningProgramme] markLessonComplete failed: ' . $e->getMessage());
-            return false;
+            return null;
         }
     }
 
@@ -753,26 +892,46 @@ class LearningProgramme
     private static function awardProgrammeSkills(int $programmeId, int $candidateId): void
     {
         $skills = self::skillsForProgramme($programmeId);
+        $skillColumns = self::tableColumns('candidate_skills') ?? [];
+        $hasSourceColumn = in_array('source', $skillColumns, true);
         foreach ($skills as $skill) {
             $exists = Database::fetchOne(
-                "SELECT id, source, verification_status FROM candidate_skills
+                "SELECT id, verification_status FROM candidate_skills
                  WHERE user_id = ? AND skill_id = ? LIMIT 1",
                 'ii', [$candidateId, (int) $skill['id']]
             );
             if ($exists) {
-                Database::execute(
-                    "UPDATE candidate_skills
-                     SET source = 'training', verification_status = 'verified'
-                     WHERE id = ? AND user_id = ?",
-                    'ii', [(int) $exists['id'], $candidateId]
-                );
+                if ($hasSourceColumn) {
+                    Database::execute(
+                        "UPDATE candidate_skills
+                         SET source = 'training', verification_status = 'verified'
+                         WHERE id = ? AND user_id = ?",
+                        'ii', [(int) $exists['id'], $candidateId]
+                    );
+                } else {
+                    Database::execute(
+                        "UPDATE candidate_skills
+                         SET verification_status = 'verified'
+                         WHERE id = ? AND user_id = ?",
+                        'ii', [(int) $exists['id'], $candidateId]
+                    );
+                }
             } else {
-                Database::execute(
-                    "INSERT INTO candidate_skills
-                      (user_id, skill_id, proficiency, verification_status, source)
-                     VALUES (?, ?, 'intermediate', 'verified', 'training')",
-                    'iis', [$candidateId, (int) $skill['id'], 'intermediate']
-                );
+                if ($hasSourceColumn) {
+                    Database::execute(
+                        "INSERT INTO candidate_skills
+                          (user_id, skill_id, proficiency, verification_status, source)
+                         VALUES (?, ?, 'intermediate', 'verified', 'training')",
+                        'ii', [$candidateId, (int) $skill['id']]
+                    );
+                } else {
+                    Database::execute(
+                        "INSERT INTO candidate_skills
+                          (user_id, skill_id, proficiency, verification_status)
+                         VALUES (?, ?, 'intermediate', 'verified')",
+                        'ii', [$candidateId, (int) $skill['id']]
+                    );
+                }
             }
         }
     }
@@ -781,9 +940,20 @@ class LearningProgramme
     // HELPERS
     // --------------------------------------------------------
 
-    private static function computeStatus(string $stored, ?string $dueDate, ?string $startedAt, int $progress): string
+    private static function computeStatus(
+        string $stored,
+        ?string $dueDate,
+        ?string $startedAt,
+        int $progress,
+        int $requiredLessons = 0,
+        int $completedLessons = 0
+    ): string
     {
-        if ($stored === self::STATUS_COMPLETED || $progress >= 100) {
+        $lessonsComplete = $requiredLessons > 0
+            ? $completedLessons >= $requiredLessons
+            : $stored === self::STATUS_COMPLETED;
+
+        if ($lessonsComplete) {
             return self::STATUS_COMPLETED;
         }
         if ($dueDate !== null) {
@@ -873,4 +1043,3 @@ class LearningProgramme
         }
     }
 }
-

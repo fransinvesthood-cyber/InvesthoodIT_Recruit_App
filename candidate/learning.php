@@ -61,7 +61,7 @@ $flashes = render_flashes();
 .learning-page .sidebar__link i { transition: color .2s, transform .2s; }
 .learning-page .sidebar__link:hover i,
 .learning-page .sidebar__link.active i { color: var(--primary); transform: translateX(1px); }
-.learning-page .dashboard__main > .container { width: 100%; padding-top: 1.75rem; padding-bottom: 2.5rem; }
+.learning-page .dash-content > .container { width: 100%; padding-top: 1.75rem; padding-bottom: 2.5rem; }
 .learning-page .learning-overview { margin-bottom: 1.5rem; }
 .learning-page .progress-card,
 .learning-page .filter-bar {
@@ -173,7 +173,7 @@ $flashes = render_flashes();
   .learning-page .learning-hero { padding: 1.75rem 0; }
   .learning-page .learning-hero .container { align-items: flex-start; }
   .learning-page .learning-hero__progress { width: 100%; justify-content: flex-start; }
-  .learning-page .dashboard__main > .container { padding-top: 1rem; }
+  .learning-page .dash-content > .container { padding-top: 1rem; }
   .learning-page .progress-card, .learning-page .filter-bar { padding: 1rem; }
   .learning-page .progress-card__stats { grid-template-columns: repeat(2, 1fr); }
   .learning-page .filter-form { grid-template-columns: 1fr; gap: .8rem; }
@@ -218,6 +218,16 @@ $flashes = render_flashes();
 </aside>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <main class="dashboard__main">
+<header class="dash-header">
+  <div class="dash-header__left">
+    <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
+  </div>
+  <div class="dash-header__right">
+    <button class="dash-header__icon-btn" id="themeToggle" aria-label="Toggle dark mode"><i class="fas fa-moon"></i></button>
+    <div class="dash-header__user"><img src="<?= url('candidate/avatar.php') ?>" alt="Profile" class="dash-header__avatar"></div>
+  </div>
+</header>
+<div class="dash-content">
 <header class="learning-hero">
   <div class="container">
     <div class="learning-hero__content">
@@ -255,7 +265,7 @@ $flashes = render_flashes();
 <div class="filter-form__group"><label for="search"><i class="fas fa-search" aria-hidden="true"></i> Search programmes</label><div class="filter-form__search"><i class="fas fa-search" aria-hidden="true"></i><input type="text" id="search" name="search" placeholder="Search by programme title or category" value="<?= e($filtersUsed['search']) ?>"></div></div>
 <div class="filter-form__group"><label for="category"><i class="fas fa-tags" aria-hidden="true"></i> Category</label>
 <select id="category" name="category">
-<option value="general" <?= $filtersUsed['category'] === 'general' ? 'selected' : '' ?>>All Categories</option>
+<option value="" <?= $filtersUsed['category'] === '' ? 'selected' : '' ?>>All Categories</option>
 <option value="digital_skills" <?= $filtersUsed['category'] === 'digital_skills' ? 'selected' : '' ?>>Digital Skills</option>
 <option value="professional_development" <?= $filtersUsed['category'] === 'professional_development' ? 'selected' : '' ?>>Professional Development</option>
 <option value="cybersecurity" <?= $filtersUsed['category'] === 'cybersecurity' ? 'selected' : '' ?>>Cybersecurity</option>
@@ -266,6 +276,7 @@ $flashes = render_flashes();
 </select></div>
 <div class="filter-form__group"><label for="status"><i class="fas fa-tasks" aria-hidden="true"></i> Status</label>
 <select id="status" name="status">
+<option value="all" <?= $filtersUsed['status'] === 'all' ? 'selected' : '' ?>>All Statuses</option>
 <option value="assigned" <?= $filtersUsed['status'] === 'assigned' ? 'selected' : '' ?>>Assigned</option>
 <option value="in_progress" <?= $filtersUsed['status'] === 'in_progress' ? 'selected' : '' ?>>In Progress</option>
 <option value="completed" <?= $filtersUsed['status'] === 'completed' ? 'selected' : '' ?>>Completed</option>
@@ -278,7 +289,7 @@ $flashes = render_flashes();
 <option value="title" <?= $filtersUsed['sort'] === 'title' ? 'selected' : '' ?>>Title</option>
 </select></div>
 <button type="submit" class="btn btn--primary"><i class="fas fa-filter"></i> Apply Filters</button>
-<?php if ($filtersUsed['search'] !== '' || $filtersUsed['category'] !== 'general' || $filtersUsed['status'] !== 'assigned' || $filtersUsed['sort'] !== 'assigned_at'): ?>
+<?php if ($filtersUsed['search'] !== '' || $filtersUsed['category'] !== '' || $filtersUsed['status'] !== 'all' || $filtersUsed['sort'] !== 'assigned_at'): ?>
 <a href="<?= url('candidate/learning.php') ?>" class="btn btn--ghost"><i class="fas fa-undo"></i> Clear</a>
 <?php endif; ?>
 </form>

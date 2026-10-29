@@ -38,14 +38,17 @@ $health['maintenance'] = (($flat['maintenance_mode'] ?? '0') === '1') ? 'ON' : '
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>System Settings | Investhood IT Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
 <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
 <link rel="stylesheet" href="<?= url('css/admin_programmes.css') ?>">
-<link rel="stylesheet" href="<?= url('css/admin_settings.css') ?>">
+<link rel="stylesheet" href="<?= url('css/admin_settings.css') ?>?v=<?= (int) filemtime(__DIR__ . '/../css/admin_settings.css') ?>">
 <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
 </head>
-<body class="dashboard-page admin-dashboard settings-module">
+<body class="dashboard-page admin-dashboard pm-module settings-module">
 <div class="dashboard">
 <aside class="sidebar admin-sidebar" id="adminSidebar">
 <div class="sidebar__header">
@@ -71,23 +74,34 @@ $health['maintenance'] = (($flat['maintenance_mode'] ?? '0') === '1') ? 'ON' : '
 </ul>
 </nav>
 <div class="sidebar__footer">
-<div class="sidebar__user"><div class="sidebar__user-info"><span class="sidebar__user-name"><?= e($user['fullname'] ?? 'Admin') ?></span><span class="sidebar__user-role">Administrator</span></div></div>
+<div class="sidebar__user"><div class="sidebar__user-avatar"><img src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Admin User') ?>&background=1a56db&color=fff&size=80" alt="Profile"></div><div class="sidebar__user-info"><span class="sidebar__user-name"><?= e($user['fullname'] ?? 'Admin') ?></span><span class="sidebar__user-role">Administrator</span></div></div>
 <a href="<?= url('auth/logout.php') ?>" class="sidebar__logout"><i class="fas fa-sign-out-alt"></i> Sign Out</a>
 </div>
 </aside>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <main class="dashboard__main">
 <header class="dash-header admin-dash-header">
-<div class="dash-header__left"><button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button><h2 style="margin:0;font-size:1.1rem;">System Settings</h2></div>
-<div class="dash-header__right"><a href="<?= url('admin/dashboard.php') ?>" class="btn btn--ghost btn--sm"><i class="fas fa-arrow-left"></i> Dashboard</a></div>
+<div class="dash-header__left">
+<button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
+<div class="dash-header__search"><i class="fas fa-search"></i><input type="text" class="dash-header__search-input" placeholder="Search system settings..." aria-label="Search"></div>
+</div>
+<div class="dash-header__right">
+<button class="dash-header__icon-btn" id="themeToggle" aria-label="Toggle dark mode"><i class="fas fa-moon"></i></button>
+<a href="<?= url('admin/dashboard.php') ?>" class="btn btn--ghost btn--sm"><i class="fas fa-arrow-left"></i> Dashboard</a>
+<div class="dash-header__user"><img src="https://ui-avatars.com/api/?name=<?= urlencode($user['fullname'] ?? 'Admin User') ?>&background=1a56db&color=fff&size=80" alt="Profile" class="dash-header__avatar"></div>
+</div>
 </header>
 <div class="dash-content">
 <?= $flashes ?>
-<div class="app-hero"><div class="app-hero__inner">
+<section class="pm-hero">
+<div class="pm-hero__inner">
+<div class="pm-hero__text">
 <span class="section__badge"><i class="fas fa-cog"></i> Administration</span>
-<h1 class="app-hero__title">System Settings</h1>
-<p class="app-hero__subtitle">Manage platform configuration. Changes take effect immediately and are stored in the database.</p>
-</div></div>
+<h1 class="pm-hero__title">System Settings</h1>
+<p class="pm-hero__subtitle">Manage platform configuration. Changes take effect immediately and are stored in the database.</p>
+</div>
+</div>
+</section>
 <?php require __DIR__ . '/settings_p1.php'; ?>
 <?php require __DIR__ . '/settings_p2.php'; ?>
 <?php require __DIR__ . '/settings_p3.php'; ?>
@@ -96,5 +110,7 @@ $health['maintenance'] = (($flat['maintenance_mode'] ?? '0') === '1') ? 'ON' : '
 </div>
 </div>
 <script src="<?= url('js/admin_settings.js') ?>"></script>
+<script src="<?= url('js/script.js') ?>"></script>
+<script src="<?= url('js/admin_dashboard.js') ?>"></script>
 </body>
 </html>

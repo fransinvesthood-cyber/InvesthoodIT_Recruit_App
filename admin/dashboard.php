@@ -1317,7 +1317,7 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
             </div>
             <div class="admin-analytics-card">
               <div class="admin-analytics-card__header">
-                <h3>Learning & Assessment</h3>
+                <h3><a href="<?= url('admin/learning.php') ?>">Learning &amp; Skills</a></h3>
               </div>
               <div class="admin-analytics-chart-container">
                 <canvas id="analyticsLearningChart"></canvas>
@@ -3385,6 +3385,10 @@ $talentSkillsCategories = (int) ($talentSkillsCategoriesRow['cnt'] ?? 0);
             <a href="<?= url('admin/programme_create.php') ?>" class="admin-quick-action">
               <div class="admin-quick-action__icon admin-quick-action__icon--primary"><i class="fas fa-graduation-cap"></i></div>
               <span>Create Programme</span>
+            </a>
+            <a href="<?= url('admin/learning.php') ?>" class="admin-quick-action">
+              <div class="admin-quick-action__icon admin-quick-action__icon--indigo"><i class="fas fa-book-open"></i></div>
+              <span>Learning &amp; Skills</span>
             </a>
             <a href="<?= url('admin/cohort_create.php') ?>" class="admin-quick-action">
               <div class="admin-quick-action__icon admin-quick-action__icon--cyan"><i class="fas fa-layer-group"></i></div>

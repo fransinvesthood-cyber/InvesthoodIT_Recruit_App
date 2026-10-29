@@ -1035,88 +1035,68 @@ $flashes = render_flashes();
           </div>
           <a href="<?= url('candidate/learning.php') ?>" class="btn btn--primary" style="margin-bottom:1.5rem;"><i class="fas fa-graduation-cap"></i> Start Learning</a>
           <div class="learning-grid">
-            <div class="learning-card">
-              <div class="learning-card__header">
-                <h4>Full-Stack Web Development</h4>
-                <span class="learning-card__badge">In Progress</span>
+            <?php if (empty($learningAssignments)): ?>
+              <div class="empty-state" style="grid-column:1 / -1;">
+                <div class="empty-state__icon"><i class="fas fa-book-open"></i></div>
+                <h3 class="empty-state__title">No learning programmes assigned yet</h3>
+                <p class="empty-state__text">Assigned programmes will appear here with your progress and deadlines.</p>
+                <a href="<?= url('candidate/learning.php') ?>" class="btn btn--ghost btn--sm">Open My Learning <i class="fas fa-arrow-right"></i></a>
               </div>
+            <?php else: ?>
+            <?php foreach (array_slice($learningAssignments, 0, 3) as $learningAssignment): ?>
+              <?php
+                $learningStatus = $learningAssignment['computed_status'] ?? $learningAssignment['status'] ?? 'assigned';
+                $learningTone = LearningProgramme::statusTone($learningStatus);
+                $learningBadgeClass = $learningTone === 'success' ? 'learning-card__badge--green' : ($learningTone === 'secondary' ? 'learning-card__badge--cyan' : '');
+                $learningProgress = (int) ($learningAssignment['progress'] ?? 0);
+                $learningDue = !empty($learningAssignment['due_date']) ? format_date($learningAssignment['due_date'], 'd M Y') : 'No due date';
+                $learningAction = $learningStatus === 'completed' ? 'Review Course' : ($learningStatus === 'assigned' ? 'Start Learning' : 'Continue Learning');
+              ?>
+            <div class="learning-card <?= $learningStatus === 'completed' ? 'learning-card--complete' : '' ?>">
+              <div class="learning-card__header">
+                <h4><?= e($learningAssignment['title'] ?? 'Learning programme') ?></h4>
+                <span class="learning-card__badge <?= e($learningBadgeClass) ?>"><?= e(LearningProgramme::statusLabel($learningStatus)) ?></span>
+              </div>
+              <p class="learning-card__meta"><i class="fas fa-tag"></i> <?= e($learningAssignment['category'] ?? 'General') ?><?= !empty($learningAssignment['provider']) ? ' &bull; ' . e($learningAssignment['provider']) : '' ?></p>
               <div class="learning-card__progress">
-                <div class="progress-bar">
-                  <div class="progress-bar__fill" style="width:60%"></div>
-                </div>
-                <span class="learning-card__percent">60% Complete</span>
+                <div class="progress-bar"><div class="progress-bar__fill" style="width:<?= $learningProgress ?>%"></div></div>
+                <span class="learning-card__percent"><?= $learningProgress ?>% Complete</span>
               </div>
               <div class="learning-card__stats">
-                <span><i class="fas fa-check-circle"></i> 6/10 Modules</span>
-                <span><i class="fas fa-clock"></i> 2 Weeks Left</span>
+                <span><i class="fas fa-check-circle"></i> <?= (int) ($learningAssignment['completed_lessons'] ?? 0) ?>/<?= (int) ($learningAssignment['required_lessons'] ?? 0) ?> Lessons</span>
+                <span><i class="fas fa-calendar-alt"></i> <?= e($learningDue) ?></span>
               </div>
-              <a href="#" class="btn btn--ghost btn--sm">Continue Learning <i class="fas fa-arrow-right"></i></a>
+              <a href="<?= url('candidate/course.php?id=' . (int) ($learningAssignment['assignment_id'] ?? 0)) ?>" class="btn btn--ghost btn--sm"><?= e($learningAction) ?> <i class="fas fa-arrow-right"></i></a>
             </div>
-            <div class="learning-card">
-              <div class="learning-card__header">
-                <h4>Cloud Computing Essentials</h4>
-                <span class="learning-card__badge learning-card__badge--cyan">In Progress</span>
-              </div>
-              <div class="learning-card__progress">
-                <div class="progress-bar">
-                  <div class="progress-bar__fill" style="width:35%"></div>
-                </div>
-                <span class="learning-card__percent">35% Complete</span>
-              </div>
-              <div class="learning-card__stats">
-                <span><i class="fas fa-check-circle"></i> 2/6 Modules</span>
-                <span><i class="fas fa-clock"></i> 4 Weeks Left</span>
-              </div>
-              <a href="#" class="btn btn--ghost btn--sm">Continue Learning <i class="fas fa-arrow-right"></i></a>
-            </div>
-            <div class="learning-card learning-card--complete">
-              <div class="learning-card__header">
-                <h4>Agile & Scrum Fundamentals</h4>
-                <span class="learning-card__badge learning-card__badge--green">Completed</span>
-              </div>
-              <div class="learning-card__progress">
-                <div class="progress-bar">
-                  <div class="progress-bar__fill" style="width:100%"></div>
-                </div>
-                <span class="learning-card__percent">100% Complete</span>
-              </div>
-              <div class="learning-card__stats">
-                <span><i class="fas fa-check-circle" style="color:var(--success);"></i> 4/4 Modules</span>
-                <span><i class="fas fa-certificate" style="color:var(--accent);"></i> Certificate Available</span>
-              </div>
-              <a href="#" class="btn btn--ghost btn--sm">View Certificate <i class="fas fa-download"></i></a>
-            </div>
+            <?php endforeach; ?>
+            <?php endif; ?>
           </div>
 
           <!-- Skills Achievements -->
           <div class="skills-achievements">
             <h3><i class="fas fa-trophy"></i> Skills Achievements</h3>
             <div class="skills-achievements__grid">
-              <div class="achievement-badge">
-                <div class="achievement-badge__icon"><i class="fas fa-code"></i></div>
-                <span class="achievement-badge__label">JavaScript</span>
-                <span class="achievement-badge__level">Advanced</span>
-              </div>
-              <div class="achievement-badge">
-                <div class="achievement-badge__icon"><i class="fab fa-react"></i></div>
-                <span class="achievement-badge__label">React</span>
-                <span class="achievement-badge__level">Intermediate</span>
-              </div>
-              <div class="achievement-badge">
-                <div class="achievement-badge__icon"><i class="fab fa-python"></i></div>
-                <span class="achievement-badge__label">Python</span>
-                <span class="achievement-badge__level">Intermediate</span>
-              </div>
-              <div class="achievement-badge achievement-badge--locked">
-                <div class="achievement-badge__icon"><i class="fas fa-cloud"></i></div>
-                <span class="achievement-badge__label">AWS</span>
-                <span class="achievement-badge__level">In Progress</span>
-              </div>
-              <div class="achievement-badge achievement-badge--locked">
-                <div class="achievement-badge__icon"><i class="fab fa-docker"></i></div>
-                <span class="achievement-badge__label">Docker</span>
-                <span class="achievement-badge__level">Not Started</span>
-              </div>
+              <?php if (empty($skills) && empty($certifications)): ?>
+                <div class="empty-state" style="grid-column:1 / -1;">
+                  <p class="empty-state__text">Add skills or certifications to build your achievements profile.</p>
+                  <a href="<?= url('candidate/profile.php#profile-skills') ?>" class="btn btn--ghost btn--sm">Manage Skills <i class="fas fa-arrow-right"></i></a>
+                </div>
+              <?php else: ?>
+                <?php foreach (array_slice($skills, 0, 5) as $skill): ?>
+                  <div class="achievement-badge">
+                    <div class="achievement-badge__icon"><i class="fas fa-award"></i></div>
+                    <span class="achievement-badge__label"><?= e($skill['name'] ?? 'Skill') ?></span>
+                    <span class="achievement-badge__level"><?= e(ucfirst((string) ($skill['proficiency'] ?? 'Added'))) ?></span>
+                  </div>
+                <?php endforeach; ?>
+                <?php foreach (array_slice($certifications, 0, max(0, 5 - count($skills))) as $certification): ?>
+                  <div class="achievement-badge">
+                    <div class="achievement-badge__icon"><i class="fas fa-certificate"></i></div>
+                    <span class="achievement-badge__label"><?= e($certification['name'] ?? 'Certification') ?></span>
+                    <span class="achievement-badge__level">Certification</span>
+                  </div>
+                <?php endforeach; ?>
+              <?php endif; ?>
             </div>
           </div>
 
@@ -1124,27 +1104,10 @@ $flashes = render_flashes();
           <div class="mentoring-sessions">
             <h3><i class="fas fa-users"></i> Mentoring Sessions</h3>
             <div class="mentoring-sessions__list">
-              <div class="mentoring-session">
-                <div class="mentoring-session__date">
-                  <span class="mentoring-session__day">15</span>
-                  <span class="mentoring-session__month">Jul</span>
-                </div>
-                <div class="mentoring-session__info">
-                  <strong>Career Development Planning</strong>
-                  <span>With: Thabo Moloi - 14:00 - 15:00</span>
-                </div>
-                <a href="#" class="btn btn--primary btn--sm">Join</a>
-              </div>
-              <div class="mentoring-session">
-                <div class="mentoring-session__date">
-                  <span class="mentoring-session__day">22</span>
-                  <span class="mentoring-session__month">Jul</span>
-                </div>
-                <div class="mentoring-session__info">
-                  <strong>Technical Interview Preparation</strong>
-                  <span>With: Sarah Mokoena - 11:00 - 12:00</span>
-                </div>
-                <a href="#" class="btn btn--outline btn--sm">Reschedule</a>
+              <div class="empty-state" style="width:100%;">
+                <div class="empty-state__icon"><i class="fas fa-calendar-plus"></i></div>
+                <h4 class="empty-state__title">No mentoring sessions scheduled</h4>
+                <p class="empty-state__text">Scheduled mentoring sessions will appear here when they are available.</p>
               </div>
             </div>
           </div>
