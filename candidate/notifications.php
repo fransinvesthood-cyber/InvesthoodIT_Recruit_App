@@ -148,6 +148,10 @@ $flashes = render_flashes();
       <header class="dash-header">
         <div class="dash-header__left">
           <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
+          <div class="dash-header__search" id="dashSearch">
+            <i class="fas fa-search"></i>
+            <input type="text" class="dash-header__search-input" placeholder="Search notifications..." aria-label="Search notifications">
+          </div>
         </div>
         <div class="dash-header__right">
           <button class="dash-header__icon-btn" id="themeToggle" aria-label="Toggle dark mode"><i class="fas fa-moon"></i></button>
@@ -179,7 +183,7 @@ $flashes = render_flashes();
                     <div class="notif-item__icon notif-item__icon--<?= e($nCat) ?>"><i class="fas <?= e(CandidateNotification::categoryIcon($nCat)) ?>"></i></div>
                     <div class="notif-item__content">
                       <div class="notif-item__title"><?= e($n['title']) ?></div>
-                      <div class="notif-item__message"><?= e($n['message']) ?></div>
+                      <div class="notif-item__message"><?= e(strip_tags((string) $n['message'])) ?></div>
                       <div class="notif-item__time"><?= e(time_ago((string) $n['created_at'])) ?></div>
                     </div>
                   </a>
@@ -191,6 +195,7 @@ $flashes = render_flashes();
               </div>
             </div>
           </div>
+          <a href="<?= url('candidate/dashboard.php') ?>" class="dash-header__icon-btn" aria-label="Back to dashboard" title="Back to dashboard"><i class="fas fa-th-large"></i></a>
           <div class="dash-header__user"><img src="<?= url('candidate/avatar.php') ?>" alt="Profile" class="dash-header__avatar"></div>
         </div>
       </header>
@@ -279,7 +284,7 @@ $flashes = render_flashes();
                       <span class="notif-item__tag notif-item__tag--<?= e($nCat) ?>"><?= e(CandidateNotification::categoryLabel($nCat)) ?></span>
                       <?php if ($nUnread): ?><span class="notif-item__unread-dot" title="Unread"></span><?php endif; ?>
                     </div>
-                    <div class="notif-item__message"><?= e($n['message']) ?></div>
+                    <div class="notif-item__message"><?= e(strip_tags((string) $n['message'])) ?></div>
                     <div class="notif-item__time"><i class="far fa-clock"></i> <?= e(format_date((string) $n['created_at'], 'd M Y, H:i')) ?> &middot; <?= e(time_ago((string) $n['created_at'])) ?></div>
                   </div>
                   <div class="notif-item__actions">
@@ -335,4 +340,3 @@ $flashes = render_flashes();
   <script src="<?= url('js/notifications.js') ?>"></script>
 </body>
 </html>
-

@@ -31,6 +31,10 @@ document.addEventListener('DOMContentLoaded', function () {
       .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   }
 
+  function plainText(value) {
+    return String(value == null ? '' : value).replace(/<[^>]*>/g, '');
+  }
+
   // ============================================
   // UNREAD BADGE
   // ============================================
@@ -84,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="notif-item__icon notif-item__icon--' + escapeHtml(n.tone) + '"><i class="fas ' + escapeHtml(n.icon) + '"></i></div>' +
         '<div class="notif-item__content">' +
           '<div class="notif-item__title">' + escapeHtml(n.title) + '</div>' +
-          '<div class="notif-item__message">' + escapeHtml(n.message) + '</div>' +
+          '<div class="notif-item__message">' + escapeHtml(plainText(n.message)) + '</div>' +
           '<div class="notif-item__time">' + escapeHtml(n.time) + '</div>' +
         '</div>' +
       '</a>';
