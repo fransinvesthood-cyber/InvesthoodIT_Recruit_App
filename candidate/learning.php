@@ -26,29 +26,10 @@ $flashes = render_flashes();
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
 <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+<link rel="stylesheet" href="<?= url('css/settings.css') ?>">
 <link rel="stylesheet" href="<?= url('css/applications.css') ?>">
 <style>
 .learning-page .dashboard__main { background: #f5f7fb; }
-.learning-page .learning-hero {
-  color: #fff;
-  padding: 2.25rem 0;
-  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
-  box-shadow: 0 8px 24px rgba(15, 59, 138, .16);
-}
-.learning-page .learning-hero .container {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 2rem; flex-wrap: wrap;
-}
-.learning-page .learning-hero__eyebrow {
-  display: inline-flex; align-items: center; gap: .5rem;
-  margin-bottom: .65rem; font-size: .75rem; font-weight: 700;
-  letter-spacing: .1em; text-transform: uppercase; opacity: .8;
-}
-.learning-page .learning-hero__title {
-  margin: 0 0 .45rem; font-size: clamp(1.65rem, 3vw, 2.2rem);
-  font-weight: 800; line-height: 1.2;
-}
-.learning-page .learning-hero__subtitle { margin: 0; max-width: 620px; font-size: .95rem; opacity: .86; }
 .learning-page .learning-hero__progress { display: flex; align-items: center; gap: .85rem; }
 .learning-page .learning-hero__progress-ring {
   width: 82px; height: 82px; display: grid; place-items: center;
@@ -228,12 +209,12 @@ $flashes = render_flashes();
   </div>
 </header>
 <div class="dash-content">
-<header class="learning-hero">
-  <div class="container">
-    <div class="learning-hero__content">
-      <span class="learning-hero__eyebrow"><i class="fas fa-graduation-cap"></i> Learning Hub</span>
-      <h1 class="learning-hero__title">My Learning Programmes</h1>
-      <p class="learning-hero__subtitle">Track courses assigned to you, complete lessons, and watch your skills grow.</p>
+<section class="settings-hero learning-hero">
+<div class="settings-hero__inner">
+  <div class="settings-hero__text">
+      <span class="settings-hero__badge"><i class="fas fa-graduation-cap"></i> Learning Hub</span>
+    <h1 class="settings-hero__title">My Learning Programmes</h1>
+    <p class="settings-hero__subtitle">Track courses assigned to you, complete lessons, and watch your skills grow.</p>
     </div>
     <div class="learning-hero__progress">
       <div class="learning-hero__progress-ring">
@@ -242,7 +223,7 @@ $flashes = render_flashes();
       <span class="learning-hero__progress-label">Overall progress</span>
     </div>
   </div>
-</header>
+</section>
 <div class="container">
 <section class="learning-overview">
 <div class="progress-card">

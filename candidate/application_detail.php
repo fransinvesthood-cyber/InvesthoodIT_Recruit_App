@@ -52,6 +52,7 @@ $flashes = render_flashes();
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/settings.css') ?>">
   <link rel="stylesheet" href="<?= url('css/applications.css') ?>">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
@@ -117,26 +118,27 @@ $flashes = render_flashes();
         <?= $flashes ?>
 
         <!-- ===== APPLICATION SUMMARY ===== -->
-        <section class="app-detail__section">
-          <div class="app-detail__header">
-            <div>
+        <section class="settings-hero application-detail__hero">
+          <div class="settings-hero__inner">
+            <div class="settings-hero__text">
               <div class="app-detail__header-badges">
                 <span class="badge badge--<?= e($badgeClass) ?>"><?= e($statusLabel) ?></span>
                 <span class="app-detail__ref"><i class="fas fa-hashtag"></i> <?= e($appReference) ?></span>
               </div>
-              <h1 class="app-detail__title"><?= e($opportunity['title']) ?></h1>
-              <p class="app-detail__programme">
+              <h1 class="settings-hero__title"><?= e($opportunity['title']) ?></h1>
+              <p class="settings-hero__subtitle">
                 <i class="fas fa-graduation-cap"></i>
-                <?= e($opportunity['programme_name']) ?>
+                <span><?= e($opportunity['programme_name']) ?></span>
                 <?php if (!empty($opportunity['cohort_name'])): ?>
-                  <span class="app-detail__separator">•</span>
+                  <span>•</span>
                   <span><?= e($opportunity['cohort_name']) ?></span>
                 <?php endif; ?>
               </p>
             </div>
           </div>
+        </section>
 
-          <div class="app-detail__grid">
+        <div class="app-detail__grid">
             <div class="app-info-card">
               <span class="app-info-card__label">Application Reference</span>
               <span class="app-info-card__value"><?= e($appReference) ?></span>
@@ -165,8 +167,7 @@ $flashes = render_flashes();
               <span class="app-info-card__label">Cohort</span>
               <span class="app-info-card__value"><?= e($opportunity['cohort_name'] ?? '—') ?></span>
             </div>
-          </div>
-        </section>
+        </div>
 
         <!-- ===== OPPORTUNITY VENUE ===== -->
         <section class="app-detail__section">
