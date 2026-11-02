@@ -35,6 +35,24 @@ if(as_has_table($conn,'assessment_attempts')){
     }
 }
 
+/* -------------------------------------------------------------------------
+ * Document verification snapshot (added in Step 5)
+ * ---------------------------------------------------------------------- */
+$docStats = ['pending'=>0,'outstanding'=>0,'verified'=>0,'rejected'=>0];
+if (as_has_table($conn, 'candidate_documents')) {
+    $res = $conn->query(
+        "SELECT COALESCE(SUM(status='pending'),0)     pending,
+                COALESCE(SUM(status='outstanding'),0) outstanding,
+                COALESCE(SUM(status='verified'),0)    verified,
+                COALESCE(SUM(status='rejected'),0)    rejected
+           FROM candidate_documents"
+    );
+    if ($res) {
+        $row = $res->fetch_assoc() ?: [];
+        foreach ($docStats as $k => $_) $docStats[$k] = (int)($row[$k] ?? 0);
+    }
+}
+
 $first=trim((string)($user['first_name']??'Assessor'));
 $defs=[
  'assigned'=>['label'=>'Assigned assessment attempts','icon'=>'fas fa-list-check','empty'=>'No assigned attempts'],
@@ -52,6 +70,14 @@ require __DIR__.'/_layout_start.php';
 .as-dashboard-modal__body{flex:1;overflow-y:auto;padding:20px 24px}.as-dashboard-panel{display:none}.as-dashboard-panel.is-active{display:block}.as-modal-summary{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:15px;padding:14px 16px;border-radius:15px;background:rgba(127,127,127,.06)}.as-modal-summary strong{font-size:21px}.as-modal-summary span{display:block;margin-top:3px;font-size:12px;opacity:.65}
 .as-modal-list{display:flex;flex-direction:column}.as-modal-assessment{display:flex;align-items:center;gap:14px;padding:15px 4px;border-bottom:1px solid rgba(127,127,127,.12);color:inherit;text-decoration:none}.as-modal-assessment__avatar{width:44px;height:44px;flex:0 0 44px;display:grid;place-items:center;border-radius:50%;background:rgba(79,70,229,.1);font-size:12px;font-weight:800}.as-modal-assessment__body{flex:1;min-width:0}.as-modal-assessment__top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.as-modal-assessment__body>span{display:block;margin-top:4px;font-size:12px;opacity:.68}.as-modal-assessment__meta{display:flex;flex-wrap:wrap;gap:12px;margin-top:7px;font-size:11px;opacity:.6}.as-modal-assessment__result{text-align:right}.as-modal-assessment__result span{display:block;margin-top:4px;font-size:11px;opacity:.6}.as-modal-empty{min-height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}.as-modal-empty i{font-size:32px;opacity:.45}.as-dashboard-modal__footer{display:flex;justify-content:flex-end;padding:14px 24px;border-top:1px solid rgba(127,127,127,.14)}.as-modal-close-btn{padding:10px 16px;border:0;border-radius:10px;background:rgba(127,127,127,.12);color:inherit;font-weight:700;cursor:pointer}
 body.dark-mode .as-dashboard-modal__dialog,html[data-theme="dark"] .as-dashboard-modal__dialog{background:#111827;color:#f8fafc}body.as-dashboard-modal-open{overflow:hidden}@media(max-width:650px){.as-dashboard-modal{align-items:flex-end;padding:0}.as-dashboard-modal__dialog{width:100%;max-height:92vh;border-radius:22px 22px 0 0}.as-modal-assessment__result{display:none}}
+
+/* Document verification card (added in Step 5) */
+.doc-dash{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:6px 4px 14px}
+.doc-dash a{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:14px;background:rgba(127,127,127,.05);text-decoration:none;color:inherit;transition:transform .15s ease,background .15s ease}
+.doc-dash a:hover{transform:translateY(-2px);background:rgba(79,70,229,.08)}
+.doc-dash strong{font-size:22px;line-height:1}
+.doc-dash span{font-size:12px;opacity:.65}
+@media(max-width:720px){.doc-dash{grid-template-columns:repeat(2,1fr)}}
 </style>
 
 <section class="as-hero"><div class="as-hero__content"><span class="as-hero__eyebrow"><i class="fas fa-award"></i> Quality Assessment Workspace</span><h2>Welcome back, <?=e($first?:'Assessor')?>.</h2><p>Review evidence against outcomes, record criterion-level decisions, provide clear feedback and maintain a complete audit trail for every assessment.</p><div class="as-hero__actions"><a class="as-btn as-btn--light" href="<?=url('assessor/assessments.php')?>"><i class="fas fa-clipboard-check"></i> Open Assessment Queue</a><a class="as-btn as-btn--glass" href="<?=url('assessor/decisions.php')?>"><i class="fas fa-gavel"></i> View My Decisions</a></div></div><div class="as-hero__visual"><div class="as-quality-orb"><div class="as-quality-orb__icon"><i class="fas fa-scale-balanced"></i></div><strong>Consistent</strong><span>Evidence-led assessment</span></div></div></section>
@@ -70,11 +96,42 @@ body.dark-mode .as-dashboard-modal__dialog,html[data-theme="dark"] .as-dashboard
 <?php if(!$queue): ?><div class="as-empty"><div class="as-empty__icon"><i class="fas fa-clipboard-check"></i></div><strong>No assessments waiting</strong><span>New assigned submissions will appear here.</span></div><?php else: ?><div class="as-queue"><?php foreach($queue as $x): $f=trim((string)$x['first_name']);$l=trim((string)$x['last_name']); ?><a class="as-queue-item" href="<?=url('assessor/review_assessment.php?id='.(int)$x['attempt_id'])?>"><div class="as-avatar"><?=e(as_initials($f,$l))?></div><div class="as-queue-item__body"><div class="as-queue-item__top"><strong><?=e(trim($f.' '.$l)?:'Participant')?></strong><span class="as-status as-status--<?=e(as_class($x['status']))?>"><?=e(as_label($x['status']))?></span></div><span class="as-queue-item__outcome"><?=e($x['outcome_code'])?> · <?=e($x['outcome_title'])?></span><div class="as-queue-item__meta"><span><i class="fas fa-rotate"></i> Attempt <?=(int)$x['attempt_number']?></span><?php if(!empty($x['submitted_at'])):?><span><i class="fas fa-clock"></i> <?=e(as_datetime($x['submitted_at']))?></span><?php endif;?></div></div><i class="fas fa-chevron-right as-queue-item__arrow"></i></a><?php endforeach;?></div><?php endif;?></section>
 <section class="as-card"><div class="as-card__header"><div><h3>Assessment Principles</h3><p>Your audit and quality safeguards.</p></div></div><div class="as-principles"><div class="as-principle"><span class="as-principle__icon as-principle__icon--blue"><i class="fas fa-list-check"></i></span><div><strong>Criterion-level decisions</strong><span>Record result and feedback against every criterion.</span></div></div><div class="as-principle"><span class="as-principle__icon as-principle__icon--purple"><i class="fas fa-shield-halved"></i></span><div><strong>Moderation segregation</strong><span>An assessor cannot moderate their own assessment.</span></div></div><div class="as-principle"><span class="as-principle__icon as-principle__icon--green"><i class="fas fa-chart-line"></i></span><div><strong>Approved progress only</strong><span>Participant progress changes only after final approval.</span></div></div></div></section></div>
 
+<!-- ===================================================================
+     Document verification card 
+     =================================================================== -->
+<section class="as-card" style="margin-top:18px">
+  <div class="as-card__header">
+    <div>
+      <h3>Document verification</h3>
+      <p>Supporting documents submitted by candidates and awaiting your review.</p>
+    </div>
+    <a class="as-link" href="<?=url('assessor/documents.php')?>">Open queue <i class="fas fa-arrow-right"></i></a>
+  </div>
+  <div class="doc-dash">
+    <a href="<?=url('assessor/documents.php?status=pending')?>">
+      <strong><?=number_format($docStats['pending'])?></strong>
+      <span><i class="fas fa-hourglass-half"></i> Pending review</span>
+    </a>
+    <a href="<?=url('assessor/documents.php?status=outstanding')?>">
+      <strong><?=number_format($docStats['outstanding'])?></strong>
+      <span><i class="fas fa-triangle-exclamation"></i> Outstanding</span>
+    </a>
+    <a href="<?=url('assessor/documents.php?status=rejected')?>">
+      <strong><?=number_format($docStats['rejected'])?></strong>
+      <span><i class="fas fa-circle-xmark"></i> Rejected</span>
+    </a>
+    <a href="<?=url('assessor/documents.php?status=verified')?>">
+      <strong><?=number_format($docStats['verified'])?></strong>
+      <span><i class="fas fa-circle-check"></i> Verified</span>
+    </a>
+  </div>
+</section>
+
 <div class="as-security"><i class="fas fa-fingerprint"></i><div><strong>Audit-ready assessment environment</strong><span>Every decision is designed to retain criterion, result, feedback, supporting evidence, attempt and assessor details.</span></div></div>
 
 <div class="as-dashboard-modal" id="assessorDashboardModal" aria-hidden="true"><div class="as-dashboard-modal__backdrop" data-assessor-close></div><section class="as-dashboard-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="assessorDashboardModalTitle"><header class="as-dashboard-modal__header"><div class="as-dashboard-modal__heading"><span class="as-dashboard-modal__icon"><i class="fas fa-list-check" id="assessorDashboardModalIcon"></i></span><div><h3 id="assessorDashboardModalTitle">Assessment Details</h3><p id="assessorDashboardModalDescription">Assessment records assigned to you.</p></div></div><button type="button" class="as-dashboard-modal__close" data-assessor-close aria-label="Close"><i class="fas fa-xmark"></i></button></header><div class="as-dashboard-modal__body">
-<?php foreach($defs as $k=>$d): ?><section class="as-dashboard-panel" data-assessor-panel="<?=e($k)?>"><div class="as-modal-summary"><div><strong><?=number_format($stats[$k])?></strong><span><?=e($d['label'])?></span></div><a class="as-btn as-btn--light" href="<?=url('assessor/assessments.php')?>"><i class="fas fa-clipboard-check"></i> Open Queue</a></div><?php if(!$modalData[$k]): ?><div class="as-modal-empty"><i class="<?=e($d['icon'])?>"></i><strong><?=e($d['empty'])?></strong><span>Relevant assessment records will appear here.</span></div><?php else:?><div class="as-modal-list"><?php foreach($modalData[$k] as $a): $f=trim((string)$a['first_name']);$l=trim((string)$a['last_name']);$name=trim($f.' '.$l)?:'Participant'; ?><a class="as-modal-assessment" href="<?=url('assessor/review_assessment.php?id='.(int)$a['attempt_id'])?>"><div class="as-modal-assessment__avatar"><?=e(as_initials($f,$l))?></div><div class="as-modal-assessment__body"><div class="as-modal-assessment__top"><strong><?=e($name)?></strong><span class="as-status as-status--<?=e(as_class($a['status']))?>"><?=e(as_label($a['status']))?></span></div><span><?=e($a['outcome_code'])?> · <?=e($a['outcome_title'])?></span><div class="as-modal-assessment__meta"><span><i class="fas fa-rotate"></i> Attempt <?=(int)$a['attempt_number']?></span><?php if(!empty($a['submitted_at'])):?><span><i class="fas fa-clock"></i> <?=e(as_datetime($a['submitted_at']))?></span><?php endif;?><?php if(!empty($a['email'])):?><span><i class="fas fa-envelope"></i> <?=e($a['email'])?></span><?php endif;?></div></div><div class="as-modal-assessment__result"><strong><?=!empty($a['assessor_result'])?e(as_label($a['assessor_result'])):'Pending'?></strong><?php if(!empty($a['moderation_status'])):?><span>Moderation: <?=e(as_label($a['moderation_status']))?></span><?php endif;?></div></a><?php endforeach;?></div><?php endif;?></section><?php endforeach;?>
-</div><footer class="as-dashboard-modal__footer"><button type="button" class="as-modal-close-btn" data-assessor-close><i class="fas fa-xmark"></i> Close</button></footer></section></div>
+<?php foreach($defs as $k=>$d): ?><section class="as-dashboard-panel" data-assessor-panel="<?=e($k)?>"><div class="as-modal-summary"><div><strong><?=number_format($stats[$k])?></strong><span><?=e($d['label'])?></span></div><a class="as-btn as-btn--light" href="<?=url('assessor/assessments.php')?>"><i class="fas fa-clipboard-check"></i> Open Queue</a></div><?php if(!$modalData[$k]): ?><div class="as-modal-empty"><i class="<?=e($d['icon'])?>"></i><strong><?=e($d['empty'])?></strong><span>Relevant assessment records will appear here.</span></div><?php else:?><div class="as-modal-list"><?php foreach($modalData[$k] as $a): $f=trim((string)$a['first_name']);$l=trim((string)$a['last_name']);$name=trim($f.' '.$l)?:'Participant'; ?><a class="as-modal-assessment" href="<?=url('assessor/review_assessment.php?id='.(int)$a['attempt_id'])?>"><div class="as-modal-assessment__avatar"><?=e(as_initials($f,$l))?></div><div class="as-modal-assessment__body"><div class="as-modal-assessment__top"><strong><?=e($name)?></strong><span class="as-status as-status--<?=e(as_class($a['status']))?>"><?=e(as_label($a['status']))?></span></div><span><?=e($a['outcome_code'])?> · <?=e($a['outcome_title'])?></span><div class="as-modal-assessment__meta"><span><i class("fas fa-rotate"></i> Attempt <?=(int)$a['attempt_number']?></span><?php if(!empty($a['submitted_at'])):?><span><i class("fas fa-clock"></i> <?=e(as_datetime($a['submitted_at']))?></span><?php endif;?><?php if(!empty($a['email'])):?><span><i class("fas fa-envelope"></i> <?=e($a['email'])?></span><?php endif;?></div></div><div class("as-modal-assessment__result")?><strong><?=!empty($a['assessor_result'])?e(as_label($a['assessor_result'])):'Pending'?></strong><?php if(!empty($a['moderation_status'])):?><span>Moderation: <?=e(as_label($a['moderation_status']))?></span><?php endif;?></div></a><?php endforeach;?></div><?php endif;?></section><?php endforeach;?>
+</div><footer class("as-dashboard-modal__footer")?><button type("button")?class("as-modal-close-btn")?data-assessor-close?><i class("fas fa-xmark")></i> Close</button></footer></section></div>
 
 <script>
 document.addEventListener('DOMContentLoaded',function(){const modal=document.getElementById('assessorDashboardModal');if(!modal)return;const cards=document.querySelectorAll('[data-assessor-modal]'),panels=modal.querySelectorAll('[data-assessor-panel]'),closers=modal.querySelectorAll('[data-assessor-close]'),title=document.getElementById('assessorDashboardModalTitle'),desc=document.getElementById('assessorDashboardModalDescription'),icon=document.getElementById('assessorDashboardModalIcon');let last=null;const cfg={assigned:['Assigned Attempts','All assessment attempts assigned to you.','fas fa-list-check'],pending:['Awaiting Review','Submitted and in-review assessments requiring your attention.','fas fa-hourglass-half'],competent:['Competent','Assessment attempts you have marked competent.','fas fa-circle-check'],nyc:['Not Yet Competent','Assessment attempts marked not yet competent.','fas fa-rotate-right'],moderation:['Awaiting Moderation','Your assessed attempts currently awaiting moderation.','fas fa-shield-halved']};function openModal(type,trigger){if(!cfg[type])return;last=trigger;panels.forEach(p=>p.classList.toggle('is-active',p.dataset.assessorPanel===type));title.textContent=cfg[type][0];desc.textContent=cfg[type][1];icon.className=cfg[type][2];modal.classList.add('is-open');modal.setAttribute('aria-hidden','false');document.body.classList.add('as-dashboard-modal-open');const b=modal.querySelector('.as-dashboard-modal__close');if(b)b.focus()}function closeModal(){modal.classList.remove('is-open');modal.setAttribute('aria-hidden','true');document.body.classList.remove('as-dashboard-modal-open');panels.forEach(p=>p.classList.remove('is-active'));if(last)last.focus()}cards.forEach(c=>{c.addEventListener('click',()=>openModal(c.dataset.assessorModal,c));c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openModal(c.dataset.assessorModal,c)}})});closers.forEach(b=>b.addEventListener('click',closeModal));document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modal.classList.contains('is-open'))closeModal()})});

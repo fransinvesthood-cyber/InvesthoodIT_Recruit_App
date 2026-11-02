@@ -144,6 +144,14 @@
   color: var(--dark);
 }
 
+.application-detail__hero .app-detail__header-badges {
+  margin-bottom: 0.5rem;
+}
+
+.application-detail__hero .app-detail__ref {
+  color: rgba(255, 255, 255, 0.75);
+}
+
 .app-detail__header {
   display: flex;
   justify-content: space-between;

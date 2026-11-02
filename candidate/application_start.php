@@ -51,6 +51,7 @@ $flashes = render_flashes();
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/settings.css') ?>">
   <link rel="stylesheet" href="<?= url('css/applications.css') ?>">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
@@ -116,10 +117,16 @@ $flashes = render_flashes();
         <?= $flashes ?>
 
         <!-- ===== APPLICATION START HERO ===== -->
-        <section class="opp-hero">
-          <div class="opp-hero__inner">
-            <h1 class="opp-hero__title">Start Your Application</h1>
-            <p class="opp-hero__subtitle">Begin your application for this opportunity.</p>
+        <section class="settings-hero">
+          <div class="settings-hero__inner">
+            <div class="settings-hero__text">
+              <span class="settings-hero__badge"><i class="fas fa-file-alt"></i> Application</span>
+              <h1 class="settings-hero__title">Start Your Application</h1>
+              <p class="settings-hero__subtitle">Begin your application for this opportunity.</p>
+            </div>
+            <div class="settings-hero__actions">
+              <span class="settings-hero__badge"><?= e(Application::label($application['status'])) ?></span>
+            </div>
           </div>
         </section>
 

@@ -38,6 +38,7 @@ $flashes = render_flashes();
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
 <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+<link rel="stylesheet" href="<?= url('css/settings.css') ?>">
 <link rel="stylesheet" href="<?= url('css/applications.css') ?>">
 <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
@@ -217,21 +218,19 @@ $flashes = render_flashes();
 </div>
 </header>
 <div class="dash-content">
-<header class="page-header">
-<div class="container">
-<p class="page-header__breadcrumb"><a href="<?= url('candidate/learning.php') ?>">My Learning</a> <span aria-hidden="true">/</span> Course Details</p>
-<div class="page-header__content">
-<div>
-<h1 class="page-header__title"><?= e($assignment['title']) ?></h1>
-<p class="page-header__subtitle"><?= e(($assignment['description'] ?? '') ?: 'Build your foundation in modern web development.') ?></p>
+<section class="settings-hero">
+<div class="settings-hero__inner">
+<div class="settings-hero__text">
+<span class="settings-hero__badge"><i class="fas fa-graduation-cap"></i> Course Details</span>
+<h1 class="settings-hero__title"><?= e($assignment['title']) ?></h1>
+<p class="settings-hero__subtitle"><?= e(($assignment['description'] ?? '') ?: 'Build your foundation in modern web development.') ?></p>
 </div>
-<div class="page-header__aside">
-<span class="page-header__meta"><i class="fas fa-circle" aria-hidden="true"></i> <?= $assignment['programme_status'] ? e(LearningProgramme::statusLabel($assignment['programme_status'])) : 'Active' ?></span>
-<span class="page-header__meta"><i class="fas fa-calendar-alt" aria-hidden="true"></i> <?= !empty($assignment['due_date']) ? e(format_date($assignment['due_date'], 'd M Y')) : 'No due date' ?></span>
-</div>
+<div class="settings-hero__actions">
+<span class="settings-hero__badge"><i class="fas fa-circle" aria-hidden="true"></i> <?= $assignment['programme_status'] ? e(LearningProgramme::statusLabel($assignment['programme_status'])) : 'Active' ?></span>
+<span class="settings-hero__badge"><i class="fas fa-calendar-alt" aria-hidden="true"></i> <?= !empty($assignment['due_date']) ? e(format_date($assignment['due_date'], 'd M Y')) : 'No due date' ?></span>
 </div>
 </div>
-</header>
+</section>
 <div class="container">
 <!-- ===== COURSE SUMMARY ===== -->
 <section class="course-summary">
