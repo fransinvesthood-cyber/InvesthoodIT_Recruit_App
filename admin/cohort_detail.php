@@ -9,6 +9,12 @@
 
 require_once __DIR__ . '/../includes/bootstrap.php';
 
+// Ensure OPcache serves fresh code in dev (XAMPP caches bytecode).
+if (function_exists('opcache_invalidate')) {
+    opcache_invalidate(__FILE__, true);
+    opcache_invalidate(__DIR__ . '/../models/Cohort.php', true);
+}
+
 require_role('admin');
 
 $id = (int) ($_GET['id'] ?? 0);
@@ -25,8 +31,11 @@ $counts       = Cohort::participantCounts($id);
 $selected     = (int) $counts['selected'];
 $onboarded    = (int) $counts['onboarded'];
 $active       = (int) $counts['active'];
+$completed    = (int) $counts['completed'];
+$withdrawn    = (int) $counts['withdrawn'];
 $committed    = $selected + $onboarded + $active;
 $max          = (int) $cohort['max_capacity'];
+$applications = Cohort::applicationCount($id);
 $available    = max(0, $max - $committed);
 $pct          = $max > 0 ? round(($committed / $max) * 100) : 0;
 
@@ -115,7 +124,7 @@ $flashes = render_flashes();
         <section class="pm-capacity">
           <div class="pm-capacity__stats">
             <div class="pm-capacity-stat"><span class="pm-capacity-stat__value"><?= (int) $max ?></span><span class="pm-capacity-stat__label">Maximum Capacity</span></div>
-            <div class="pm-capacity-stat"><span class="pm-capacity-stat__value"><?= (int) $cohort['applications_count'] ?></span><span class="pm-capacity-stat__label">Applications</span></div>
+            <div class="pm-capacity-stat"><span class="pm-capacity-stat__value"><?= (int) $applications ?></span><span class="pm-capacity-stat__label">Applications</span></div>
             <div class="pm-capacity-stat"><span class="pm-capacity-stat__value"><?= (int) $selected ?></span><span class="pm-capacity-stat__label">Selected</span></div>
             <div class="pm-capacity-stat"><span class="pm-capacity-stat__value"><?= (int) $onboarded ?></span><span class="pm-capacity-stat__label">Onboarded</span></div>
             <div class="pm-capacity-stat"><span class="pm-capacity-stat__value"><?= (int) $available ?></span><span class="pm-capacity-stat__label">Available Places</span></div>

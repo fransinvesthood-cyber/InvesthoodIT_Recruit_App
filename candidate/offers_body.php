@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/settings.css') ?>">
   <link rel="stylesheet" href="<?= url('css/applications.css') ?>">
   <link rel="stylesheet" href="<?= url('css/candidate_offers.css') ?>">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
@@ -50,12 +51,12 @@
         </div>
       </header>
       <div class="dash-content">
-        <section class="opp-hero">
-          <div class="opp-hero__inner">
-            <div>
-              <span class="section__badge">Selection &amp; Offers</span>
-              <h1 class="opp-hero__title">My Offers</h1>
-              <p class="opp-hero__subtitle">View offers issued by the programme team and accept or decline before the deadline.</p>
+        <section class="settings-hero">
+          <div class="settings-hero__inner">
+            <div class="settings-hero__text">
+              <span class="settings-hero__badge">Selection &amp; Offers</span>
+              <h1 class="settings-hero__title">My Offers</h1>
+              <p class="settings-hero__subtitle">View offers issued by the programme team and accept or decline before the deadline.</p>
             </div>
           </div>
         </section>

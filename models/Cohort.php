@@ -224,6 +224,17 @@ class Cohort
                 $counts[$r['status']] = (int) $r['cnt'];
             }
         }
+        // Add active placements for candidates not already counted as cohort participants
+        $placementRow = Database::fetchOne(
+            "SELECT COUNT(*) AS cnt FROM placements p
+             WHERE p.cohort_id = ? AND p.status = 'active'
+               AND p.candidate_id NOT IN (
+                 SELECT user_id FROM cohort_participants WHERE cohort_id = ?
+               )",
+            'ii',
+            [$cohortId, $cohortId]
+        );
+        $counts['active'] += (int) ($placementRow['cnt'] ?? 0);
         return $counts;
     }
 
@@ -236,10 +247,15 @@ class Cohort
     public static function committedCount(int $cohortId): int
     {
         $row = Database::fetchOne(
-            "SELECT COUNT(*) AS cnt FROM cohort_participants
-             WHERE cohort_id = ? AND status IN ('selected','onboarded','active')",
-            'i',
-            [$cohortId]
+            "SELECT COUNT(DISTINCT candidate_id) AS cnt FROM (
+                SELECT user_id AS candidate_id FROM cohort_participants
+                 WHERE cohort_id = ? AND status IN ('selected','onboarded','active')
+                UNION
+                SELECT candidate_id FROM placements
+                 WHERE cohort_id = ? AND status = 'active'
+            ) AS combined",
+            'ii',
+            [$cohortId, $cohortId]
         );
         return (int) ($row['cnt'] ?? 0);
     }
@@ -366,5 +382,26 @@ class Cohort
             'ii',
             [$count, $cohortId]
         ) >= 0;
+    }
+
+    /**
+     * Total live applications for all opportunities belonging to a cohort.
+     * Counted dynamically from the applications table (not the cached
+     * cohorts.applications_count column, which can go stale).
+     *
+     * @param int $cohortId
+     * @return int
+     */
+    public static function applicationCount(int $cohortId): int
+    {
+        $row = Database::fetchOne(
+            "SELECT COUNT(*) AS cnt
+             FROM applications a
+             JOIN opportunities o ON o.id = a.opportunity_id
+             WHERE o.cohort_id = ?",
+            'i',
+            [$cohortId]
+        );
+        return (int) ($row['cnt'] ?? 0);
     }
 }

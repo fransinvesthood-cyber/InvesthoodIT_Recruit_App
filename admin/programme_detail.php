@@ -24,6 +24,60 @@ $cohorts      = Cohort::forProgramme($id);
 $participants = Programme::participantCount($id);
 $applications = Programme::applicationCount($id);
 $totalCapacity = (int) $programme['total_capacity'];
+
+// --- Real participant data across all cohorts of this programme ---
+// Includes cohort participants (selected/onboarded/active) and active
+// placements, deduplicating candidates that appear in both.
+$programmeParticipants = Database::fetchAll(
+    "SELECT cp.id, cp.user_id, cp.status AS participant_status,
+            cp.selected_at, cp.onboarded_at, cp.created_at AS joined_at,
+            u.first_name, u.last_name, u.email,
+            c.id AS cohort_id, c.name AS cohort_name
+     FROM cohort_participants cp
+     INNER JOIN users u ON u.id = cp.user_id
+     INNER JOIN cohorts c ON c.id = cp.cohort_id
+     WHERE c.programme_id = ?
+       AND cp.status IN ('selected','onboarded','active')
+     UNION
+     SELECT p.id, p.candidate_id AS user_id, 'active' AS participant_status,
+             NULL AS selected_at, NULL AS onboarded_at, p.created_at AS joined_at,
+             u.first_name, u.last_name, u.email,
+             p.cohort_id AS cohort_id, c.name AS cohort_name
+     FROM placements p
+     INNER JOIN users u ON u.id = p.candidate_id
+     LEFT JOIN cohorts c ON c.id = p.cohort_id
+     WHERE p.programme_id = ? AND p.status = 'active'
+       AND p.candidate_id NOT IN (
+           SELECT cp2.user_id FROM cohort_participants cp2
+           INNER JOIN cohorts c2 ON c2.id = cp2.cohort_id
+           WHERE c2.programme_id = ? AND cp2.status IN ('selected','onboarded','active')
+       )
+     ORDER BY joined_at DESC",
+    'iii',
+    [$id, $id, $id]
+);
+
+// --- Real application data across all opportunities/cohorts of this programme ---
+// Use LEFT JOINs so an application is never hidden just because a related
+// record (candidate, opportunity or cohort) is missing. An application counts
+// for this programme if its opportunity's cohort belongs to the programme OR
+// if the opportunity is linked directly to the programme. (Mirrors the
+// LEFT-JOIN pattern used in models/Analytics.php.)
+$programmeApplications = Database::fetchAll(
+    "SELECT a.id, a.application_reference, a.status AS application_status,
+            a.created_at, a.submitted_at,
+            u.id AS candidate_id, u.first_name, u.last_name, u.email,
+            o.id AS opportunity_id, o.title AS opportunity_title,
+            c.id AS cohort_id, c.name AS cohort_name
+     FROM applications a
+     LEFT JOIN users u ON u.id = a.candidate_id
+     LEFT JOIN opportunities o ON o.id = a.opportunity_id
+     LEFT JOIN cohorts c ON c.id = o.cohort_id
+     WHERE (c.programme_id = ? OR o.programme_id = ?)
+     ORDER BY a.created_at DESC",
+    'ii',
+    [$id, $id]
+);
 $availablePlaces = max(0, $totalCapacity - $participants);
 
 $activeCohorts = 0;
@@ -117,7 +171,7 @@ $flashes = render_flashes();
           <div class="pm-summary-card"><span class="pm-summary-card__value"><?= (int) $activeCohorts ?></span><span class="pm-summary-card__label">Active Cohorts</span></div>
           <div class="pm-summary-card"><span class="pm-summary-card__value"><?= (int) $totalCapacity ?></span><span class="pm-summary-card__label">Total Capacity</span></div>
           <div class="pm-summary-card"><span class="pm-summary-card__value"><?= (int) $participants ?></span><span class="pm-summary-card__label">Current Participants</span></div>
-          <div class="pm-summary-card"><span class="pm-summary-card__value"><?= (int) $applications ?></span><span class="pm-summary-card__label">Applications</span></div>
+          <div class="pm-summary-card"><span class="pm-summary-card__value"><?= (int) count($programmeApplications) ?></span><span class="pm-summary-card__label">Applications</span></div>
           <div class="pm-summary-card"><span class="pm-summary-card__value"><?= (int) $availablePlaces ?></span><span class="pm-summary-card__label">Available Places</span></div>
         </section>
 
@@ -130,6 +184,8 @@ $flashes = render_flashes();
             <button class="pm-tab" data-tab="documents"><i class="fas fa-file-alt"></i> Required Evidence</button>
             <button class="pm-tab" data-tab="workflow"><i class="fas fa-route"></i> Workflow</button>
             <button class="pm-tab" data-tab="activity"><i class="fas fa-history"></i> Activity</button>
+            <button class="pm-tab" data-tab="participants"><i class="fas fa-users"></i> Participants <span class="pm-tab__count"><?= (int) count($programmeParticipants) ?></span></button>
+            <button class="pm-tab" data-tab="applications"><i class="fas fa-file-alt"></i> Applications <span class="pm-tab__count"><?= (int) count($programmeApplications) ?></span></button>
           </nav>
 
           <div class="pm-tab-panels">
@@ -191,7 +247,7 @@ $flashes = render_flashes();
                     <div class="pm-cohort-card__dates">
                       <span><i class="fas fa-calendar-alt"></i> <?= e(!empty($c['start_date']) ? format_date($c['start_date'], 'd M Y') : 'TBC') ?> — <?= e(!empty($c['end_date']) ? format_date($c['end_date'], 'd M Y') : 'TBC') ?></span>
                       <span><i class="fas fa-users"></i> Capacity <?= (int) $max ?></span>
-                      <span><i class="fas fa-file-alt"></i> <?= (int) $c['applications_count'] ?> applications</span>
+                      <span><i class="fas fa-file-alt"></i> <?= (int) Cohort::applicationCount((int) $c['id']) ?> applications</span>
                     </div>
                     <div class="pm-cohort-card__capacity">
                       <div class="pm-cohort-card__capacity-head"><span>Capacity</span><span><?= $committed ?> / <?= $max ?> participants</span></div>
@@ -401,6 +457,136 @@ $flashes = render_flashes();
                   </div>
                 <?php endforeach; endif; ?>
               </div>
+            </div>
+
+            <!-- PARTICIPANTS PANEL -->
+            <div class="pm-tab-panel" id="tab-participants">
+              <div class="pm-panel-header">
+                <h3 class="pm-panel-title">Current Participants</h3>
+                <p class="pm-panel-sub">Selected, onboarded and active participants across all cohorts of this programme.</p>
+              </div>
+              <?php if (empty($programmeParticipants)): ?>
+                <div class="pm-empty pm-empty--sm">
+                  <div class="pm-empty__icon"><i class="fas fa-users"></i></div>
+                  <h3>No current participants.</h3>
+                  <p>There are no selected, onboarded or active participants in this programme yet.</p>
+                </div>
+              <?php else: ?>
+                <div class="pm-table-container">
+                  <div class="pm-table-wrapper">
+                    <table class="pm-table">
+                      <thead>
+                        <tr>
+                          <th>Candidate</th>
+                          <th>Cohort</th>
+                          <th>Status</th>
+                          <th>Joined</th>
+                          <th class="pm-table__actions">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <?php foreach ($programmeParticipants as $p):
+                            $participantStatusTone = [
+                              'selected'   => 'primary',
+                              'onboarded'  => 'green',
+                              'active'     => 'green',
+                              'completed'  => 'primary',
+                              'withdrawn'  => 'muted',
+                            ][$p['participant_status'] ?? ''] ?? 'primary';
+                            $participantStatusLabel = ucfirst(str_replace('_', ' ', (string) ($p['participant_status'] ?? '')));
+                        ?>
+                        <tr>
+                          <td>
+                            <div class="pm-table__user">
+                              <div class="pm-table__avatar">
+                                <img src="https://ui-avatars.com/api/?name=<?= urlencode($p['first_name'] . '+' . $p['last_name']) ?>&amp;background=1a56db&amp;color=fff&amp;size=48" alt="<?= e($p['first_name'] . ' ' . $p['last_name']) ?>">
+                              </div>
+                              <div class="pm-table__user-info">
+                                <div class="pm-table__user-name"><?= e($p['first_name'] . ' ' . $p['last_name']) ?></div>
+                                <div class="pm-table__user-username"><?= e($p['email']) ?></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td><?= e($p['cohort_name']) ?></td>
+                          <td><span class="tag tag--<?= e($participantStatusTone) ?>"><?= e($participantStatusLabel) ?></span></td>
+                          <td><?= e(!empty($p['joined_at']) ? format_date($p['joined_at'], 'd M Y') : '—') ?></td>
+                          <td class="pm-table__actions">
+                            <div class="pm-table__action-group">
+                              <a href="<?= url('admin/candidate_profile.php?user_id=' . (int) $p['user_id']) ?>" class="btn btn--ghost btn--sm"><i class="fas fa-eye"></i> View</a>
+                            </div>
+                          </td>
+                        </tr>
+                        <?php endforeach; ?>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              <?php endif; ?>
+            </div>
+
+            <!-- APPLICATIONS PANEL -->
+            <div class="pm-tab-panel" id="tab-applications">
+              <div class="pm-panel-header">
+                <h3 class="pm-panel-title">Applications</h3>
+                <p class="pm-panel-sub">Live applications across all opportunities and cohorts of this programme.</p>
+              </div>
+              <?php if (empty($programmeApplications)): ?>
+                <div class="pm-empty pm-empty--sm">
+                  <div class="pm-empty__icon"><i class="fas fa-file-alt"></i></div>
+                  <h3>No applications.</h3>
+                  <p>There are no applications recorded for this programme yet.</p>
+                </div>
+              <?php else: ?>
+                <div class="pm-table-container">
+                  <div class="pm-table-wrapper">
+                    <table class="pm-table">
+                      <thead>
+                        <tr>
+                          <th>Reference</th>
+                          <th>Candidate</th>
+                          <th>Opportunity</th>
+                          <th>Cohort</th>
+                          <th>Status</th>
+                          <th>Submitted</th>
+                          <th class="pm-table__actions">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <?php foreach ($programmeApplications as $a):
+                            $appStatusTone = Application::STATUS_BADGES[$a['application_status'] ?? ''] ?? 'primary';
+                            $appStatusLabel = Application::label($a['application_status'] ?? '');
+                        ?>
+                        <tr>
+                          <td>
+                            <span class="tag tag--primary"><?= e($a['application_reference']) ?></span>
+                          </td>
+                          <td>
+                            <div class="pm-table__user">
+                              <div class="pm-table__avatar">
+                                <img src="https://ui-avatars.com/api/?name=<?= urlencode($a['first_name'] . '+' . $a['last_name']) ?>&amp;background=1a56db&amp;color=fff&amp;size=48" alt="<?= e($a['first_name'] . ' ' . $a['last_name']) ?>">
+                              </div>
+                              <div class="pm-table__user-info">
+                                <div class="pm-table__user-name"><?= e($a['first_name'] . ' ' . $a['last_name']) ?></div>
+                                <div class="pm-table__user-username"><?= e($a['email']) ?></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td><?= e($a['opportunity_title']) ?></td>
+                          <td><?= e($a['cohort_name']) ?></td>
+                          <td><span class="tag tag--<?= e($appStatusTone) ?>"><?= e($appStatusLabel) ?></span></td>
+                          <td><?= e(!empty($a['submitted_at']) ? format_date($a['submitted_at'], 'd M Y') : (!empty($a['created_at']) ? format_date($a['created_at'], 'd M Y') : '—')) ?></td>
+                          <td class="pm-table__actions">
+                            <div class="pm-table__action-group">
+                              <a href="<?= url('admin/candidate_profile.php?user_id=' . (int) $a['candidate_id']) ?>" class="btn btn--ghost btn--sm"><i class="fas fa-eye"></i> View</a>
+                            </div>
+                          </td>
+                        </tr>
+                        <?php endforeach; ?>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              <?php endif; ?>
             </div>
 
           </div>

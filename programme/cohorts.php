@@ -1572,7 +1572,8 @@ $capacityBarClasses = [
 <script type="application/json" id="pmSupervisorOversightData"><?= $supervisorOversightJson ?></script>
 
 <!-- Base scripts -->
-<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20260927"></script>
+<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20261025"></script>
+<script src="<?= url('js/original_pm_sidebar.js') ?>?v=20261025"></script>
 
 <!-- Cohort + Supervisor + Stat modal logic (no ?. or ?? for browser safety) -->
 <script>

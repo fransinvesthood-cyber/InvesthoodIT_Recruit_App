@@ -371,6 +371,9 @@ class Application
             $params = [];
             $types = '';
 
+            // Drafts are candidate-side/incomplete applications; never list them in admin views
+            $where[] = "a.status != 'draft'";
+
             if (!empty($filters['search'])) {
                 $search = '%' . $filters['search'] . '%';
                 $where[] = "(a.application_reference LIKE ? OR CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR u.email LIKE ? OR o.title LIKE ?)";

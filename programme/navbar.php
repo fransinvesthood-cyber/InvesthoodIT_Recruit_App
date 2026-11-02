@@ -35,6 +35,8 @@ $titles = [
     'reports' => 'Reports',
     'activity_log' => 'Activity Log',
     'notifications' => 'Notifications',
+    'announcements' => 'Communication Centre',
+    'milestones' => 'Milestones & Deadlines',
 ];
 
 $navbarTitle = $titles[$currentPage] ?? ($pageTitle ?? 'Programme Manager Portal');

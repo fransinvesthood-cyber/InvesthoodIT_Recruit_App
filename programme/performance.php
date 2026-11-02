@@ -106,9 +106,10 @@ if ($stmt) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <title><?= e($pageTitle) ?> | Investhood IT</title>
 <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
-<link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20261006">
+<link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20261021">
 <style>
 .pm-performance-page{padding:0 0 2rem}.pm-performance-hero{margin-bottom:1.5rem}
 .pm-performance-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin:1.25rem 0}
@@ -149,10 +150,10 @@ html[data-theme="dark"] .pm-performance-table th{background:#0f172a}html[data-th
 </div>
 
 <div class="pm-performance-kpis">
-<div class="pm-performance-kpi"><span class="pm-performance-kpi__label">Programmes</span><strong class="pm-performance-kpi__value"><?= number_format($kpi['programmes']) ?></strong><span class="pm-performance-kpi__meta"><?= number_format($kpi['active_programmes']) ?> active</span></div>
-<div class="pm-performance-kpi"><span class="pm-performance-kpi__label">Cohorts</span><strong class="pm-performance-kpi__value"><?= number_format($kpi['cohorts']) ?></strong><span class="pm-performance-kpi__meta">Across your programmes</span></div>
-<div class="pm-performance-kpi"><span class="pm-performance-kpi__label">Candidates</span><strong class="pm-performance-kpi__value"><?= number_format($kpi['candidates']) ?></strong><span class="pm-performance-kpi__meta"><?= number_format($kpi['completed_candidates']) ?> completed</span></div>
-<div class="pm-performance-kpi"><span class="pm-performance-kpi__label">Applications</span><strong class="pm-performance-kpi__value"><?= number_format($kpi['applications']) ?></strong><span class="pm-performance-kpi__meta"><?= number_format($kpi['selected_applications']) ?> selected / offer stage</span></div>
+<a class="pm-performance-kpi pm-performance-kpi--link" href="<?= url('programme/programmes.php') ?>"><span class="pm-performance-kpi__label">Programmes</span><strong class="pm-performance-kpi__value"><?= number_format($kpi['programmes']) ?></strong><span class="pm-performance-kpi__meta"><?= number_format($kpi['active_programmes']) ?> active</span></a>
+<a class="pm-performance-kpi pm-performance-kpi--link" href="<?= url('programme/cohorts.php') ?>"><span class="pm-performance-kpi__label">Cohorts</span><strong class="pm-performance-kpi__value"><?= number_format($kpi['cohorts']) ?></strong><span class="pm-performance-kpi__meta">Across your programmes</span></a>
+<a class="pm-performance-kpi pm-performance-kpi--link" href="<?= url('programme/candidates.php') ?>"><span class="pm-performance-kpi__label">Candidates</span><strong class="pm-performance-kpi__value"><?= number_format($kpi['candidates']) ?></strong><span class="pm-performance-kpi__meta"><?= number_format($kpi['completed_candidates']) ?> completed</span></a>
+<a class="pm-performance-kpi pm-performance-kpi--link" href="<?= url('programme/reports.php') ?>"><span class="pm-performance-kpi__label">Applications</span><strong class="pm-performance-kpi__value"><?= number_format($kpi['applications']) ?></strong><span class="pm-performance-kpi__meta"><?= number_format($kpi['selected_applications']) ?> selected / offer stage</span></a>
 </div>
 
 <div class="pm-performance-card">
@@ -185,6 +186,7 @@ html[data-theme="dark"] .pm-performance-table th{background:#0f172a}html[data-th
 </div>
 </main>
 </div>
-<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20261006"></script>
+<script src="<?= url('js/programme_manager_enhancements.js') ?>?v=20261021"></script>
+<script src="<?= url('js/original_pm_sidebar.js') ?>?v=20261021"></script>
 </body>
 </html>

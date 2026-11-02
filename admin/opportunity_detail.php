@@ -37,7 +37,7 @@ $skills = OpportunitySkill::forOpportunity($id);
 $docs = OpportunityDocument::forOpportunity($id);
 $responsibilities = OpportunityResponsibility::forOpportunity($id);
 
-// Application statistics (zeroed until Application module is built)
+// Application statistics (live from applications table)
 $appStats = Opportunity::applicationStats($id);
 $selectedCount = (int) $appStats['selected'];
 $applicationsReceived = (int) $appStats['applications'];
@@ -336,7 +336,7 @@ $flashes = render_flashes();
             <div class="pm-tab-panel" id="tab-applications">
               <div class="pm-panel-header">
                 <h3 class="pm-panel-title">Application Statistics</h3>
-                <p class="pm-panel-sub">Live application metrics. The Application module is not yet implemented, so these will populate once candidate applications are enabled.</p>
+                <p class="pm-panel-sub">Live application metrics pulled from submitted candidate applications.</p>
               </div>
               <div class="pm-summary">
                 <div class="pm-summary-card"><span class="pm-summary-card__value"><?= (int) $applicationsReceived ?></span><span class="pm-summary-card__label">Applications</span></div>

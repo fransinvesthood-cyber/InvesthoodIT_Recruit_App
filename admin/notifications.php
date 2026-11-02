@@ -71,14 +71,9 @@ $flashes = render_flashes();
 <button class="dash-header__icon-btn" id="themeToggle" aria-label="Toggle dark mode"><i class="fas fa-moon"></i></button>
 </div>
 </header>
-<div class="dash-content">
+<div class="dash-content" style="padding-top:0.5rem;">
 <?= $flashes ?>
-<section class="app-hero"><div class="app-hero__inner"><div><span class="section__badge">Admin Notifications</span><h1 class="app-hero__title">Notifications</h1><p class="app-hero__subtitle">System activity requiring administrative attention.</p></div><div class="app-hero__actions"><?php if ($unreadCount > 0): ?><button type="button" class="btn btn--primary btn--sm" data-notif-mark-all><i class="fas fa-check-double"></i> Mark All Read</button><?php endif; ?></div></div></section>
-<section class="app-stats"><div class="app-stats__grid">
-<div class="stat-card"><span class="stat-card__number"><?= (int) $statusCounts['all'] ?></span><span class="stat-card__label">Total</span></div>
-<div class="stat-card"><span class="stat-card__number" id="adminNotifStatUnread"><?= (int) $statusCounts['unread'] ?></span><span class="stat-card__label">Unread</span></div>
-<div class="stat-card"><span class="stat-card__number"><?= (int) $statusCounts['read'] ?></span><span class="stat-card__label">Read</span></div>
-</div></section>
+<section class="app-hero" style="padding:1rem 1rem;margin-bottom:0.75rem;"><div class="app-hero__inner"><div><span class="section__badge">Admin Notifications</span><h1 class="app-hero__title" style="font-size:1.5rem;margin:0.2rem 0;">Notifications</h1><p class="app-hero__subtitle" style="font-size:0.85rem;margin:0;">System activity requiring administrative attention.</p></div><div class="app-hero__actions"><?php if ($unreadCount > 0): ?><button type="button" class="btn btn--primary btn--sm" data-notif-mark-all><i class="fas fa-check-double"></i> Mark All Read</button><?php endif; ?></div></div></section>
 <section class="notif-centre" id="notificationsPanel">
 <div class="notif-centre__toolbar">
 <div class="notif-centre__filters" role="tablist" aria-label="Status filter">

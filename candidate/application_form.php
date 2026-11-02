@@ -44,6 +44,7 @@ if ($readonly) {
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
       <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+      <link rel="stylesheet" href="<?= url('css/settings.css') ?>">
       <link rel="stylesheet" href="<?= url('css/applications.css') ?>">
       <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
       <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
@@ -240,6 +241,7 @@ function render_question_input(array $question, string $value = ''): string
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/settings.css') ?>">
   <link rel="stylesheet" href="<?= url('css/applications.css') ?>">
   <link rel="stylesheet" href="<?= url('css/application_form.css') ?>">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
@@ -299,22 +301,26 @@ function render_question_input(array $question, string $value = ''): string
         <?= $flashes ?>
 
         <!-- ===== FORM HEADER ===== -->
-        <section class="app-form__header">
-          <div class="app-form__header-badges">
-            <span class="badge badge--muted"><?= e(Application::label($application['status'])) ?></span>
-            <?php if (!empty($application['application_reference'])): ?>
-              <span class="app-form__ref"><i class="fas fa-hashtag"></i> <?= e($application['application_reference']) ?></span>
-            <?php endif; ?>
+        <section class="settings-hero app-form__header">
+          <div class="settings-hero__inner">
+            <div class="settings-hero__text">
+              <div class="app-form__header-badges">
+                <span class="badge badge--muted"><?= e(Application::label($application['status'])) ?></span>
+                <?php if (!empty($application['application_reference'])): ?>
+                  <span class="app-form__ref"><i class="fas fa-hashtag"></i> <?= e($application['application_reference']) ?></span>
+                <?php endif; ?>
+              </div>
+              <h1 class="settings-hero__title"><?= e($opportunity['title'] ?? 'Application') ?></h1>
+              <p class="settings-hero__subtitle">
+                <i class="fas fa-graduation-cap"></i>
+                <span><?= e($opportunity['programme_name'] ?? '') ?></span>
+                <?php if (!empty($opportunity['cohort_name'])): ?>
+                  <span>•</span>
+                  <span><?= e($opportunity['cohort_name']) ?></span>
+                <?php endif; ?>
+              </p>
+            </div>
           </div>
-          <h1 class="app-form__title"><?= e($opportunity['title'] ?? 'Application') ?></h1>
-          <p class="app-form__subtitle">
-            <i class="fas fa-graduation-cap"></i>
-            <?= e($opportunity['programme_name'] ?? '') ?>
-            <?php if (!empty($opportunity['cohort_name'])): ?>
-              <span class="app-form__separator">•</span>
-              <span><?= e($opportunity['cohort_name']) ?></span>
-            <?php endif; ?>
-          </p>
         </section>
 
         <!-- ===== PROGRESS INDICATOR ===== -->

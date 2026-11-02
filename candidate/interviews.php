@@ -51,6 +51,7 @@ $flashes = render_flashes();
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/settings.css') ?>">
   <link rel="stylesheet" href="<?= url('css/applications.css') ?>">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
@@ -94,18 +95,25 @@ $flashes = render_flashes();
       <header class="dash-header">
         <div class="dash-header__left">
           <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
+          <div class="dash-header__search" id="dashSearch">
+            <i class="fas fa-search"></i>
+            <input type="text" class="dash-header__search-input" placeholder="Search interviews..." aria-label="Search interviews">
+          </div>
         </div>
         <div class="dash-header__right">
           <button class="dash-header__icon-btn" id="themeToggle" aria-label="Toggle dark mode"><i class="fas fa-moon"></i></button>
+          <a href="<?= url('candidate/dashboard.php') ?>" class="dash-header__icon-btn" aria-label="Back to dashboard" title="Back to dashboard"><i class="fas fa-th-large"></i></a>
           <div class="dash-header__user"><img src="<?= url('candidate/avatar.php') ?>" alt="Profile" class="dash-header__avatar"></div>
         </div>
       </header>
       <div class="dash-content">
         <!-- ===== PAGE HERO ===== -->
-        <section class="opp-hero">
-          <div class="opp-hero__inner">
-            <h1 class="opp-hero__title">Interview Management</h1>
-            <p class="opp-hero__subtitle">View your upcoming and previous interviews, join online interviews, and review interview details.</p>
+        <section class="settings-hero">
+          <div class="settings-hero__inner">
+            <div class="settings-hero__text">
+              <h1 class="settings-hero__title">Interview Management</h1>
+              <p class="settings-hero__subtitle">View your upcoming and previous interviews, join online interviews, and review interview details.</p>
+            </div>
           </div>
         </section>
         <?= $flashes ?>

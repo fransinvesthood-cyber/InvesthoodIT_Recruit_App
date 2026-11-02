@@ -111,9 +111,10 @@ if($stageIndex===false) $stageIndex=-1;
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <title><?=e($pageTitle)?> | Investhood IT</title>
 <link rel="stylesheet" href="<?=url('css/styles.css')?>">
-<link rel="stylesheet" href="<?=url('css/programme_manager_enhancements.css')?>?v=20261006">
+<link rel="stylesheet" href="<?=url('css/programme_manager_enhancements.css')?>?v=20261021">
 <style>
 .cp-page{padding-bottom:2rem}.cp-selectors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1.2rem 0}.cp-field label{display:block;font-weight:800;font-size:.78rem;margin-bottom:.4rem}.cp-field select{width:100%;padding:.75rem;border:1px solid var(--border,#e5e7eb);border-radius:10px;background:var(--bg-white,#fff);color:var(--text,#111827)}
 .cp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;margin:1.2rem 0}.cp-card{display:block;text-decoration:none;padding:1.1rem;border:1px solid var(--border,#e5e7eb);border-radius:14px;background:var(--bg-white,#fff);color:var(--text,#111827)}.cp-card:hover{border-color:#2563eb;transform:translateY(-2px)}.cp-card.active{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12)}.cp-card h3{margin:0 0 .4rem;font-size:.95rem}.cp-card p{margin:.2rem 0;color:var(--text-light,#64748b);font-size:.78rem}.cp-table-wrap{overflow:auto;background:var(--bg-white,#fff);border:1px solid var(--border,#e5e7eb);border-radius:14px}.cp-table{width:100%;border-collapse:collapse;min-width:820px}.cp-table th,.cp-table td{padding:.9rem 1rem;text-align:left;border-bottom:1px solid var(--border-light,#eef2f7);font-size:.82rem}.cp-table th{background:var(--bg,#f8fafc);font-size:.7rem;text-transform:uppercase;color:var(--text-light,#64748b)}.cp-status{display:inline-flex;padding:.3rem .55rem;border-radius:999px;background:#eef2ff;color:#3730a3;font-weight:800;font-size:.7rem}.cp-action{color:#2563eb;text-decoration:none;font-weight:800}.cp-timeline{display:grid;grid-template-columns:repeat(7,1fr);gap:0;margin:1.5rem 0 1rem}.cp-stage{text-align:center;position:relative}.cp-stage:before{content:"";position:absolute;top:13px;left:-50%;right:50%;height:3px;background:#e5e7eb;z-index:0}.cp-stage:first-child:before{display:none}.cp-stage__dot{position:relative;z-index:1;width:28px;height:28px;margin:0 auto 8px;border-radius:50%;display:grid;place-items:center;background:#e5e7eb;color:#64748b;font-size:.65rem}.cp-stage.done .cp-stage__dot,.cp-stage.current .cp-stage__dot{background:#2563eb;color:#fff}.cp-stage.done:before,.cp-stage.current:before{background:#2563eb}.cp-stage span{display:block;font-size:.68rem;font-weight:800;color:#64748b}.cp-stage.current span{color:#2563eb}.cp-candidate-detail{margin-top:1.2rem;padding:1.2rem;border:1px solid var(--border,#e5e7eb);border-radius:14px;background:var(--bg-white,#fff)}.cp-candidate-detail h2{margin:0}.cp-meta{color:var(--text-light,#64748b);font-size:.8rem;margin-top:.3rem}
@@ -153,4 +154,5 @@ html[data-theme="dark"] .cp-card,html[data-theme="dark"] .cp-table-wrap,html[dat
 <p class="cp-meta">Application stage is read from the existing <code>applications.status</code> workflow. Participant status is shown separately so recruitment progress is not confused with programme participation.</p>
 </div>
 <?php endif;?>
-</div></main></div><script src="<?=url('js/programme_manager_enhancements.js')?>?v=20261006"></script></body></html>
+</div></main></div><script src="<?=url('js/programme_manager_enhancements.js')?>?v=20261021"></script><script src="<?= url('js/original_pm_sidebar.js') ?>?v=20261021"></script>
+</body></html>

@@ -43,6 +43,19 @@ if (!empty($candidateProvince)) {
 // Fetch personalized opportunities (limit to 6 for dashboard)
 $recentOpportunities = CandidateOpportunitiesController::searchOpportunities($personalizedFilters, 1, 6)['opportunities'];
 
+// Exclude closed opportunities (status closed/archived or application period already expired)
+$today = date('Y-m-d');
+$recentOpportunities = array_values(array_filter($recentOpportunities, function ($opp) use ($today) {
+    $status = $opp['status'] ?? '';
+    if (in_array($status, ['closed', 'archived'], true)) {
+        return false;
+    }
+    if (!empty($opp['application_close_date']) && $opp['application_close_date'] < $today) {
+        return false;
+    }
+    return true;
+}));
+
 // Get saved opportunity IDs for quick lookup
 $savedOpportunityIds = [];
 foreach ($savedOpportunities as $saved) {
@@ -54,6 +67,20 @@ $appStats = Application::countByStatus($userId);
 $draftApplications = (int) ($appStats['draft'] ?? 0);
 $activeApplications = (int) ($appStats['total'] ?? 0) - (int) ($appStats['rejected'] ?? 0);
 $interviewInvitations = (int) ($appStats['under_review'] ?? 0);
+// ---- Learning integration ----
+try {
+    $learningStats = CandidateLearningController::index($userId);
+    $learningAssignments = $learningStats['assignments'];
+    $learningOverall = $learningStats['overall_progress'];
+    $learningStatsCounts = $learningStats['stats'];
+} catch (Throwable $e) {
+    error_log('[Candidate Dashboard] Learning load failed for user ' . $userId . ': ' . $e->getMessage());
+    $learningStats = ['assignments' => [], 'overall_progress' => 0, 'stats' => ['total' => 0, 'assigned' => 0, 'in_progress' => 0, 'completed' => 0, 'overdue' => 0]];
+    $learningAssignments = [];
+    $learningOverall = 0;
+    $learningStatsCounts = ['total' => 0, 'assigned' => 0, 'in_progress' => 0, 'completed' => 0, 'overdue' => 0];
+}
+
 
 // Offers integration (Stage 12) — live data from Admin Selection & Offers.
 $offerSummary = ['stats' => ['total' => 0, 'pending' => 0, 'accepted' => 0, 'declined' => 0, 'expired' => 0, 'withdrawn' => 0], 'recent' => null, 'recentList' => [], 'deadlines' => [], 'notifications' => [], 'unread' => 0, 'expired' => 0];
@@ -176,23 +203,36 @@ $totalApplicationCount = count($allApplications);
 
 // Define the application progress stages for the timeline
 $progressStages = [
-    'submitted' => 1,
-    'eligibility_review' => 2,
-    'screened' => 3,
-    'assessment' => 4,
-    'interview' => 5,
-    'waitlisted' => 6,
-    'selected' => 7,
+    'draft'               => 0,
+    'submitted'           => 1,
+    'under_review'        => 2,
+    'shortlisted'         => 3,
+    'assessment'          => 4,
+    'interview_scheduled' => 5,
+    'interview_required'  => 5,
+    'interview_completed' => 6,
+    'selected'            => 7,
+    'waitlisted'          => 6,
+    'offer_sent'          => 8,
+    'offer_accepted'      => 9,
+    'offer_declined'      => 8,
+    'on_hold'             => 0,
+    'rejected'            => 0,
+    'withdrawn'           => 0,
 ];
 
 // Define all timeline steps for display
 $timelineSteps = [
     ['key' => 'submitted', 'label' => 'Submitted'],
-    ['key' => 'eligibility_review', 'label' => 'Review'],
-    ['key' => 'screened', 'label' => 'Screened'],
+    ['key' => 'under_review', 'label' => 'Under Review'],
+    ['key' => 'shortlisted', 'label' => 'Shortlisted'],
     ['key' => 'assessment', 'label' => 'Assessment'],
-    ['key' => 'interview', 'label' => 'Interview'],
-    ['key' => 'selected', 'label' => 'Decision'],
+    ['key' => 'interview_scheduled', 'label' => 'Interview Scheduled'],
+    ['key' => 'interview_completed', 'label' => 'Interview Completed'],
+    ['key' => 'selected', 'label' => 'Selected'],
+    ['key' => 'waitlisted', 'label' => 'Waitlisted'],
+    ['key' => 'offer_sent', 'label' => 'Offer Sent'],
+    ['key' => 'offer_accepted', 'label' => 'Offer Accepted'],
 ];
 
 $flashes = render_flashes();
@@ -249,6 +289,7 @@ $flashes = render_flashes();
           <li><a href="#dashboard-interviews" class="sidebar__link" data-section="interviews"><i class="fas fa-calendar-check"></i> Interviews</a></li>
           <li><a href="#dashboard-offers" class="sidebar__link" data-section="offers"><i class="fas fa-envelope-open-text"></i> Offers</a></li>
 <li><a href="#dashboard-notifications" class="sidebar__link" data-section="notifications"><i class="fas fa-bell"></i> Notifications</a></li>
+          <li><a href="<?= url('communications/announcements.php') ?>" class="sidebar__link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
 <li><a href="#dashboard-analytics" class="sidebar__link" data-section="analytics"><i class="fas fa-chart-line"></i> Analytics</a></li>
         </ul>
 
@@ -640,7 +681,7 @@ $flashes = render_flashes();
                 $appCloseDate = $app['application_close_date'] ?? '';
                 $appId = (int) ($app['id'] ?? 0);
                 $appOppId = (int) ($app['opportunity_id'] ?? 0);
-                $isTerminal = in_array($appStatus, ['selected', 'rejected', 'withdrawn', 'expired'], true);
+                $isTerminal = in_array($appStatus, ['selected', 'offer_accepted', 'rejected', 'withdrawn', 'offer_declined', 'expired'], true);
                 $isRejected = in_array($appStatus, ['rejected', 'withdrawn'], true);
                 $currentStage = $progressStages[$appStatus] ?? 0;
                 $totalStages = count($timelineSteps);
@@ -685,7 +726,19 @@ $flashes = render_flashes();
                   </div>
                   <div class="app-card__progress">
                     <div class="app-card__progress-bar"><div class="app-card__progress-fill" style="width:<?= (int) $progressPercent ?>%"></div></div>
-                    <span class="app-card__progress-label"><?php if ($isRejected): ?><strong style="color:#ef4444;"><?= e($appStatusLabel) ?></strong><?php elseif ($appStatus === 'selected'): ?><strong style="color:var(--success);">Congratulations! Selected</strong><?php else: ?>Current: <strong><?= e($appStatusLabel) ?></strong> &middot; <?= (int) $progressPercent ?>% complete<?php endif; ?></span>
+                    <span class="app-card__progress-label">
+                      <?php if ($isRejected): ?>
+                        <span class="app-progress-stage"><i class="fas fa-times-circle"></i> Rejected: <?= e($appStatusLabel) ?></span>
+                      <?php elseif ($appStatus === 'selected'): ?>
+                        <span class="app-progress-stage app-progress-stage--success"><i class="fas fa-check-circle"></i> Stage: <?= e($appStatusLabel) ?></span>
+                      <?php elseif ($appStatus === 'offer_accepted'): ?>
+                        <span class="app-progress-stage app-progress-stage--success"><i class="fas fa-check-circle"></i> Stage: <?= e($appStatusLabel) ?></span>
+                      <?php elseif ($isTerminal): ?>
+                        <span class="app-progress-stage app-progress-stage--terminal"><i class="fas fa-flag"></i> Stage: <?= e($appStatusLabel) ?></span>
+                      <?php else: ?>
+                        <span class="app-progress-stage">Stage: <strong><?= e($appStatusLabel) ?></strong></span> &middot; <span class="app-progress-pct"><strong><?= (int) $progressPercent ?>%</strong> complete</span>
+                      <?php endif; ?>
+                    </span>
                   </div>
                   <?php else: ?>
                   <div class="app-card__progress">
@@ -980,89 +1033,70 @@ $flashes = render_flashes();
           <div class="section__header" style="text-align:left;margin-bottom:1.5rem;">
             <h2 class="section__title" style="font-size:1.5rem;">Learning & Skills <span class="text-gradient">Development</span></h2>
           </div>
+          <a href="<?= url('candidate/learning.php') ?>" class="btn btn--primary" style="margin-bottom:1.5rem;"><i class="fas fa-graduation-cap"></i> Start Learning</a>
           <div class="learning-grid">
-            <div class="learning-card">
-              <div class="learning-card__header">
-                <h4>Full-Stack Web Development</h4>
-                <span class="learning-card__badge">In Progress</span>
+            <?php if (empty($learningAssignments)): ?>
+              <div class="empty-state" style="grid-column:1 / -1;">
+                <div class="empty-state__icon"><i class="fas fa-book-open"></i></div>
+                <h3 class="empty-state__title">No learning programmes assigned yet</h3>
+                <p class="empty-state__text">Assigned programmes will appear here with your progress and deadlines.</p>
+                <a href="<?= url('candidate/learning.php') ?>" class="btn btn--ghost btn--sm">Open My Learning <i class="fas fa-arrow-right"></i></a>
               </div>
+            <?php else: ?>
+            <?php foreach (array_slice($learningAssignments, 0, 3) as $learningAssignment): ?>
+              <?php
+                $learningStatus = $learningAssignment['computed_status'] ?? $learningAssignment['status'] ?? 'assigned';
+                $learningTone = LearningProgramme::statusTone($learningStatus);
+                $learningBadgeClass = $learningTone === 'success' ? 'learning-card__badge--green' : ($learningTone === 'secondary' ? 'learning-card__badge--cyan' : '');
+                $learningProgress = (int) ($learningAssignment['progress'] ?? 0);
+                $learningDue = !empty($learningAssignment['due_date']) ? format_date($learningAssignment['due_date'], 'd M Y') : 'No due date';
+                $learningAction = $learningStatus === 'completed' ? 'Review Course' : ($learningStatus === 'assigned' ? 'Start Learning' : 'Continue Learning');
+              ?>
+            <div class="learning-card <?= $learningStatus === 'completed' ? 'learning-card--complete' : '' ?>">
+              <div class="learning-card__header">
+                <h4><?= e($learningAssignment['title'] ?? 'Learning programme') ?></h4>
+                <span class="learning-card__badge <?= e($learningBadgeClass) ?>"><?= e(LearningProgramme::statusLabel($learningStatus)) ?></span>
+              </div>
+              <p class="learning-card__meta"><i class="fas fa-tag"></i> <?= e($learningAssignment['category'] ?? 'General') ?><?= !empty($learningAssignment['provider']) ? ' &bull; ' . e($learningAssignment['provider']) : '' ?></p>
               <div class="learning-card__progress">
-                <div class="progress-bar">
-                  <div class="progress-bar__fill" style="width:60%"></div>
-                </div>
-                <span class="learning-card__percent">60% Complete</span>
+                <div class="progress-bar"><div class="progress-bar__fill" style="width:<?= $learningProgress ?>%"></div></div>
+                <span class="learning-card__percent"><?= $learningProgress ?>% Complete</span>
               </div>
               <div class="learning-card__stats">
-                <span><i class="fas fa-check-circle"></i> 6/10 Modules</span>
-                <span><i class="fas fa-clock"></i> 2 Weeks Left</span>
+                <span><i class="fas fa-check-circle"></i> <?= (int) ($learningAssignment['completed_lessons'] ?? 0) ?>/<?= (int) ($learningAssignment['required_lessons'] ?? 0) ?> Lessons</span>
+                <span><i class="fas fa-calendar-alt"></i> <?= e($learningDue) ?></span>
               </div>
-              <a href="#" class="btn btn--ghost btn--sm">Continue Learning <i class="fas fa-arrow-right"></i></a>
+              <a href="<?= url('candidate/course.php?id=' . (int) ($learningAssignment['assignment_id'] ?? 0)) ?>" class="btn btn--ghost btn--sm"><?= e($learningAction) ?> <i class="fas fa-arrow-right"></i></a>
             </div>
-            <div class="learning-card">
-              <div class="learning-card__header">
-                <h4>Cloud Computing Essentials</h4>
-                <span class="learning-card__badge learning-card__badge--cyan">In Progress</span>
-              </div>
-              <div class="learning-card__progress">
-                <div class="progress-bar">
-                  <div class="progress-bar__fill" style="width:35%"></div>
-                </div>
-                <span class="learning-card__percent">35% Complete</span>
-              </div>
-              <div class="learning-card__stats">
-                <span><i class="fas fa-check-circle"></i> 2/6 Modules</span>
-                <span><i class="fas fa-clock"></i> 4 Weeks Left</span>
-              </div>
-              <a href="#" class="btn btn--ghost btn--sm">Continue Learning <i class="fas fa-arrow-right"></i></a>
-            </div>
-            <div class="learning-card learning-card--complete">
-              <div class="learning-card__header">
-                <h4>Agile & Scrum Fundamentals</h4>
-                <span class="learning-card__badge learning-card__badge--green">Completed</span>
-              </div>
-              <div class="learning-card__progress">
-                <div class="progress-bar">
-                  <div class="progress-bar__fill" style="width:100%"></div>
-                </div>
-                <span class="learning-card__percent">100% Complete</span>
-              </div>
-              <div class="learning-card__stats">
-                <span><i class="fas fa-check-circle" style="color:var(--success);"></i> 4/4 Modules</span>
-                <span><i class="fas fa-certificate" style="color:var(--accent);"></i> Certificate Available</span>
-              </div>
-              <a href="#" class="btn btn--ghost btn--sm">View Certificate <i class="fas fa-download"></i></a>
-            </div>
+            <?php endforeach; ?>
+            <?php endif; ?>
           </div>
 
           <!-- Skills Achievements -->
           <div class="skills-achievements">
             <h3><i class="fas fa-trophy"></i> Skills Achievements</h3>
             <div class="skills-achievements__grid">
-              <div class="achievement-badge">
-                <div class="achievement-badge__icon"><i class="fas fa-code"></i></div>
-                <span class="achievement-badge__label">JavaScript</span>
-                <span class="achievement-badge__level">Advanced</span>
-              </div>
-              <div class="achievement-badge">
-                <div class="achievement-badge__icon"><i class="fab fa-react"></i></div>
-                <span class="achievement-badge__label">React</span>
-                <span class="achievement-badge__level">Intermediate</span>
-              </div>
-              <div class="achievement-badge">
-                <div class="achievement-badge__icon"><i class="fab fa-python"></i></div>
-                <span class="achievement-badge__label">Python</span>
-                <span class="achievement-badge__level">Intermediate</span>
-              </div>
-              <div class="achievement-badge achievement-badge--locked">
-                <div class="achievement-badge__icon"><i class="fas fa-cloud"></i></div>
-                <span class="achievement-badge__label">AWS</span>
-                <span class="achievement-badge__level">In Progress</span>
-              </div>
-              <div class="achievement-badge achievement-badge--locked">
-                <div class="achievement-badge__icon"><i class="fab fa-docker"></i></div>
-                <span class="achievement-badge__label">Docker</span>
-                <span class="achievement-badge__level">Not Started</span>
-              </div>
+              <?php if (empty($skills) && empty($certifications)): ?>
+                <div class="empty-state" style="grid-column:1 / -1;">
+                  <p class="empty-state__text">Add skills or certifications to build your achievements profile.</p>
+                  <a href="<?= url('candidate/profile.php#profile-skills') ?>" class="btn btn--ghost btn--sm">Manage Skills <i class="fas fa-arrow-right"></i></a>
+                </div>
+              <?php else: ?>
+                <?php foreach (array_slice($skills, 0, 5) as $skill): ?>
+                  <div class="achievement-badge">
+                    <div class="achievement-badge__icon"><i class="fas fa-award"></i></div>
+                    <span class="achievement-badge__label"><?= e($skill['name'] ?? 'Skill') ?></span>
+                    <span class="achievement-badge__level"><?= e(ucfirst((string) ($skill['proficiency'] ?? 'Added'))) ?></span>
+                  </div>
+                <?php endforeach; ?>
+                <?php foreach (array_slice($certifications, 0, max(0, 5 - count($skills))) as $certification): ?>
+                  <div class="achievement-badge">
+                    <div class="achievement-badge__icon"><i class="fas fa-certificate"></i></div>
+                    <span class="achievement-badge__label"><?= e($certification['name'] ?? 'Certification') ?></span>
+                    <span class="achievement-badge__level">Certification</span>
+                  </div>
+                <?php endforeach; ?>
+              <?php endif; ?>
             </div>
           </div>
 
@@ -1070,27 +1104,10 @@ $flashes = render_flashes();
           <div class="mentoring-sessions">
             <h3><i class="fas fa-users"></i> Mentoring Sessions</h3>
             <div class="mentoring-sessions__list">
-              <div class="mentoring-session">
-                <div class="mentoring-session__date">
-                  <span class="mentoring-session__day">15</span>
-                  <span class="mentoring-session__month">Jul</span>
-                </div>
-                <div class="mentoring-session__info">
-                  <strong>Career Development Planning</strong>
-                  <span>With: Thabo Moloi - 14:00 - 15:00</span>
-                </div>
-                <a href="#" class="btn btn--primary btn--sm">Join</a>
-              </div>
-              <div class="mentoring-session">
-                <div class="mentoring-session__date">
-                  <span class="mentoring-session__day">22</span>
-                  <span class="mentoring-session__month">Jul</span>
-                </div>
-                <div class="mentoring-session__info">
-                  <strong>Technical Interview Preparation</strong>
-                  <span>With: Sarah Mokoena - 11:00 - 12:00</span>
-                </div>
-                <a href="#" class="btn btn--outline btn--sm">Reschedule</a>
+              <div class="empty-state" style="width:100%;">
+                <div class="empty-state__icon"><i class="fas fa-calendar-plus"></i></div>
+                <h4 class="empty-state__title">No mentoring sessions scheduled</h4>
+                <p class="empty-state__text">Scheduled mentoring sessions will appear here when they are available.</p>
               </div>
             </div>
           </div>

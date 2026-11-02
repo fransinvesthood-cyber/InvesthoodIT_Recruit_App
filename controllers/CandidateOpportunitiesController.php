@@ -55,6 +55,10 @@ class CandidateOpportunitiesController
         $conditions[] = "(o.application_open_date IS NULL OR o.application_open_date <= ?)";
         $params[] = $today;
 
+        // Must not be past the application close date (if one is set) — hide closed opportunities
+        $conditions[] = "(o.application_close_date IS NULL OR o.application_close_date >= ?)";
+        $params[] = $today;
+
         // Search term: title, organisation, programme name, cohort name
         if (!empty($filters['search'])) {
             $searchTerm = '%' . $filters['search'] . '%';

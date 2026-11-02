@@ -265,7 +265,7 @@ if ($stmt) {
         rel="stylesheet"
         href="<?= url(
             'css/programme_manager_enhancements.css'
-        ) ?>?v=20260920"
+        ) ?>?v=20261021"
     >
 
     <link
@@ -286,7 +286,7 @@ if ($stmt) {
         rel="stylesheet"
         href="<?= url(
             'css/original_pm_sidebar_compat.css'
-        ) ?>"
+        ) ?>?v=20261021"
     >
 
 
@@ -1605,13 +1605,13 @@ if ($stmt) {
 <script
     src="<?= url(
         'js/programme_manager_enhancements.js'
-    ) ?>?v=20260920"
+    ) ?>?v=20261021"
 ></script>
 
 <script
     src="<?= url(
         'js/original_pm_sidebar.js'
-    ) ?>?v=20260920"
+    ) ?>?v=20261021"
 ></script>
 
 
