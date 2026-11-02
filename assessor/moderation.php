@@ -1,3 +1,80 @@
 <?php
-require_once __DIR__.'/../includes/bootstrap.php';require_role('assessor');$user=current_user();$flashes=render_flashes();$currentPage='moderation';$pageTitle='Moderation Status';require_once __DIR__.'/_helpers.php';$conn=Database::getConnection();$uid=(int)($user['id']??$user['user_id']??0);$rows=[];if($uid<=0){http_response_code(403);exit('Invalid Assessor account.');}if(as_has_table($conn,'assessment_attempts')){$s=$conn->prepare("SELECT aa.*,u.first_name,u.last_name,u.email,ao.code outcome_code,ao.title outcome_title,m.first_name moderator_first_name,m.last_name moderator_last_name FROM assessment_attempts aa JOIN users u ON u.id=aa.participant_id JOIN assessment_outcomes ao ON ao.id=aa.outcome_id LEFT JOIN users m ON m.id=aa.moderator_id WHERE aa.assessor_id=? AND aa.status IN ('awaiting_moderation','moderated','final_approved') ORDER BY aa.assessed_at DESC");if($s){$s->bind_param('i',$uid);$s->execute();$r=$s->get_result();while($x=$r->fetch_assoc())$rows[]=$x;$s->close();}}require __DIR__.'/_layout_start.php';?>
-<div class="as-page-header"><div><span class="as-page-header__eyebrow">Quality Assurance</span><h2>Moderation Status</h2><p>Track assessments submitted for independent moderation and final approval.</p></div></div><div class="as-alert as-alert--info"><i class="fas fa-shield-halved"></i><div><strong>Segregation of duties</strong><span>This Assessor portal is read-only for moderation. An assessor cannot moderate an assessment they assessed.</span></div></div><div class="as-card"><div class="as-card__header"><div><h3>Moderation Tracking</h3><p><?= count($rows) ?> record(s).</p></div></div><?php if(!$rows):?><div class="as-empty"><div class="as-empty__icon"><i class="fas fa-shield-halved"></i></div><strong>No moderation records</strong><span>Assessments submitted for moderation will appear here.</span></div><?php else:?><div class="as-table-wrap"><table class="as-table"><thead><tr><th>Participant</th><th>Outcome</th><th>Assessor Result</th><th>Moderation</th><th>Moderator</th><th>Assessed</th><th>Moderated</th></tr></thead><tbody><?php foreach($rows as $x):$m=trim((string)$x['moderator_first_name'].' '.(string)$x['moderator_last_name']);?><tr><td><strong><?= e(trim($x['first_name'].' '.$x['last_name'])) ?></strong><span class="as-table-sub">Attempt #<?= (int)$x['attempt_number'] ?></span></td><td><strong><?= e($x['outcome_code']) ?></strong><span class="as-table-sub"><?= e($x['outcome_title']) ?></span></td><td><span class="as-status as-status--<?= e(as_class($x['assessor_result'])) ?>"><?= e(as_label($x['assessor_result'])) ?></span></td><td><span class="as-status as-status--<?= e(as_class($x['moderation_status'])) ?>"><?= e(as_label($x['moderation_status'])) ?></span></td><td><?= e($m?:'Not assigned') ?></td><td><?= e(as_datetime($x['assessed_at'])) ?></td><td><?= e(as_datetime($x['moderated_at'])) ?></td></tr><?php endforeach;?></tbody></table></div><?php endif;?></div><?php require __DIR__.'/_layout_end.php';?>
+require_once __DIR__ . '/../includes/bootstrap.php';
+require_role('assessor');
+$user = current_user();
+$currentPage = 'moderation';
+$pageTitle = 'Moderation Queue';
+require_once __DIR__ . '/_helpers.php';
+
+$conn = Database::getConnection();
+$assessorId = (int)($user['id'] ?? $user['user_id'] ?? 0);
+if ($assessorId <= 0) { http_response_code(403); exit('Invalid Assessor account.'); }
+
+$attempts = [];
+if (as_has_table($conn, 'assessment_attempts')) {
+    // Fetch assessments waiting for moderation
+    $sql = "SELECT aa.id AS attempt_id, aa.attempt_number, aa.status, aa.assessor_result, aa.assessed_at,
+                   u.first_name, u.last_name, u.email,
+                   ao.code AS outcome_code, ao.title AS outcome_title,
+                   assessor.first_name AS assessor_first, assessor.last_name AS assessor_last
+            FROM assessment_attempts aa
+            JOIN users u ON u.id = aa.participant_id
+            JOIN assessment_outcomes ao ON ao.id = aa.outcome_id
+            LEFT JOIN users assessor ON assessor.id = aa.assessor_id
+            WHERE aa.status IN ('awaiting_moderation', 'in_review') 
+              AND aa.moderation_status = 'pending'
+              AND aa.assessor_id != ?  -- Prevent assessors from moderating their own work
+            ORDER BY aa.assessed_at ASC";
+            
+    $stmt = $conn->prepare($sql);
+    if ($stmt) {
+        $stmt->bind_param('i', $assessorId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        while ($row = $res->fetch_assoc()) $attempts[] = $row;
+        $stmt->close();
+    }
+}
+
+require __DIR__ . '/_layout_start.php';
+?>
+
+<section class="as-hero">
+  <div class="as-hero__content">
+    <span class="as-hero__eyebrow"><i class="fas fa-scale-balanced"></i> Quality Assurance</span>
+    <h2>Moderation Queue</h2>
+    <p>Review assessor scoring, verify adherence to criteria, and finalize candidate results.</p>
+  </div>
+</section>
+
+<div class="as-card">
+  <div class="as-card__header">
+    <div><h3>Awaiting Moderation</h3><p>Assessments submitted by assessors for QA sign-off.</p></div>
+  </div>
+  
+  <?php if (!$attempts): ?>
+    <div class="as-empty"><i class="fas fa-shield-check"></i><p>No assessments are currently awaiting moderation.</p></div>
+  <?php else: ?>
+    <div class="as-list">
+      <?php foreach ($attempts as $a): 
+          $f = trim($a['first_name']); $l = trim($a['last_name']); $name = trim("$f $l") ?: 'Candidate';
+          $af = trim($a['assessor_first']); $al = trim($a['assessor_last']); $assessorName = trim("$af $al") ?: 'Assessor';
+      ?>
+      <div class="as-list-item" style="display:flex; justify-content:space-between; align-items:center; padding:16px; border-bottom:1px solid rgba(127,127,127,.1);">
+        <div>
+          <h4 style="margin:0 0 4px; font-size:15px;"><?=e($name)?> <span class="as-badge as-badge--blue">Attempt <?=(int)$a['attempt_number']?></span></h4>
+          <span style="font-size:12px; opacity:.7; display:block; margin-bottom:4px;"><?=e($a['outcome_code'])?> · <?=e($a['outcome_title'])?></span>
+          <span style="font-size:11px; opacity:.6;"><i class="fas fa-user-pen"></i> Scored by: <?=e($assessorName)?> on <?=e(as_datetime($a['assessed_at']))?></span>
+        </div>
+        <div style="text-align:right;">
+          <a href="<?=url('assessor/review_moderation.php?id='.$a['attempt_id'])?>" class="as-btn as-btn--primary" style="padding:8px 16px; font-size:12px;">
+            <i class="fas fa-magnifying-glass"></i> Review Scores
+          </a>
+        </div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+</div>
+
+<?php require __DIR__ . '/_layout_end.php'; ?>
