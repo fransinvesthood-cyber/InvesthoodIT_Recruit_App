@@ -21,17 +21,63 @@ if(as_has_table($conn,'assessment_attempts')){
     if(!$s) throw new RuntimeException('Queue query failed: '.$conn->error);
     $s->bind_param('i',$assessorId); $s->execute(); $res=$s->get_result(); while($x=$res->fetch_assoc())$queue[]=$x; $s->close();
 
-    $base="SELECT aa.id attempt_id,aa.participant_id,aa.outcome_id,aa.attempt_number,aa.assessor_id,aa.moderator_id,aa.status,aa.assessor_result,aa.moderation_status,aa.moderator_result,aa.submitted_at,aa.assessed_at,aa.moderated_at,aa.final_approved_at,aa.created_at,aa.updated_at,u.first_name,u.last_name,u.email,ao.code outcome_code,ao.title outcome_title FROM assessment_attempts aa JOIN users u ON u.id=aa.participant_id JOIN assessment_outcomes ao ON ao.id=aa.outcome_id WHERE aa.assessor_id=? ";
-    $parts=[
-      'assigned'=>"ORDER BY aa.created_at DESC,aa.id DESC LIMIT 100",
-      'pending'=>"AND aa.status IN ('submitted','in_review') ORDER BY CASE WHEN aa.status='submitted' THEN 0 ELSE 1 END,aa.submitted_at ASC,aa.id ASC LIMIT 100",
-      'competent'=>"AND aa.assessor_result='competent' ORDER BY aa.assessed_at DESC,aa.id DESC LIMIT 100",
-      'nyc'=>"AND aa.assessor_result='not_yet_competent' ORDER BY aa.assessed_at DESC,aa.id DESC LIMIT 100",
-      'moderation'=>"AND aa.moderation_status='pending' AND aa.status='awaiting_moderation' ORDER BY aa.assessed_at DESC,aa.id DESC LIMIT 100"
+    /* -----------------------------------------------------------------
+     * Build the attempt column list from the real table schema so that
+     * optional columns (e.g. final_approved_at) can never break the page.
+     * -------------------------------------------------------------- */
+    $attemptCols = [];
+    if ($r0 = $conn->query("SELECT * FROM assessment_attempts LIMIT 0")) {
+        foreach ($r0->fetch_fields() as $f) {
+            $attemptCols[strtolower($f->name)] = true;
+        }
+        $r0->free();
+    }
+
+    $col = static function (string $name, ?string $alias = null) use ($attemptCols): string {
+        $alias = $alias ?? $name;
+        return isset($attemptCols[strtolower($name)])
+            ? "aa.`{$name}` AS `{$alias}`"
+            : "NULL AS `{$alias}`";
+    };
+
+    $selectList = implode(",\n           ", [
+        $col('id', 'attempt_id'), $col('participant_id'), $col('outcome_id'), $col('attempt_number'),
+        $col('assessor_id'), $col('moderator_id'), $col('status'), $col('assessor_result'),
+        $col('moderation_status'), $col('moderator_result'), $col('submitted_at'), $col('assessed_at'),
+        $col('moderated_at'), $col('final_approved_at'), $col('created_at'), $col('updated_at'),
+    ]);
+
+    $base = "SELECT {$selectList},
+                    u.first_name, u.last_name, u.email,
+                    ao.code AS outcome_code, ao.title AS outcome_title
+               FROM assessment_attempts aa
+               JOIN users u  ON u.id  = aa.participant_id
+               JOIN assessment_outcomes ao ON ao.id = aa.outcome_id
+              WHERE aa.assessor_id = ? ";
+
+    /* ORDER BY fragments that tolerate missing timestamp columns */
+    $bySubmitted = isset($attemptCols['submitted_at'])
+        ? "CASE WHEN aa.status='submitted' THEN 0 ELSE 1 END, aa.submitted_at ASC"
+        : "CASE WHEN aa.status='submitted' THEN 0 ELSE 1 END";
+    $byAssessed = isset($attemptCols['assessed_at']) ? "aa.assessed_at DESC" : "aa.id DESC";
+    $byCreated  = isset($attemptCols['created_at'])  ? "aa.created_at DESC"  : "aa.id DESC";
+
+    $parts = [
+        'assigned'   => "ORDER BY {$byCreated}, aa.id DESC LIMIT 100",
+        'pending'    => "AND aa.status IN ('submitted','in_review') ORDER BY {$bySubmitted}, aa.id ASC LIMIT 100",
+        'competent'  => "AND aa.assessor_result='competent' ORDER BY {$byAssessed}, aa.id DESC LIMIT 100",
+        'nyc'        => "AND aa.assessor_result='not_yet_competent' ORDER BY {$byAssessed}, aa.id DESC LIMIT 100",
+        'moderation' => "AND aa.moderation_status='pending' AND aa.status='awaiting_moderation' ORDER BY {$byAssessed}, aa.id DESC LIMIT 100",
     ];
-    foreach($parts as $k=>$suffix){
-        $s=$conn->prepare($base.$suffix); if(!$s) throw new RuntimeException('Modal query failed: '.$conn->error);
-        $s->bind_param('i',$assessorId); $s->execute(); $res=$s->get_result(); while($x=$res->fetch_assoc())$modalData[$k][]=$x; $s->close();
+
+    foreach ($parts as $k => $suffix) {
+        $s = $conn->prepare($base . $suffix);
+        if (!$s) throw new RuntimeException('Modal query failed: ' . $conn->error);
+        $s->bind_param('i', $assessorId);
+        $s->execute();
+        $res = $s->get_result();
+        while ($x = $res->fetch_assoc()) $modalData[$k][] = $x;
+        $s->close();
     }
 }
 
@@ -130,8 +176,8 @@ body.dark-mode .as-dashboard-modal__dialog,html[data-theme="dark"] .as-dashboard
 <div class="as-security"><i class="fas fa-fingerprint"></i><div><strong>Audit-ready assessment environment</strong><span>Every decision is designed to retain criterion, result, feedback, supporting evidence, attempt and assessor details.</span></div></div>
 
 <div class="as-dashboard-modal" id="assessorDashboardModal" aria-hidden="true"><div class="as-dashboard-modal__backdrop" data-assessor-close></div><section class="as-dashboard-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="assessorDashboardModalTitle"><header class="as-dashboard-modal__header"><div class="as-dashboard-modal__heading"><span class="as-dashboard-modal__icon"><i class="fas fa-list-check" id="assessorDashboardModalIcon"></i></span><div><h3 id="assessorDashboardModalTitle">Assessment Details</h3><p id="assessorDashboardModalDescription">Assessment records assigned to you.</p></div></div><button type="button" class="as-dashboard-modal__close" data-assessor-close aria-label="Close"><i class="fas fa-xmark"></i></button></header><div class="as-dashboard-modal__body">
-<?php foreach($defs as $k=>$d): ?><section class="as-dashboard-panel" data-assessor-panel="<?=e($k)?>"><div class="as-modal-summary"><div><strong><?=number_format($stats[$k])?></strong><span><?=e($d['label'])?></span></div><a class="as-btn as-btn--light" href="<?=url('assessor/assessments.php')?>"><i class="fas fa-clipboard-check"></i> Open Queue</a></div><?php if(!$modalData[$k]): ?><div class="as-modal-empty"><i class="<?=e($d['icon'])?>"></i><strong><?=e($d['empty'])?></strong><span>Relevant assessment records will appear here.</span></div><?php else:?><div class="as-modal-list"><?php foreach($modalData[$k] as $a): $f=trim((string)$a['first_name']);$l=trim((string)$a['last_name']);$name=trim($f.' '.$l)?:'Participant'; ?><a class="as-modal-assessment" href="<?=url('assessor/review_assessment.php?id='.(int)$a['attempt_id'])?>"><div class="as-modal-assessment__avatar"><?=e(as_initials($f,$l))?></div><div class="as-modal-assessment__body"><div class="as-modal-assessment__top"><strong><?=e($name)?></strong><span class="as-status as-status--<?=e(as_class($a['status']))?>"><?=e(as_label($a['status']))?></span></div><span><?=e($a['outcome_code'])?> · <?=e($a['outcome_title'])?></span><div class="as-modal-assessment__meta"><span><i class("fas fa-rotate"></i> Attempt <?=(int)$a['attempt_number']?></span><?php if(!empty($a['submitted_at'])):?><span><i class("fas fa-clock"></i> <?=e(as_datetime($a['submitted_at']))?></span><?php endif;?><?php if(!empty($a['email'])):?><span><i class("fas fa-envelope"></i> <?=e($a['email'])?></span><?php endif;?></div></div><div class("as-modal-assessment__result")?><strong><?=!empty($a['assessor_result'])?e(as_label($a['assessor_result'])):'Pending'?></strong><?php if(!empty($a['moderation_status'])):?><span>Moderation: <?=e(as_label($a['moderation_status']))?></span><?php endif;?></div></a><?php endforeach;?></div><?php endif;?></section><?php endforeach;?>
-</div><footer class("as-dashboard-modal__footer")?><button type("button")?class("as-modal-close-btn")?data-assessor-close?><i class("fas fa-xmark")></i> Close</button></footer></section></div>
+<?php foreach($defs as $k=>$d): ?><section class="as-dashboard-panel" data-assessor-panel="<?=e($k)?>"><div class="as-modal-summary"><div><strong><?=number_format($stats[$k])?></strong><span><?=e($d['label'])?></span></div><a class="as-btn as-btn--light" href="<?=url('assessor/assessments.php')?>"><i class="fas fa-clipboard-check"></i> Open Queue</a></div><?php if(!$modalData[$k]): ?><div class="as-modal-empty"><i class="<?=e($d['icon'])?>"></i><strong><?=e($d['empty'])?></strong><span>Relevant assessment records will appear here.</span></div><?php else:?><div class="as-modal-list"><?php foreach($modalData[$k] as $a): $f=trim((string)$a['first_name']);$l=trim((string)$a['last_name']);$name=trim($f.' '.$l)?:'Participant'; ?><a class="as-modal-assessment" href="<?=url('assessor/review_assessment.php?id='.(int)$a['attempt_id'])?>"><div class="as-modal-assessment__avatar"><?=e(as_initials($f,$l))?></div><div class="as-modal-assessment__body"><div class="as-modal-assessment__top"><strong><?=e($name)?></strong><span class="as-status as-status--<?=e(as_class($a['status']))?>"><?=e(as_label($a['status']))?></span></div><span><?=e($a['outcome_code'])?> · <?=e($a['outcome_title'])?></span><div class="as-modal-assessment__meta"><span><i class="fas fa-rotate"></i> Attempt <?=(int)$a['attempt_number']?></span><?php if(!empty($a['submitted_at'])):?><span><i class="fas fa-clock"></i> <?=e(as_datetime($a['submitted_at']))?></span><?php endif;?><?php if(!empty($a['email'])):?><span><i class="fas fa-envelope"></i> <?=e($a['email'])?></span><?php endif;?></div></div><div class="as-modal-assessment__result"><strong><?=!empty($a['assessor_result'])?e(as_label($a['assessor_result'])):'Pending'?></strong><?php if(!empty($a['moderation_status'])):?><span>Moderation: <?=e(as_label($a['moderation_status']))?></span><?php endif;?></div></a><?php endforeach;?></div><?php endif;?></section><?php endforeach;?>
+</div><footer class="as-dashboard-modal__footer"><button type="button" class="as-modal-close-btn" data-assessor-close><i class="fas fa-xmark"></i> Close</button></footer></section></div>
 
 <script>
 document.addEventListener('DOMContentLoaded',function(){const modal=document.getElementById('assessorDashboardModal');if(!modal)return;const cards=document.querySelectorAll('[data-assessor-modal]'),panels=modal.querySelectorAll('[data-assessor-panel]'),closers=modal.querySelectorAll('[data-assessor-close]'),title=document.getElementById('assessorDashboardModalTitle'),desc=document.getElementById('assessorDashboardModalDescription'),icon=document.getElementById('assessorDashboardModalIcon');let last=null;const cfg={assigned:['Assigned Attempts','All assessment attempts assigned to you.','fas fa-list-check'],pending:['Awaiting Review','Submitted and in-review assessments requiring your attention.','fas fa-hourglass-half'],competent:['Competent','Assessment attempts you have marked competent.','fas fa-circle-check'],nyc:['Not Yet Competent','Assessment attempts marked not yet competent.','fas fa-rotate-right'],moderation:['Awaiting Moderation','Your assessed attempts currently awaiting moderation.','fas fa-shield-halved']};function openModal(type,trigger){if(!cfg[type])return;last=trigger;panels.forEach(p=>p.classList.toggle('is-active',p.dataset.assessorPanel===type));title.textContent=cfg[type][0];desc.textContent=cfg[type][1];icon.className=cfg[type][2];modal.classList.add('is-open');modal.setAttribute('aria-hidden','false');document.body.classList.add('as-dashboard-modal-open');const b=modal.querySelector('.as-dashboard-modal__close');if(b)b.focus()}function closeModal(){modal.classList.remove('is-open');modal.setAttribute('aria-hidden','true');document.body.classList.remove('as-dashboard-modal-open');panels.forEach(p=>p.classList.remove('is-active'));if(last)last.focus()}cards.forEach(c=>{c.addEventListener('click',()=>openModal(c.dataset.assessorModal,c));c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openModal(c.dataset.assessorModal,c)}})});closers.forEach(b=>b.addEventListener('click',closeModal));document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modal.classList.contains('is-open'))closeModal()})});
