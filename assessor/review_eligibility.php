@@ -73,6 +73,34 @@ while ($row = $res->fetch_assoc()) {
 }
 $stmt->close();
 
+// ── Readiness summary for this candidate ─────────────────────────────
+$readinessStats = ['total' => 0, 'met' => 0, 'na' => 0, 'unmet' => 0, 'pending' => 0, 'unmetMand' => 0];
+foreach ($criteriaList as $crit) {
+    $st = $eligStatus[$crit['id']]['status'] ?? 'pending';
+    $readinessStats['total']++;
+    if ($st === 'met')          $readinessStats['met']++;
+    elseif ($st === 'na')       $readinessStats['na']++;
+    elseif ($st === 'unmet')  { $readinessStats['unmet']++;
+        if ((int)$crit['is_mandatory'] === 1) $readinessStats['unmetMand']++; }
+    else                        $readinessStats['pending']++;
+}
+
+$docIssues = 0;
+foreach ($candidateDocs as $d) {
+    if (in_array($d['status'], ['pending','outstanding','rejected'], true)) $docIssues++;
+}
+
+$readinessStats['resolved'] = $readinessStats['met'] + $readinessStats['na'];
+$readinessStats['progress'] = $readinessStats['total'] > 0
+    ? (int)round(($readinessStats['resolved'] / $readinessStats['total']) * 100)
+    : 0;
+
+if ($readinessStats['unmetMand'] > 0)      { $readiness = 'blocked';  $readinessLabel = 'Blocked — mandatory criteria unmet'; }
+elseif ($docIssues > 0)                     { $readiness = 'documents'; $readinessLabel = 'Documents pending action'; }
+elseif ($readinessStats['pending'] > 0)     { $readiness = 'pending';  $readinessLabel = 'Awaiting review'; }
+else                                        { $readiness = 'ready';    $readinessLabel = 'Ready for assessment'; }
+$readinessIcon = ['ready'=>'fa-circle-check','blocked'=>'fa-circle-exclamation','documents'=>'fa-folder-exclamation','pending'=>'fa-hourglass-half'][$readiness];
+
 $f = trim($candidate['first_name']); $l = trim($candidate['last_name']); 
 $name = trim("$f $l") ?: 'Candidate';
 require __DIR__ . '/_layout_start.php';
@@ -93,6 +121,16 @@ require __DIR__ . '/_layout_start.php';
 .crit-actions label { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; cursor:pointer; }
 .crit-actions input[type="radio"] { width:16px; height:16px; cursor:pointer; }
 .crit-notes { width:100%; padding:10px; border-radius:10px; border:1px solid rgba(127,127,127,.25); background:transparent; font-size:13px; resize:vertical; color:inherit; font-family:inherit; }
+
+/* ── Readiness banner ─────────────────────────────────────────────── */
+.readiness-banner { display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:12px; background:rgba(127,127,127,.06); margin-top:12px; font-size:13px; }
+.readiness-banner i { font-size:20px; }
+.readiness-banner strong { display:block; }
+.readiness-banner span { font-size:11px; opacity:.7; }
+.readiness-banner--ready     { background:rgba(34,197,94,.1); color:#15803d; }
+.readiness-banner--blocked   { background:rgba(239,68,68,.1); color:#b91c1c; }
+.readiness-banner--documents { background:rgba(245,158,11,.1); color:#b45309; }
+.readiness-banner--pending   { background:rgba(59,130,246,.1); color:#1d4ed8; }
 </style>
 
 <section class="as-hero">
@@ -100,6 +138,19 @@ require __DIR__ . '/_layout_start.php';
     <span class="as-hero__eyebrow"><i class="fas fa-user-check"></i> Candidate Evaluation</span>
     <h2>Evaluating: <?=e($name)?></h2>
     <p><?=e($candidate['email'])?></p>
+
+    <div class="readiness-banner readiness-banner--<?=$readiness?>">
+      <i class="fas <?=$readinessIcon?>"></i>
+      <div>
+        <strong><?=e($readinessLabel)?></strong>
+        <span>
+          <?=$readinessStats['resolved']?>/<?=$readinessStats['total']?> requirements resolved
+          <?php if ($docIssues > 0): ?> · <?=$docIssues?> document issue<?=$docIssues===1?'':'s'?><?php endif; ?>
+          <?php if ($readinessStats['unmetMand'] > 0): ?> · <?=$readinessStats['unmetMand']?> mandatory unmet<?php endif; ?>
+        </span>
+      </div>
+    </div>
+
     <div class="as-hero__actions">
       <a class="as-btn as-btn--light" href="<?=url('assessor/eligibility.php')?>"><i class="fas fa-arrow-left"></i> Back to Queue</a>
       <a class="as-btn as-btn--glass" href="<?=url('assessor/documents.php?q='.urlencode($candidate['email']))?>"><i class="fas fa-folder-open"></i> View All Documents</a>
