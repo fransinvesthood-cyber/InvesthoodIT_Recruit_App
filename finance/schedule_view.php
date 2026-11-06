@@ -1,7 +1,333 @@
+
 <?php
-require_once __DIR__.'/../includes/bootstrap.php';require_role('finance_officer');$user=current_user();$flashes=render_flashes();$currentPage='schedule_view';$pageTitle='Schedule Details';require_once __DIR__.'/_helpers.php';$conn=Database::getConnection();$uid=(int)($user['id']??$user['user_id']??0);$id=(int)($_GET['id']??$_POST['schedule_id']??0);$s=$conn->prepare("SELECT ss.*,maker.first_name maker_first_name,maker.last_name maker_last_name,ap.first_name approver_first_name,ap.last_name approver_last_name FROM stipend_schedules ss JOIN users maker ON maker.id=ss.created_by LEFT JOIN users ap ON ap.id=ss.approved_by WHERE ss.id=? LIMIT 1");$s->bind_param('i',$id);$s->execute();$sch=$s->get_result()->fetch_assoc();$s->close();if(!$sch){http_response_code(404);exit('Schedule not found.');}
-if($_SERVER['REQUEST_METHOD']==='POST'){fo_verify_csrf();$action=$_POST['action']??'';if($action==='submit_for_approval'&&$sch['status']==='draft'&&(int)$sch['created_by']===$uid){$u=$conn->prepare("UPDATE stipend_schedules SET status='awaiting_approval',submitted_at=NOW() WHERE id=? AND created_by=? AND status='draft'");$u->bind_param('ii',$id,$uid);$u->execute();$u->close();fo_activity($conn,$uid,'stipend_schedule_submitted','Submitted stipend schedule for approval.','stipend_schedule',$id);fo_flash('success','Schedule submitted for approval.');header('Location: '.url('finance_officer/schedule_view.php?id='.$id));exit;}if($action==='create_revision'&&$sch['status']==='approved'){$conn->begin_transaction();try{$v=(int)$sch['version_number']+1;$ref=$sch['schedule_reference'].'-R'.$v;$u=$conn->prepare("INSERT INTO stipend_schedules(schedule_reference,period_start,period_end,programme_name,daily_rate,calculation_basis,participant_count,total_amount,exception_count,status,created_by,version_number,supersedes_schedule_id) VALUES(?,?,?,?,?,?,?,?,?,'draft',?,?,?)");$u->bind_param('ssssdsidiiii',$ref,$sch['period_start'],$sch['period_end'],$sch['programme_name'],$sch['daily_rate'],$sch['calculation_basis'],$sch['participant_count'],$sch['total_amount'],$sch['exception_count'],$uid,$v,$id);$u->execute();$nid=$u->insert_id;$u->close();$u=$conn->prepare("INSERT INTO stipend_schedule_lines(schedule_id,participant_id,participant_name_snapshot,programme_name_snapshot,cohort_name_snapshot,approved_minutes,eligible_days,daily_rate,gross_amount,exception_code,exception_message) SELECT ?,participant_id,participant_name_snapshot,programme_name_snapshot,cohort_name_snapshot,approved_minutes,eligible_days,daily_rate,gross_amount,exception_code,exception_message FROM stipend_schedule_lines WHERE schedule_id=?");$u->bind_param('ii',$nid,$id);$u->execute();$u->close();$conn->commit();fo_activity($conn,$uid,'stipend_schedule_revision_created','Created revision from approved schedule.','stipend_schedule',$nid);fo_flash('success','Revision created; approved history remains unchanged.');header('Location: '.url('finance_officer/schedule_view.php?id='.$nid));exit;}catch(Throwable $e){$conn->rollback();fo_flash('danger','Could not create revision.');header('Location: '.url('finance_officer/schedule_view.php?id='.$id));exit;}}}
-$lines=[];$s=$conn->prepare("SELECT * FROM stipend_schedule_lines WHERE schedule_id=? ORDER BY participant_name_snapshot");$s->bind_param('i',$id);$s->execute();$r=$s->get_result();while($x=$r->fetch_assoc())$lines[]=$x;$s->close();$cfg=fo_config($conn);$maker=trim($sch['maker_first_name'].' '.$sch['maker_last_name']);require __DIR__.'/_layout_start.php';?>
-<div class="fo-page-header"><div><span>Stipend Schedule</span><h2><?= e($sch['schedule_reference']) ?></h2><p><?= e(fo_date($sch['period_start'])) ?> - <?= e(fo_date($sch['period_end'])) ?> · Maker <?= e($maker) ?></p></div><div><?php if($sch['status']==='draft'&&(int)$sch['created_by']===$uid):?><form method="post"><input type="hidden" name="csrf_token" value="<?= e(fo_csrf_token()) ?>"><input type="hidden" name="schedule_id" value="<?= $id ?>"><input type="hidden" name="action" value="submit_for_approval"><button class="fo-btn fo-btn--primary"><i class="fas fa-paper-plane"></i> Submit for Approval</button></form><?php elseif($sch['status']==='approved'):?><form method="post"><input type="hidden" name="csrf_token" value="<?= e(fo_csrf_token()) ?>"><input type="hidden" name="schedule_id" value="<?= $id ?>"><input type="hidden" name="action" value="create_revision"><button class="fo-btn fo-btn--secondary"><i class="fas fa-code-branch"></i> Create Revision</button></form><?php endif;?></div></div>
-<section class="fo-stats fo-stats--4"><article><i class="fas fa-users"></i><strong><?= number_format((int)$sch['participant_count']) ?></strong><span>Participants</span></article><article><i class="fas fa-coins"></i><strong><?= e(fo_money($sch['total_amount'])) ?></strong><span>Total</span></article><article><i class="fas fa-triangle-exclamation"></i><strong><?= number_format((int)$sch['exception_count']) ?></strong><span>Exceptions</span></article><article><i class="fas fa-money-bill-wave"></i><strong><?= e(fo_money($sch['daily_rate'])) ?></strong><span>Daily Rate</span></article></section><div class="fo-alert fo-alert--info"><i class="fas fa-calculator"></i><div><strong>Calculation basis</strong><span><?= e($sch['calculation_basis']) ?></span></div></div><div class="fo-card"><div class="fo-table-wrap"><table><thead><tr><th>Participant</th><th>Programme</th><th>Approved Minutes</th><th>Eligible Days</th><th>Daily Rate</th><th>Gross Amount</th><th>Exception</th></tr></thead><tbody><?php foreach($lines as $x):?><tr><td><strong><?= e($x['participant_name_snapshot']) ?></strong></td><td><?= e($x['programme_name_snapshot']) ?><span><?= e($x['cohort_name_snapshot']) ?></span></td><td><?= number_format((int)$x['approved_minutes']) ?></td><td><?= number_format((float)$x['eligible_days'],2) ?></td><td><?= e(fo_money($x['daily_rate'])) ?></td><td><strong><?= e(fo_money($x['gross_amount'])) ?></strong></td><td><?php if($x['exception_message']):?><span class="fo-status fo-status--danger"><?= e($x['exception_message']) ?></span><?php else:?><span class="fo-status fo-status--success">None</span><?php endif;?></td></tr><?php endforeach;?></tbody></table></div></div><?php if($sch['status']==='approved'):?><div class="fo-security"><i class="fas fa-lock"></i><div><strong>Approved schedule is immutable.</strong><span>Corrections require a new revision. This record remains unchanged.</span></div></div><?php elseif($sch['status']==='awaiting_approval'&&!fo_can_approve($cfg,(int)$sch['created_by'],$uid)):?><div class="fo-alert fo-alert--warning"><i class="fas fa-user-shield"></i><div><strong>Maker/checker segregation is active.</strong><span>You prepared this schedule and cannot final-approve it.</span></div></div><?php endif;?>
-<?php require __DIR__.'/_layout_end.php';?>
+require_once __DIR__ . '/../includes/bootstrap.php';
+require_role('finance_officer');
+require_once __DIR__ . '/_helpers.php';
+
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+
+/*
+ * Resolve the database connection provided by bootstrap.php.
+ * Adjust this section only if your project uses a different connection variable.
+ */
+$db = $conn ?? $mysqli ?? $con ?? null;
+
+if (!$db instanceof mysqli) {
+    http_response_code(500);
+    exit('Database connection is unavailable. Check includes/bootstrap.php.');
+}
+
+$scheduleId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+
+if (!$scheduleId || $scheduleId < 1) {
+    http_response_code(400);
+    exit('Invalid stipend schedule ID.');
+}
+
+$stmt = $db->prepare(
+    "SELECT ss.*, u.first_name, u.last_name
+     FROM stipend_schedules ss
+     LEFT JOIN users u ON u.id = ss.created_by
+     WHERE ss.id = ?
+     LIMIT 1"
+);
+
+if (!$stmt) {
+    http_response_code(500);
+    exit('Unable to prepare the schedule query.');
+}
+
+$stmt->bind_param('i', $scheduleId);
+$stmt->execute();
+$result = $stmt->get_result();
+$schedule = $result->fetch_assoc();
+$stmt->close();
+
+if (!$schedule) {
+    http_response_code(404);
+    exit('Stipend schedule not found.');
+}
+
+$history = [];
+$historyAvailable = fo_has_table(
+    $db,
+    'stipend_schedule_approval_history'
+);
+
+if ($historyAvailable) {
+    $historyStmt = $db->prepare(
+        "SELECT h.*, u.first_name, u.last_name
+         FROM stipend_schedule_approval_history h
+         LEFT JOIN users u ON u.id = h.acted_by
+         WHERE h.schedule_id = ?
+         ORDER BY h.id DESC"
+    );
+
+    if ($historyStmt) {
+        $historyStmt->bind_param('i', $scheduleId);
+        $historyStmt->execute();
+        $history = $historyStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $historyStmt->close();
+    }
+}
+
+if (!function_exists('fo_view_escape')) {
+    function fo_view_escape($value): string {
+        return htmlspecialchars(
+            (string)($value ?? ''),
+            ENT_QUOTES,
+            'UTF-8'
+        );
+    }
+}
+
+$status = (string)($schedule['status'] ?? 'unknown');
+$creator = trim(
+    (string)($schedule['first_name'] ?? '') . ' ' .
+    (string)($schedule['last_name'] ?? '')
+);
+
+$pageTitle = 'Stipend Schedule Details';
+
+/*
+ * Use the existing portal layout if your project provides these files.
+ */
+$layoutStart = __DIR__ . '/_layout_start.php';
+$layoutEnd = __DIR__ . '/_layout_end.php';
+
+if (is_file($layoutStart)) {
+    require $layoutStart;
+} else {
+    ?><!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title><?= fo_view_escape($pageTitle) ?></title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+              rel="stylesheet">
+    </head>
+    <body class="bg-light">
+    <main class="container py-4">
+    <?php
+}
+?>
+
+<div class="container-fluid py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h2 class="mb-1">Stipend Schedule Details</h2>
+            <p class="text-muted mb-0">
+                Review schedule information and approval history.
+            </p>
+        </div>
+
+        <a href="<?= fo_view_escape(
+            function_exists('url')
+                ? url('finance/approvals.php')
+                : 'approvals.php'
+        ) ?>" class="btn btn-outline-secondary">
+            &larr; Back to Approvals
+        </a>
+    </div>
+
+    <?= fo_local_flash() ?>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">Schedule Information</h5>
+        </div>
+
+        <div class="card-body">
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <small class="text-muted">Schedule Reference</small>
+                    <div class="fw-semibold">
+                        <?= fo_view_escape(
+                            $schedule['schedule_reference'] ?? 'Not assigned'
+                        ) ?>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <small class="text-muted">Status</small>
+                    <div>
+                        <span class="badge text-bg-<?= fo_view_escape(
+                            fo_status_class($status)
+                        ) ?>">
+                            <?= fo_view_escape(fo_label($status)) ?>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <small class="text-muted">Programme</small>
+                    <div class="fw-semibold">
+                        <?= fo_view_escape(
+                            $schedule['programme_name'] ?? 'Not specified'
+                        ) ?>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <small class="text-muted">Created By</small>
+                    <div class="fw-semibold">
+                        <?= fo_view_escape($creator ?: 'Unknown') ?>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <small class="text-muted">Period Start</small>
+                    <div>
+                        <?= fo_view_escape(
+                            fo_date($schedule['period_start'] ?? null)
+                        ) ?>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <small class="text-muted">Period End</small>
+                    <div>
+                        <?= fo_view_escape(
+                            fo_date($schedule['period_end'] ?? null)
+                        ) ?>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <small class="text-muted">Participants</small>
+                    <div class="fw-semibold">
+                        <?= number_format(
+                            (int)($schedule['participant_count'] ?? 0)
+                        ) ?>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <small class="text-muted">Total Amount</small>
+                    <div class="fw-semibold fs-5">
+                        <?= fo_view_escape(
+                            fo_money($schedule['total_amount'] ?? 0)
+                        ) ?>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <small class="text-muted">Exceptions</small>
+                    <div>
+                        <?= number_format(
+                            (int)($schedule['exception_count'] ?? 0)
+                        ) ?>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <small class="text-muted">Submitted At</small>
+                    <div>
+                        <?= fo_view_escape(
+                            fo_datetime($schedule['submitted_at'] ?? null)
+                        ) ?>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <small class="text-muted">Approved At</small>
+                    <div>
+                        <?= fo_view_escape(
+                            fo_datetime($schedule['approved_at'] ?? null)
+                        ) ?>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <small class="text-muted">Approved By</small>
+                    <div>
+                        <?= !empty($schedule['approved_by'])
+                            ? 'User #' . (int)$schedule['approved_by']
+                            : 'Not approved' ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">Approval History</h5>
+        </div>
+
+        <div class="card-body">
+            <?php if (!$historyAvailable): ?>
+                <p class="text-muted mb-0">
+                    Approval history is unavailable because the history
+                    table does not exist in this database.
+                </p>
+            <?php elseif (!$history): ?>
+                <p class="text-muted mb-0">
+                    No approval history has been recorded for this schedule.
+                </p>
+            <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                        <tr>
+                            <th>Action</th>
+                            <th>Performed By</th>
+                            <th>Note</th>
+                            <th>Date</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($history as $item): ?>
+                            <tr>
+                                <td>
+                                    <?= fo_view_escape(
+                                        fo_label($item['action'] ?? '')
+                                    ) ?>
+                                </td>
+                                <td>
+                                    <?= fo_view_escape(
+                                        trim(
+                                            (string)($item['first_name'] ?? '') .
+                                            ' ' .
+                                            (string)($item['last_name'] ?? '')
+                                        ) ?: 'Unknown'
+                                    ) ?>
+                                </td>
+                                <td>
+                                    <?= fo_view_escape(
+                                        $item['action_note'] ?? '—'
+                                    ) ?>
+                                </td>
+                                <td>
+                                    <?= fo_view_escape(
+                                        fo_datetime(
+                                            $item['created_at']
+                                                ?? $item['acted_at']
+                                                ?? null
+                                        )
+                                    ) ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<?php
+if (is_file($layoutEnd)) {
+    require $layoutEnd;
+} else {
+    ?>
+    </main>
+    </body>
+    </html>
+    <?php
+}
+?>

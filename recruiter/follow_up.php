@@ -73,6 +73,25 @@ usort($rows, static function($a,$b) { return ((int)$b['is_overdue'] <=> (int)$a[
 require __DIR__ . '/_layout_start.php';
 ?>
 <link rel="stylesheet" href="<?= url('css/recruiter_pipeline.css') ?>?v=20261015">
+<style>
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-panel,:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-metric,:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-alert{background:#111827;color:#f8fafc;border-color:rgba(255,255,255,.12)}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-metric span,:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-metric strong,:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-metric small{color:#f8fafc}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-metric small,:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-table small,:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-footnote{color:#94a3b8}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-filters label{color:#cbd5e1}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-filters input,:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-filters select{background:#0b1220;color:#f8fafc;border-color:rgba(255,255,255,.22);color-scheme:dark}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-filters select option{background:#111827;color:#f8fafc}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-table{color:#f8fafc}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-table th{background:#0b1220;color:#cbd5e1;border-color:rgba(255,255,255,.12)}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-table td{background:transparent;color:#f8fafc;border-color:rgba(255,255,255,.10)}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-table tbody tr:hover td{background:rgba(255,255,255,.04)}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-actions a,:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-secondary{background:rgba(255,255,255,.08);color:#f8fafc;border-color:rgba(255,255,255,.18)}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-stage{background:rgba(147,180,255,.16);color:#93b4ff}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-overdue{color:#fca5a5}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-current{color:#6ee7b7}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-feedback-note{color:#fcd34d}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-empty,:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-empty strong,:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-empty span{color:#cbd5e1}
+:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-footnote code,:is([data-theme="dark"],[data-bs-theme="dark"],.dark-mode,.dark,.theme-dark) .rp-alert code{background:rgba(255,255,255,.10);color:#f8fafc}
+</style>
 <section class="rp-hero"><div><span class="rc-eyebrow">Recruitment operations</span><h2>Candidate Follow-Up &amp; Recruitment Pipeline</h2><p>Track submitted applications through screening, shortlisting, interviews, feedback and final decisions. Records below come from the existing application workflow.</p></div><a class="rp-secondary" href="<?= url('recruiter/dashboard.php') ?>"><i class="fas fa-arrow-left"></i> Back to dashboard</a></section>
 <?php if (!$hasApplications): ?><div class="rp-alert"><strong>Applications table not found.</strong> The pipeline needs the existing <code>applications</code> table. Apply the project's application migration before using this page.</div><?php else: ?>
 <section class="rp-metrics" aria-label="Pipeline summary">
