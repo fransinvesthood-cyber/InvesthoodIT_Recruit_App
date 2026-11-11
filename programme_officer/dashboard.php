@@ -1,63 +1,2960 @@
 <?php
 
-
 require_once __DIR__ . '/../includes/bootstrap.php';
-
-
 
 require_role('programme_officer');
 
-
-
 require_once __DIR__ . '/_helpers.php';
 
-
-
 /*
-
 |--------------------------------------------------------------------------
-
 | Current User
-
 |--------------------------------------------------------------------------
-
 */
-
-
 
 $user = current_user();
 
-
-
 $flashes = render_flashes();
-
-
 
 $currentPage = 'dashboard';
 
-
-
 $pageTitle = 'Programme Officer Dashboard';
-
-
 
 $conn = Database::getConnection();
 
 
+/*
+|--------------------------------------------------------------------------
+| Programme Officer
+|--------------------------------------------------------------------------
+*/
+
+$officerId = (int) (
+    $user['id']
+    ?? $user['user_id']
+    ?? 0
+);
+
+if ($officerId <= 0) {
+
+    http_response_code(403);
+
+    exit('Invalid Programme Officer account.');
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Programme Officer Scope
+|--------------------------------------------------------------------------
+*/
+
+$scope = po_scope(
+    $conn,
+    'p',
+    'c'
+);
+
+$scopeMode = po_scope_mode($scope);
+
+$scopeCondition = po_scope_condition($scope);
+
+
+/*
+|--------------------------------------------------------------------------
+| Dashboard Statistics
+|--------------------------------------------------------------------------
+*/
+
+$stats = [
+    'programmes' => 0,
+    'cohorts' => 0,
+    'candidates' => 0,
+    'active' => 0,
+    'completed' => 0,
+];
+
+if ($scopeMode !== 'none') {
+
+    $sql = "
+        SELECT
+
+            COUNT(
+                DISTINCT p.id
+            ) AS programmes,
+
+            COUNT(
+                DISTINCT c.id
+            ) AS cohorts,
+
+            COUNT(
+                DISTINCT CASE
+                    WHEN cp.status <> 'withdrawn'
+                    THEN cp.user_id
+                END
+            ) AS candidates,
+
+            COUNT(
+                DISTINCT CASE
+                    WHEN cp.status = 'active'
+                    THEN cp.user_id
+                END
+            ) AS active,
+
+            COUNT(
+                DISTINCT CASE
+                    WHEN cp.status = 'completed'
+                    THEN cp.user_id
+                END
+            ) AS completed
+
+        FROM programmes p
+
+        LEFT JOIN cohorts c
+            ON c.programme_id = p.id
+
+        LEFT JOIN cohort_participants cp
+            ON cp.cohort_id = c.id
+
+        WHERE {$scopeCondition}
+    ";
+
+    $stmt = $conn->prepare($sql);
+
+    if ($stmt) {
+
+        $stmt->bind_param(
+            'i',
+            $officerId
+        );
+
+        $stmt->execute();
+
+        $row = $stmt
+            ->get_result()
+            ->fetch_assoc();
+
+        if ($row) {
+
+            $stats = [
+                'programmes' =>
+                    (int) ($row['programmes'] ?? 0),
+
+                'cohorts' =>
+                    (int) ($row['cohorts'] ?? 0),
+
+                'candidates' =>
+                    (int) ($row['candidates'] ?? 0),
+
+                'active' =>
+                    (int) ($row['active'] ?? 0),
+
+                'completed' =>
+                    (int) ($row['completed'] ?? 0),
+            ];
+        }
+
+        $stmt->close();
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Completion Rate
+|--------------------------------------------------------------------------
+*/
+
+$completionRate = po_completion_rate(
+    $stats['candidates'],
+    $stats['completed']
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| Programme Portfolio
+|--------------------------------------------------------------------------
+*/
+
+$programmes = [];
+
+if ($scopeMode !== 'none') {
+
+    $sql = "
+        SELECT
+
+            p.id,
+            p.name,
+            p.type,
+            p.status,
+            p.start_date,
+            p.end_date,
+
+            COUNT(
+                DISTINCT c.id
+            ) AS cohort_count,
+
+            COUNT(
+                DISTINCT CASE
+                    WHEN cp.status <> 'withdrawn'
+                    THEN cp.user_id
+                END
+            ) AS candidate_count,
+
+            COUNT(
+                DISTINCT CASE
+                    WHEN cp.status = 'completed'
+                    THEN cp.user_id
+                END
+            ) AS completed_count
+
+        FROM programmes p
+
+        LEFT JOIN cohorts c
+            ON c.programme_id = p.id
+
+        LEFT JOIN cohort_participants cp
+            ON cp.cohort_id = c.id
+
+        WHERE {$scopeCondition}
+
+        GROUP BY
+            p.id,
+            p.name,
+            p.type,
+            p.status,
+            p.start_date,
+            p.end_date
+
+        ORDER BY
+
+            CASE
+                WHEN p.status = 'active'
+                THEN 0
+                ELSE 1
+            END,
+
+            p.start_date DESC,
+            p.id DESC
+
+        LIMIT 5
+    ";
+
+    $stmt = $conn->prepare($sql);
+
+    if ($stmt) {
+
+        $stmt->bind_param(
+            'i',
+            $officerId
+        );
+
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+
+        while (
+            $row = $result->fetch_assoc()
+        ) {
+
+            $programmes[] = $row;
+        }
+
+        $stmt->close();
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Recent Candidate Activity
+|--------------------------------------------------------------------------
+*/
+
+$recentCandidates = [];
+
+if ($scopeMode !== 'none') {
+
+    $sql = "
+        SELECT
+
+            u.id AS candidate_id,
+
+            u.first_name,
+            u.last_name,
+            u.email,
+
+            cp.status AS participant_status,
+
+            cp.selected_at,
+            cp.onboarded_at,
+            cp.completed_at,
+
+            c.id AS cohort_id,
+            c.name AS cohort_name,
+
+            p.id AS programme_id,
+            p.name AS programme_name
+
+        FROM cohort_participants cp
+
+        INNER JOIN cohorts c
+            ON c.id = cp.cohort_id
+
+        INNER JOIN programmes p
+            ON p.id = c.programme_id
+
+        INNER JOIN users u
+            ON u.id = cp.user_id
+
+        WHERE {$scopeCondition}
+
+        ORDER BY
+
+            COALESCE(
+                cp.completed_at,
+                cp.onboarded_at,
+                cp.selected_at
+            ) DESC,
+
+            cp.id DESC
+
+        LIMIT 6
+    ";
+
+    $stmt = $conn->prepare($sql);
+
+    if ($stmt) {
+
+        $stmt->bind_param(
+            'i',
+            $officerId
+        );
+
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+
+        while (
+            $row = $result->fetch_assoc()
+        ) {
+
+            $recentCandidates[] = $row;
+        }
+
+        $stmt->close();
+    }
+}
 
 
 
 /*
-
 |--------------------------------------------------------------------------
-
-| Programme Officer
-
+| Dashboard Modal Data
 |--------------------------------------------------------------------------
-
+| Each modal uses the same Programme Officer scope as the dashboard.
 */
 
+$modalProgrammes = [];
+$modalCohorts = [];
+$modalCandidates = [];
+$modalActiveCandidates = [];
+$modalCompletedCandidates = [];
 
+if ($scopeMode !== 'none') {
+
+    // Programmes
+    $sql = "
+        SELECT
+            p.id,
+            p.name,
+            p.type,
+            p.status,
+            p.start_date,
+            p.end_date
+        FROM programmes p
+        LEFT JOIN cohorts c
+            ON c.programme_id = p.id
+        WHERE {$scopeCondition}
+        GROUP BY
+            p.id, p.name, p.type, p.status, p.start_date, p.end_date
+        ORDER BY
+            CASE WHEN p.status = 'active' THEN 0 ELSE 1 END,
+            p.name ASC
+    ";
+
+    $stmt = $conn->prepare($sql);
+
+    if ($stmt) {
+        $stmt->bind_param('i', $officerId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        while ($row = $result->fetch_assoc()) {
+            $modalProgrammes[] = $row;
+        }
+
+        $stmt->close();
+    }
+
+    // Cohorts
+    $sql = "
+        SELECT DISTINCT
+            c.id,
+            c.name,
+            c.status,
+            c.start_date,
+            c.end_date,
+            c.location,
+            c.province,
+            p.id AS programme_id,
+            p.name AS programme_name
+        FROM cohorts c
+        INNER JOIN programmes p
+            ON p.id = c.programme_id
+        WHERE {$scopeCondition}
+        ORDER BY
+            CASE WHEN c.status = 'active' THEN 0 ELSE 1 END,
+            c.start_date DESC,
+            c.name ASC
+    ";
+
+    $stmt = $conn->prepare($sql);
+
+    if ($stmt) {
+        $stmt->bind_param('i', $officerId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        while ($row = $result->fetch_assoc()) {
+            $modalCohorts[] = $row;
+        }
+
+        $stmt->close();
+    }
+
+    // Candidates
+    $sql = "
+        SELECT DISTINCT
+            cp.id AS participant_id,
+            cp.status AS participant_status,
+            cp.selected_at,
+            cp.onboarded_at,
+            cp.completed_at,
+            u.id AS candidate_id,
+            u.first_name,
+            u.last_name,
+            u.email,
+            c.id AS cohort_id,
+            c.name AS cohort_name,
+            p.id AS programme_id,
+            p.name AS programme_name
+        FROM cohort_participants cp
+        INNER JOIN cohorts c
+            ON c.id = cp.cohort_id
+        INNER JOIN programmes p
+            ON p.id = c.programme_id
+        INNER JOIN users u
+            ON u.id = cp.user_id
+        WHERE {$scopeCondition}
+          AND cp.status <> 'withdrawn'
+        ORDER BY
+            u.first_name ASC,
+            u.last_name ASC,
+            cp.id DESC
+    ";
+
+    $stmt = $conn->prepare($sql);
+
+    if ($stmt) {
+        $stmt->bind_param('i', $officerId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        while ($row = $result->fetch_assoc()) {
+            $modalCandidates[] = $row;
+
+            if (($row['participant_status'] ?? '') === 'active') {
+                $modalActiveCandidates[] = $row;
+            }
+
+            if (($row['participant_status'] ?? '') === 'completed') {
+                $modalCompletedCandidates[] = $row;
+            }
+        }
+
+        $stmt->close();
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Assessment & Interview Monitoring
+|--------------------------------------------------------------------------
+| Self-contained: auto-detects optional tables and degrades gracefully.
+*/
+
+/* --- Table detection ------------------------------------------------ */
+
+$monTables = [];
+
+if ($monRes = $conn->query('SHOW TABLES')) {
+    while ($monRow = $monRes->fetch_row()) {
+        $monTables[] = $monRow[0];
+    }
+    $monRes->free();
+}
+
+$monPickTable = static function (array $names) use ($monTables): ?string {
+    foreach ($names as $needle) {
+        foreach ($monTables as $t) {
+            if (strcasecmp($t, $needle) === 0) {
+                return $t;
+            }
+        }
+    }
+    return null;
+};
+
+$tblAssessments    = $monPickTable(['assessments', 'programme_assessments']);
+$tblAssessmentLink = $monPickTable([
+    'assessment_submissions',
+    'candidate_assessments',
+    'assessment_results',
+    'assessment_participants',
+]);
+$tblInterviews     = $monPickTable([
+    'interviews',
+    'programme_interviews',
+    'interview_sessions',
+]);
+$tblInterviewLink  = $monPickTable([
+    'interview_schedules',
+    'candidate_interviews',
+    'interview_participants',
+    'interview_slots',
+]);
+
+$assessmentAvailable = (bool) ($tblAssessments && $tblAssessmentLink);
+$interviewAvailable  = (bool) ($tblInterviews  && $tblInterviewLink);
+
+$monitoringAvailable = $scopeMode !== 'none'
+    && ($assessmentAvailable || $interviewAvailable);
+
+/* --- Metric defaults ------------------------------------------------ */
+
+$assessmentMetrics = [
+    'total'            => 0,
+    'pending'          => 0,
+    'overdue'          => 0,
+    'due_soon'         => 0,
+    'awaiting_grading' => 0,
+    'completed'        => 0,
+    'follow_up'        => 0,
+];
+
+$interviewMetrics = [
+    'total'     => 0,
+    'upcoming'  => 0,
+    'today'     => 0,
+    'this_week' => 0,
+    'no_show'   => 0,
+    'completed' => 0,
+    'follow_up' => 0,
+];
+
+$assessmentRows = [];
+$interviewRows  = [];
+
+$monNow         = time();
+$monWeekFromNow = strtotime('+7 days');
+$monTodayYmd    = date('Y-m-d');
+
+/* --- Load assessments ---------------------------------------------- */
+
+if ($monitoringAvailable && $assessmentAvailable && $scopeMode !== 'none') {
+
+    $sql = "
+        SELECT
+            a.id            AS assessment_id,
+            a.title         AS assessment_title,
+            a.type          AS assessment_type,
+            a.due_date      AS assessment_due_date,
+            a.status        AS assessment_status,
+
+            s.id            AS submission_id,
+            s.status        AS submission_status,
+            s.submitted_at  AS submission_submitted_at,
+            s.graded_at     AS submission_graded_at,
+
+            u.id            AS candidate_id,
+            u.first_name,
+            u.last_name,
+            u.email,
+
+            c.id            AS cohort_id,
+            c.name          AS cohort_name,
+
+            p.id            AS programme_id,
+            p.name          AS programme_name
+
+        FROM `{$tblAssessments}` a
+
+        INNER JOIN `{$tblAssessmentLink}` s
+            ON s.assessment_id = a.id
+
+        INNER JOIN users u
+            ON u.id = s.user_id
+
+        INNER JOIN cohorts c
+            ON c.id = a.cohort_id
+
+        INNER JOIN programmes p
+            ON p.id = c.programme_id
+
+        WHERE {$scopeCondition}
+
+        ORDER BY
+            a.due_date ASC,
+            u.first_name ASC,
+            u.last_name ASC
+    ";
+
+    if ($stmt = $conn->prepare($sql)) {
+
+        $stmt->bind_param('i', $officerId);
+
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) {
+                $assessmentRows[] = $r;
+            }
+        }
+
+        $stmt->close();
+    }
+
+    $assessmentMetrics['total'] = count($assessmentRows);
+
+    foreach ($assessmentRows as $r) {
+
+        $st        = strtolower((string) ($r['submission_status'] ?? ''));
+        $submitted = !empty($r['submission_submitted_at']);
+        $graded    = !empty($r['submission_graded_at'])
+                  || in_array($st, ['graded', 'completed', 'passed', 'failed'], true);
+
+        $dueTs = !empty($r['assessment_due_date'])
+            ? strtotime((string) $r['assessment_due_date'])
+            : null;
+
+        if ($graded) {
+            $assessmentMetrics['completed']++;
+            continue;
+        }
+
+        if ($submitted) {
+            $assessmentMetrics['awaiting_grading']++;
+            continue;
+        }
+
+        if ($dueTs !== null && $dueTs < $monNow) {
+            $assessmentMetrics['overdue']++;
+            $assessmentMetrics['follow_up']++;
+        } elseif ($dueTs !== null && $dueTs <= $monWeekFromNow) {
+            $assessmentMetrics['due_soon']++;
+            $assessmentMetrics['pending']++;
+        } else {
+            $assessmentMetrics['pending']++;
+        }
+    }
+}
+
+/* --- Load interviews ----------------------------------------------- */
+
+if ($monitoringAvailable && $interviewAvailable && $scopeMode !== 'none') {
+
+    // Detect optional link-level scheduled_at column
+    $linkCols = [];
+    if ($lcRes = $conn->query("SHOW COLUMNS FROM `{$tblInterviewLink}`")) {
+        while ($lcRow = $lcRes->fetch_assoc()) {
+            $linkCols[] = $lcRow['Field'];
+        }
+        $lcRes->free();
+    }
+
+    $linkScheduleCol = null;
+    foreach (['scheduled_at', 'slot_at', 'starts_at', 'interview_at'] as $cand) {
+        foreach ($linkCols as $lc) {
+            if (strcasecmp($lc, $cand) === 0) {
+                $linkScheduleCol = $lc;
+                break 2;
+            }
+        }
+    }
+
+    $schedExpr = $linkScheduleCol
+        ? "COALESCE(s.`{$linkScheduleCol}`, i.scheduled_at)"
+        : "i.scheduled_at";
+
+    $sql = "
+        SELECT
+            i.id             AS interview_id,
+            i.title          AS interview_title,
+            i.status         AS interview_status,
+
+            s.id             AS schedule_id,
+            s.status         AS schedule_status,
+            s.outcome        AS schedule_outcome,
+
+            {$schedExpr}     AS effective_scheduled_at,
+
+            u.id             AS candidate_id,
+            u.first_name,
+            u.last_name,
+            u.email,
+
+            c.id             AS cohort_id,
+            c.name           AS cohort_name,
+
+            p.id             AS programme_id,
+            p.name           AS programme_name
+
+        FROM `{$tblInterviews}` i
+
+        INNER JOIN `{$tblInterviewLink}` s
+            ON s.interview_id = i.id
+
+        INNER JOIN users u
+            ON u.id = s.user_id
+
+        INNER JOIN cohorts c
+            ON c.id = i.cohort_id
+
+        INNER JOIN programmes p
+            ON p.id = c.programme_id
+
+        WHERE {$scopeCondition}
+
+        ORDER BY
+            effective_scheduled_at ASC,
+            u.first_name ASC
+    ";
+
+    if ($stmt = $conn->prepare($sql)) {
+
+        $stmt->bind_param('i', $officerId);
+
+        if ($stmt->execute()) {
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) {
+                $interviewRows[] = $r;
+            }
+        }
+
+        $stmt->close();
+    }
+
+    $interviewMetrics['total'] = count($interviewRows);
+
+    foreach ($interviewRows as $r) {
+
+        $st = strtolower((string) ($r['schedule_status'] ?? ''));
+
+        $ts = !empty($r['effective_scheduled_at'])
+            ? strtotime((string) $r['effective_scheduled_at'])
+            : null;
+
+        if (in_array($st, ['completed', 'done', 'passed'], true)) {
+            $interviewMetrics['completed']++;
+            continue;
+        }
+
+        if ($st === 'no_show') {
+            $interviewMetrics['no_show']++;
+            $interviewMetrics['follow_up']++;
+            continue;
+        }
+
+        if ($st === 'scheduled' && $ts !== null) {
+            if ($ts >= $monNow) {
+                $interviewMetrics['upcoming']++;
+                if (date('Y-m-d', $ts) === $monTodayYmd) {
+                    $interviewMetrics['today']++;
+                }
+                if ($ts <= $monWeekFromNow) {
+                    $interviewMetrics['this_week']++;
+                }
+            } else {
+                // Scheduled in the past but never completed
+                $interviewMetrics['follow_up']++;
+            }
+        }
+    }
+}
+
+$followUpCount = (int) (
+    ($assessmentMetrics['follow_up'] ?? 0)
+    + ($interviewMetrics['follow_up'] ?? 0)
+);
+
+/* --- Previews for the dashboard panels ----------------------------- */
+
+$upcomingInterviewsPreview = [];
+
+foreach ($interviewRows as $r) {
+
+    if (count($upcomingInterviewsPreview) >= 5) {
+        break;
+    }
+
+    $st = strtolower((string) ($r['schedule_status'] ?? ''));
+    $ts = !empty($r['effective_scheduled_at'])
+        ? strtotime((string) $r['effective_scheduled_at'])
+        : null;
+
+    if ($st === 'scheduled' && $ts !== null && $ts >= $monNow) {
+        $upcomingInterviewsPreview[] = $r;
+    }
+}
+
+$overdueAssessmentsPreview = [];
+
+foreach ($assessmentRows as $r) {
+
+    if (count($overdueAssessmentsPreview) >= 5) {
+        break;
+    }
+
+    $st        = strtolower((string) ($r['submission_status'] ?? ''));
+    $submitted = !empty($r['submission_submitted_at']);
+    $graded    = !empty($r['submission_graded_at'])
+              || in_array($st, ['graded', 'completed'], true);
+    $dueTs     = !empty($r['assessment_due_date'])
+              ? strtotime((string) $r['assessment_due_date'])
+              : null;
+
+    if ($dueTs !== null && $dueTs < $monNow && !$submitted && !$graded) {
+        $overdueAssessmentsPreview[] = $r;
+    }
+}
+
+/* --- Modal lists ---------------------------------------------------- */
+
+$assessmentModalItems = array_values(array_filter(
+    $assessmentRows,
+    static function ($r) {
+        $st        = strtolower((string) ($r['submission_status'] ?? ''));
+        $submitted = !empty($r['submission_submitted_at']);
+        $graded    = !empty($r['submission_graded_at'])
+                  || in_array($st, ['graded', 'completed'], true);
+        return !$submitted && !$graded;
+    }
+));
+
+$interviewModalItems = array_values(array_filter(
+    $interviewRows,
+    static function ($r) {
+        return strtolower((string) ($r['schedule_status'] ?? '')) === 'scheduled';
+    }
+));
+
+/* --- Local formatting helpers -------------------------------------- */
+
+if (!function_exists('po_mon_relative')) {
+    function po_mon_relative($date): string
+    {
+        if (empty($date)) {
+            return '—';
+        }
+
+        $ts = strtotime((string) $date);
+
+        if ($ts === false) {
+            return '—';
+        }
+
+        $now  = time();
+        $days = (int) round(($ts - $now) / 86400);
+
+        if (date('Y-m-d', $ts) === date('Y-m-d', $now)) {
+            return 'Today';
+        }
+        if ($days === 1)  return 'Tomorrow';
+        if ($days === -1) return 'Yesterday';
+        if ($days > 1)    return 'In ' . $days . ' days';
+        if ($days < -1)   return abs($days) . ' days overdue';
+
+        return 'Today';
+    }
+}
+
+if (!function_exists('po_mon_status_label')) {
+    function po_mon_status_label($status): string
+    {
+        $status = strtolower(trim((string) $status));
+
+        $map = [
+            'no_show'     => 'No Show',
+            'not_started' => 'Not Started',
+            'in_progress' => 'In Progress',
+            'due_soon'    => 'Due Soon',
+        ];
+
+        if (isset($map[$status])) {
+            return $map[$status];
+        }
+
+        return po_status_label($status);
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| First Name
+|--------------------------------------------------------------------------
+*/
+
+$firstName = trim(
+    (string) (
+        $user['first_name']
+        ?? 'Programme Officer'
+    )
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| Layout
+|--------------------------------------------------------------------------
+*/
+
+require __DIR__ . '/_layout_start.php';
+
+?>
+
+<link
+    rel="stylesheet"
+    href="<?= url('css/dashboard_card_modals.css') ?>"
+>
+
+
+<?php if ($scopeMode === 'portfolio'): ?>
+
+    <div class="po-alert">
+
+        <i class="fas fa-circle-info"></i>
+
+        <div>
+
+            <strong>
+                Programme portfolio access
+            </strong>
+
+            <span>
+                No Programme Officer assignment column exists
+                in the current database schema. Your account is
+                therefore displaying the real programme portfolio.
+            </span>
+
+        </div>
+
+    </div>
+
+<?php endif; ?>
+
+
+<!-- =========================================================
+     HERO
+========================================================= -->
+
+<section class="po-hero">
+
+    <div class="po-hero__content">
+
+        <span class="po-hero__eyebrow">
+
+            <i class="fas fa-sparkles"></i>
+
+            Programme Operations
+
+        </span>
+
+        <h2>
+            Welcome back,
+            <?= e(
+                $firstName !== ''
+                    ? $firstName
+                    : 'Programme Officer'
+            ) ?>.
+        </h2>
+
+        <p>
+            Manage programmes, monitor cohort delivery,
+            review candidate movement and keep programme
+            operations on track from one workspace.
+        </p>
+
+        <div class="po-hero__actions">
+
+            <a
+                href="<?= url(
+                    'programme_officer/programmes.php'
+                ) ?>"
+                class="po-btn po-btn--light"
+            >
+
+                <i class="fas fa-diagram-project"></i>
+
+                My Programmes
+
+            </a>
+
+            <a
+                href="<?= url(
+                    'programme_officer/candidates.php'
+                ) ?>"
+                class="po-btn po-btn--glass"
+            >
+
+                <i class="fas fa-users"></i>
+
+                Review Candidates
+
+            </a>
+
+        </div>
+
+    </div>
+
+
+    <div class="po-hero__metric">
+
+        <div
+            class="po-ring"
+            style="--progress:<?= $completionRate ?>"
+        >
+
+            <strong>
+                <?= $completionRate ?>%
+            </strong>
+
+        </div>
+
+        <span>
+            Candidate completion
+        </span>
+
+    </div>
+
+</section>
+
+
+<!-- =========================================================
+     REAL DATABASE STATISTICS
+========================================================= -->
+
+<section class="po-stats po-stats--5 po-dashboard-stats">
+
+    <article
+        class="po-stat po-stat--interactive"
+        tabindex="0"
+        role="button"
+        data-po-modal="programmes"
+        aria-label="View my programmes"
+    >
+        <span class="po-stat__icon po-stat__icon--blue">
+            <i class="fas fa-diagram-project"></i>
+        </span>
+        <strong><?= number_format($stats['programmes']) ?></strong>
+        <span>My Programmes</span>
+        <span class="po-stat__hint">
+            View details <i class="fas fa-arrow-up-right-from-square"></i>
+        </span>
+    </article>
+
+    <article
+        class="po-stat po-stat--interactive"
+        tabindex="0"
+        role="button"
+        data-po-modal="cohorts"
+        aria-label="View cohorts"
+    >
+        <span class="po-stat__icon po-stat__icon--purple">
+            <i class="fas fa-layer-group"></i>
+        </span>
+        <strong><?= number_format($stats['cohorts']) ?></strong>
+        <span>Cohorts</span>
+        <span class="po-stat__hint">
+            View details <i class="fas fa-arrow-up-right-from-square"></i>
+        </span>
+    </article>
+
+    <article
+        class="po-stat po-stat--interactive"
+        tabindex="0"
+        role="button"
+        data-po-modal="candidates"
+        aria-label="View current candidates"
+    >
+        <span class="po-stat__icon po-stat__icon--orange">
+            <i class="fas fa-users"></i>
+        </span>
+        <strong><?= number_format($stats['candidates']) ?></strong>
+        <span>Current Candidates</span>
+        <span class="po-stat__hint">
+            View details <i class="fas fa-arrow-up-right-from-square"></i>
+        </span>
+    </article>
+
+    <article
+        class="po-stat po-stat--interactive"
+        tabindex="0"
+        role="button"
+        data-po-modal="active"
+        aria-label="View active candidates"
+    >
+        <span class="po-stat__icon po-stat__icon--cyan">
+            <i class="fas fa-person-running"></i>
+        </span>
+        <strong><?= number_format($stats['active']) ?></strong>
+        <span>Active</span>
+        <span class="po-stat__hint">
+            View details <i class="fas fa-arrow-up-right-from-square"></i>
+        </span>
+    </article>
+
+    <article
+        class="po-stat po-stat--interactive"
+        tabindex="0"
+        role="button"
+        data-po-modal="completed"
+        aria-label="View completed candidates"
+    >
+        <span class="po-stat__icon po-stat__icon--green">
+            <i class="fas fa-circle-check"></i>
+        </span>
+        <strong><?= number_format($stats['completed']) ?></strong>
+        <span>Completed</span>
+        <span class="po-stat__hint">
+            View details <i class="fas fa-arrow-up-right-from-square"></i>
+        </span>
+    </article>
+
+</section>
+
+
+<!-- =========================================================
+     PROGRAMME PORTFOLIO / QUICK ACTIONS
+========================================================= -->
+
+<div class="po-grid po-grid--main">
+
+    <section class="po-card">
+
+        <div class="po-card__header">
+
+            <div>
+
+                <h3>
+                    Programme Portfolio
+                </h3>
+
+                <p>
+                    Real programme and participant
+                    performance from the database.
+                </p>
+
+            </div>
+
+            <a
+                class="po-link"
+                href="<?= url(
+                    'programme_officer/programmes.php'
+                ) ?>"
+            >
+
+                View all
+
+                <i class="fas fa-arrow-right"></i>
+
+            </a>
+
+        </div>
+
+
+        <?php if (!$programmes): ?>
+
+            <div class="po-empty">
+
+                <div class="po-empty__icon">
+
+                    <i class="fas fa-diagram-project"></i>
+
+                </div>
+
+                <strong>
+                    No programmes available
+                </strong>
+
+                <span>
+                    No programme records are available
+                    for this Programme Officer scope.
+                </span>
+
+            </div>
+
+        <?php else: ?>
+
+            <div class="po-list">
+
+                <?php foreach (
+                    $programmes as $programme
+                ): ?>
+
+                    <?php
+
+                    $candidateTotal =
+                        (int) $programme[
+                            'candidate_count'
+                        ];
+
+                    $completedTotal =
+                        (int) $programme[
+                            'completed_count'
+                        ];
+
+                    $programmeRate =
+                        po_completion_rate(
+                            $candidateTotal,
+                            $completedTotal
+                        );
+
+                    ?>
+
+                    <a
+                        href="<?= url(
+                            'programme_officer/cohorts.php'
+                            . '?programme_id='
+                            . (int) $programme['id']
+                        ) ?>"
+                        class="po-list-item"
+                    >
+
+                        <div class="po-list-item__icon">
+
+                            <i
+                                class="
+                                    fas
+                                    fa-diagram-project
+                                "
+                            ></i>
+
+                        </div>
+
+
+                        <div class="po-list-item__main">
+
+                            <div
+                                class="
+                                    po-list-item__title
+                                "
+                            >
+
+                                <strong>
+                                    <?= e(
+                                        $programme['name']
+                                    ) ?>
+                                </strong>
+
+                                <span
+                                    class="
+                                        po-status
+                                        po-status--<?= e(
+                                            po_status_class(
+                                                $programme[
+                                                    'status'
+                                                ]
+                                            )
+                                        ) ?>
+                                    "
+                                >
+                                    <?= e(
+                                        po_status_label(
+                                            $programme[
+                                                'status'
+                                            ]
+                                        )
+                                    ) ?>
+                                </span>
+
+                            </div>
+
+
+                            <span>
+
+                                <?= e(
+                                    (string) (
+                                        $programme['type']
+                                        ?? 'Programme'
+                                    )
+                                ) ?>
+
+                                ·
+
+                                <?= number_format(
+                                    (int) $programme[
+                                        'cohort_count'
+                                    ]
+                                ) ?>
+                                cohorts
+
+                                ·
+
+                                <?= number_format(
+                                    $candidateTotal
+                                ) ?>
+                                candidates
+
+                            </span>
+
+
+                            <div class="po-progress">
+
+                                <div
+                                    class="
+                                        po-progress__track
+                                    "
+                                >
+
+                                    <span
+                                        style="
+                                            width:
+                                            <?= $programmeRate ?>%
+                                        "
+                                    ></span>
+
+                                </div>
+
+                                <small>
+                                    <?= $programmeRate ?>%
+                                    completed
+                                </small>
+
+                            </div>
+
+                        </div>
+
+
+                        <i
+                            class="
+                                fas
+                                fa-chevron-right
+                                po-list-item__arrow
+                            "
+                        ></i>
+
+                    </a>
+
+                <?php endforeach; ?>
+
+            </div>
+
+        <?php endif; ?>
+
+    </section>
+
+
+    <!-- QUICK ACTIONS -->
+
+    <section class="po-card">
+
+        <div class="po-card__header">
+
+            <div>
+
+                <h3>
+                    Quick Actions
+                </h3>
+
+                <p>
+                    Frequently used programme operations.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="po-quick-actions">
+
+            <a
+                href="<?= url(
+                    'programme_officer/cohorts.php'
+                ) ?>"
+                class="po-quick-action"
+            >
+
+                <span class="po-quick-action__icon">
+                    <i class="fas fa-layer-group"></i>
+                </span>
+
+                <div>
+
+                    <strong>
+                        Review Cohorts
+                    </strong>
+
+                    <span>
+                        Monitor cohort delivery and
+                        timelines.
+                    </span>
+
+                </div>
+
+            </a>
+
+
+            <a
+                href="<?= url(
+                    'programme_officer/candidates.php'
+                ) ?>"
+                class="po-quick-action"
+            >
+
+                <span class="po-quick-action__icon">
+                    <i class="fas fa-users"></i>
+                </span>
+
+                <div>
+
+                    <strong>
+                        Candidate Overview
+                    </strong>
+
+                    <span>
+                        View participants across your
+                        programmes.
+                    </span>
+
+                </div>
+
+            </a>
+
+
+            <a
+                href="<?= url(
+                    'programme_officer/reports.php'
+                ) ?>"
+                class="po-quick-action"
+            >
+
+                <span class="po-quick-action__icon">
+                    <i class="fas fa-chart-line"></i>
+                </span>
+
+                <div>
+
+                    <strong>
+                        Programme Reports
+                    </strong>
+
+                    <span>
+                        Review progress and completion
+                        metrics.
+                    </span>
+
+                </div>
+
+            </a>
+
+        </div>
+
+    </section>
+
+</div>
+
+
+<!-- =========================================================
+     RECENT REAL CANDIDATE ACTIVITY
+========================================================= -->
+
+<section class="po-card">
+
+    <div class="po-card__header">
+
+        <div>
+
+            <h3>
+                Recent Candidate Activity
+            </h3>
+
+            <p>
+                Latest candidate movement in your
+                programme portfolio.
+            </p>
+
+        </div>
+
+        <a
+            class="po-link"
+            href="<?= url(
+                'programme_officer/candidates.php'
+            ) ?>"
+        >
+
+            View candidates
+
+            <i class="fas fa-arrow-right"></i>
+
+        </a>
+
+    </div>
+
+
+    <?php if (!$recentCandidates): ?>
+
+        <div class="po-empty">
+
+            <div class="po-empty__icon">
+
+                <i class="fas fa-users"></i>
+
+            </div>
+
+            <strong>
+                No candidate activity yet
+            </strong>
+
+            <span>
+                No cohort participant records are
+                currently available.
+            </span>
+
+        </div>
+
+    <?php else: ?>
+
+        <div class="po-candidate-grid">
+
+            <?php foreach (
+                $recentCandidates as $candidate
+            ): ?>
+
+                <?php
+
+                $candidateFirst =
+                    trim(
+                        (string) (
+                            $candidate['first_name']
+                            ?? ''
+                        )
+                    );
+
+                $candidateLast =
+                    trim(
+                        (string) (
+                            $candidate['last_name']
+                            ?? ''
+                        )
+                    );
+
+                $candidateName =
+                    trim(
+                        $candidateFirst
+                        . ' '
+                        . $candidateLast
+                    );
+
+                if ($candidateName === '') {
+                    $candidateName = 'Candidate';
+                }
+
+                ?>
+
+                <article class="po-person-card">
+
+                    <div class="po-person-card__top">
+
+                        <div class="po-avatar">
+
+                            <?= e(
+                                po_initials(
+                                    $candidateFirst,
+                                    $candidateLast
+                                )
+                            ) ?>
+
+                        </div>
+
+
+                        <div
+                            class="
+                                po-person-card__identity
+                            "
+                        >
+
+                            <strong>
+                                <?= e($candidateName) ?>
+                            </strong>
+
+                            <span>
+                                <?= e(
+                                    $candidate[
+                                        'programme_name'
+                                    ]
+                                ) ?>
+                            </span>
+
+                        </div>
+
+
+                        <span
+                            class="
+                                po-status
+                                po-status--<?= e(
+                                    po_status_class(
+                                        $candidate[
+                                            'participant_status'
+                                        ]
+                                    )
+                                ) ?>
+                            "
+                        >
+
+                            <?= e(
+                                po_status_label(
+                                    $candidate[
+                                        'participant_status'
+                                    ]
+                                )
+                            ) ?>
+
+                        </span>
+
+                    </div>
+
+
+                    <div
+                        class="
+                            po-person-card__footer
+                        "
+                    >
+
+                        <span>
+
+                            <i
+                                class="
+                                    fas
+                                    fa-layer-group
+                                "
+                            ></i>
+
+                            <?= e(
+                                $candidate[
+                                    'cohort_name'
+                                ]
+                            ) ?>
+
+                        </span>
+
+
+                        <a
+                            href="<?= url(
+                                'programme_officer/'
+                                . 'candidate_view.php'
+                                . '?id='
+                                . (int) $candidate[
+                                    'candidate_id'
+                                ]
+                                . '&cohort_id='
+                                . (int) $candidate[
+                                    'cohort_id'
+                                ]
+                            ) ?>"
+                        >
+
+                            View
+
+                            <i
+                                class="
+                                    fas
+                                    fa-arrow-right
+                                "
+                            ></i>
+
+                        </a>
+
+                    </div>
+
+                </article>
+
+            <?php endforeach; ?>
+
+        </div>
+
+    <?php endif; ?>
+
+</section>
+
+
+<!-- =========================================================
+     ASSESSMENT & INTERVIEW MONITORING
+========================================================= -->
+
+<section class="po-card po-monitoring">
+
+    <div class="po-card__header">
+
+        <div>
+
+            <h3>
+                Assessment &amp; Interview Monitoring
+            </h3>
+
+            <p>
+                Outstanding assessments, upcoming interviews
+                and candidates requiring follow-up across
+                your portfolio.
+            </p>
+
+        </div>
+
+    </div>
+
+    <?php if (!$monitoringAvailable): ?>
+
+        <div class="po-empty">
+
+            <div class="po-empty__icon">
+
+                <i class="fas fa-clipboard-check"></i>
+
+            </div>
+
+            <strong>
+                Monitoring not configured
+            </strong>
+
+            <span>
+                No assessment or interview tables are
+                available for this Programme Officer workspace.
+            </span>
+
+        </div>
+
+    <?php else: ?>
+
+        <!-- METRIC CARDS -->
+
+        <div class="po-monitoring__metrics">
+
+            <article
+                class="
+                    po-monitoring-metric
+                    po-monitoring-metric--amber
+                    po-stat--interactive
+                "
+                tabindex="0"
+                role="button"
+                data-po-modal="assessments"
+                aria-label="View pending assessments"
+            >
+                <span class="po-monitoring-metric__icon">
+                    <i class="fas fa-clipboard-list"></i>
+                </span>
+                <div>
+                    <strong><?= number_format((int) $assessmentMetrics['pending']) ?></strong>
+                    <span>Pending Assessments</span>
+                    <small>
+                        <?= number_format((int) $assessmentMetrics['due_soon']) ?>
+                        due this week
+                    </small>
+                </div>
+            </article>
+
+            <article
+                class="
+                    po-monitoring-metric
+                    po-monitoring-metric--red
+                    po-stat--interactive
+                "
+                tabindex="0"
+                role="button"
+                data-po-modal="assessments"
+                aria-label="View overdue assessments"
+            >
+                <span class="po-monitoring-metric__icon">
+                    <i class="fas fa-triangle-exclamation"></i>
+                </span>
+                <div>
+                    <strong><?= number_format((int) $assessmentMetrics['overdue']) ?></strong>
+                    <span>Overdue Assessments</span>
+                    <small>Past due date</small>
+                </div>
+            </article>
+
+            <article
+                class="
+                    po-monitoring-metric
+                    po-monitoring-metric--blue
+                    po-stat--interactive
+                "
+                tabindex="0"
+                role="button"
+                data-po-modal="interviews"
+                aria-label="View upcoming interviews"
+            >
+                <span class="po-monitoring-metric__icon">
+                    <i class="fas fa-calendar-check"></i>
+                </span>
+                <div>
+                    <strong><?= number_format((int) $interviewMetrics['upcoming']) ?></strong>
+                    <span>Upcoming Interviews</span>
+                    <small>
+                        <?= number_format((int) $interviewMetrics['this_week']) ?>
+                        this week
+                    </small>
+                </div>
+            </article>
+
+            <article
+                class="
+                    po-monitoring-metric
+                    po-monitoring-metric--purple
+                    po-stat--interactive
+                "
+                tabindex="0"
+                role="button"
+                data-po-modal="assessments"
+                aria-label="View candidates requiring follow-up"
+            >
+                <span class="po-monitoring-metric__icon">
+                    <i class="fas fa-user-clock"></i>
+                </span>
+                <div>
+                    <strong><?= number_format($followUpCount) ?></strong>
+                    <span>Follow-ups Needed</span>
+                    <small>Overdue or missed</small>
+                </div>
+            </article>
+
+        </div>
+
+
+        <!-- TWO COLUMN PANELS -->
+
+        <div class="po-monitoring__grid">
+
+            <!-- UPCOMING INTERVIEWS -->
+
+            <div class="po-monitoring-panel">
+
+                <h4>Upcoming Interviews</h4>
+                <p>Next scheduled candidate interviews.</p>
+
+                <?php if (!$upcomingInterviewsPreview): ?>
+
+                    <div class="po-empty po-empty--compact">
+
+                        <div class="po-empty__icon">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+
+                        <strong>No upcoming interviews</strong>
+                        <span>No interviews are currently scheduled.</span>
+
+                    </div>
+
+                <?php else: ?>
+
+                    <div class="po-monitoring-list">
+
+                        <?php foreach ($upcomingInterviewsPreview as $row): ?>
+
+                            <?php
+                            $fn = trim((string) ($row['first_name'] ?? ''));
+                            $ln = trim((string) ($row['last_name'] ?? ''));
+                            $name = trim($fn . ' ' . $ln) ?: 'Candidate';
+                            ?>
+
+                            <a
+                                class="po-monitoring-row"
+                                href="<?= url(
+                                    'programme_officer/candidate_view.php?id='
+                                    . (int) $row['candidate_id']
+                                    . '&cohort_id='
+                                    . (int) $row['cohort_id']
+                                ) ?>"
+                            >
+                                <span class="po-dashboard-modal__avatar">
+                                    <?= e(po_initials($fn, $ln)) ?>
+                                </span>
+
+                                <span class="po-monitoring-row__main">
+                                    <strong><?= e($name) ?></strong>
+                                    <small>
+                                        <?= e($row['interview_title'] ?? 'Interview') ?>
+                                        ·
+                                        <?= e($row['programme_name'] ?? '') ?>
+                                    </small>
+                                </span>
+
+                                <span class="po-monitoring-row__meta">
+                                    <span class="po-monitoring-row__date">
+                                        <?= e(po_mon_relative(
+                                            $row['effective_scheduled_at'] ?? null
+                                        )) ?>
+                                    </span>
+                                    <span class="po-status po-status--<?= e(
+                                        po_status_class($row['schedule_status'] ?? '')
+                                    ) ?>">
+                                        <?= e(po_mon_status_label(
+                                            $row['schedule_status'] ?? ''
+                                        )) ?>
+                                    </span>
+                                </span>
+                            </a>
+
+                        <?php endforeach; ?>
+
+                    </div>
+
+                <?php endif; ?>
+
+            </div>
+
+
+            <!-- OVERDUE ASSESSMENTS -->
+
+            <div class="po-monitoring-panel">
+
+                <h4>Overdue Assessments</h4>
+                <p>Candidates who missed an assessment deadline.</p>
+
+                <?php if (!$overdueAssessmentsPreview): ?>
+
+                    <div class="po-empty po-empty--compact">
+
+                        <div class="po-empty__icon">
+                            <i class="fas fa-circle-check"></i>
+                        </div>
+
+                        <strong>No overdue assessments</strong>
+                        <span>Everyone is on track.</span>
+
+                    </div>
+
+                <?php else: ?>
+
+                    <div class="po-monitoring-list">
+
+                        <?php foreach ($overdueAssessmentsPreview as $row): ?>
+
+                            <?php
+                            $fn = trim((string) ($row['first_name'] ?? ''));
+                            $ln = trim((string) ($row['last_name'] ?? ''));
+                            $name = trim($fn . ' ' . $ln) ?: 'Candidate';
+                            ?>
+
+                            <a
+                                class="po-monitoring-row"
+                                href="<?= url(
+                                    'programme_officer/candidate_view.php?id='
+                                    . (int) $row['candidate_id']
+                                    . '&cohort_id='
+                                    . (int) $row['cohort_id']
+                                ) ?>"
+                            >
+                                <span class="po-dashboard-modal__avatar">
+                                    <?= e(po_initials($fn, $ln)) ?>
+                                </span>
+
+                                <span class="po-monitoring-row__main">
+                                    <strong><?= e($name) ?></strong>
+                                    <small>
+                                        <?= e($row['assessment_title'] ?? 'Assessment') ?>
+                                        ·
+                                        <?= e($row['cohort_name'] ?? '') ?>
+                                    </small>
+                                </span>
+
+                                <span class="po-monitoring-row__meta">
+                                    <span
+                                        class="
+                                            po-monitoring-row__date
+                                            po-monitoring-row__date--overdue
+                                        "
+                                    >
+                                        <?= e(po_mon_relative(
+                                            $row['assessment_due_date'] ?? null
+                                        )) ?>
+                                    </span>
+                                    <span class="po-status po-status--danger">
+                                        Overdue
+                                    </span>
+                                </span>
+                            </a>
+
+                        <?php endforeach; ?>
+
+                    </div>
+
+                <?php endif; ?>
+
+            </div>
+
+        </div>
+
+    <?php endif; ?>
+
+</section>
+
+
+
+<!-- =========================================================
+     DASHBOARD DETAIL MODAL
+========================================================= -->
+
+<div
+    class="po-dashboard-modal"
+    id="poDashboardModal"
+    aria-hidden="true"
+>
+    <div class="po-dashboard-modal__backdrop" data-po-modal-close></div>
+
+    <section
+        class="po-dashboard-modal__dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="poDashboardModalTitle"
+    >
+        <header class="po-dashboard-modal__header">
+            <div>
+                <span class="po-dashboard-modal__eyebrow">
+                    Programme Officer Dashboard
+                </span>
+                <h3 id="poDashboardModalTitle">Details</h3>
+                <p id="poDashboardModalSubtitle"></p>
+            </div>
+
+            <button
+                type="button"
+                class="po-dashboard-modal__close"
+                data-po-modal-close
+                aria-label="Close modal"
+            >
+                <i class="fas fa-xmark"></i>
+            </button>
+        </header>
+
+        <div class="po-dashboard-modal__body">
+
+            <div class="po-dashboard-modal__panel" data-po-panel="programmes">
+                <?php if (!$modalProgrammes): ?>
+                    <div class="po-dashboard-modal__empty">
+                        <i class="fas fa-diagram-project"></i>
+                        <strong>No programmes available</strong>
+                        <span>No programmes are assigned to this Programme Officer.</span>
+                    </div>
+                <?php else: ?>
+                    <div class="po-dashboard-modal__list">
+                        <?php foreach ($modalProgrammes as $programme): ?>
+                            <a
+                                class="po-dashboard-modal__row"
+                                href="<?= url(
+                                    'programme_officer/cohorts.php?programme_id='
+                                    . (int) $programme['id']
+                                ) ?>"
+                            >
+                                <span class="po-dashboard-modal__row-icon">
+                                    <i class="fas fa-diagram-project"></i>
+                                </span>
+
+                                <span class="po-dashboard-modal__row-main">
+                                    <strong><?= e($programme['name']) ?></strong>
+                                    <small>
+                                        <?= e(po_status_label($programme['type'] ?? 'programme')) ?>
+                                        ·
+                                        <?= e(po_date($programme['start_date'] ?? null)) ?>
+                                        –
+                                        <?= e(po_date($programme['end_date'] ?? null)) ?>
+                                    </small>
+                                </span>
+
+                                <span class="po-status po-status--<?= e(
+                                    po_status_class($programme['status'] ?? '')
+                                ) ?>">
+                                    <?= e(po_status_label($programme['status'] ?? '')) ?>
+                                </span>
+
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <div class="po-dashboard-modal__panel" data-po-panel="cohorts">
+                <?php if (!$modalCohorts): ?>
+                    <div class="po-dashboard-modal__empty">
+                        <i class="fas fa-layer-group"></i>
+                        <strong>No cohorts available</strong>
+                        <span>No cohorts are available in your assigned programmes.</span>
+                    </div>
+                <?php else: ?>
+                    <div class="po-dashboard-modal__list">
+                        <?php foreach ($modalCohorts as $cohort): ?>
+                            <a
+                                class="po-dashboard-modal__row"
+                                href="<?= url(
+                                    'programme_officer/cohort_view.php?id='
+                                    . (int) $cohort['id']
+                                ) ?>"
+                            >
+                                <span class="po-dashboard-modal__row-icon">
+                                    <i class="fas fa-layer-group"></i>
+                                </span>
+
+                                <span class="po-dashboard-modal__row-main">
+                                    <strong><?= e($cohort['name']) ?></strong>
+                                    <small>
+                                        <?= e($cohort['programme_name']) ?>
+                                        <?php if (!empty($cohort['location'])): ?>
+                                            · <?= e($cohort['location']) ?>
+                                        <?php endif; ?>
+                                    </small>
+                                </span>
+
+                                <span class="po-status po-status--<?= e(
+                                    po_status_class($cohort['status'] ?? '')
+                                ) ?>">
+                                    <?= e(po_status_label($cohort['status'] ?? '')) ?>
+                                </span>
+
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <?php
+            $candidatePanels = [
+                'candidates' => $modalCandidates,
+                'active' => $modalActiveCandidates,
+                'completed' => $modalCompletedCandidates,
+            ];
+            ?>
+
+            <?php foreach ($candidatePanels as $panelName => $panelCandidates): ?>
+                <div
+                    class="po-dashboard-modal__panel"
+                    data-po-panel="<?= e($panelName) ?>"
+                >
+                    <?php if (!$panelCandidates): ?>
+                        <div class="po-dashboard-modal__empty">
+                            <i class="fas fa-users"></i>
+                            <strong>No candidates available</strong>
+                            <span>
+                                There are no <?= e($panelName) ?> candidate records
+                                in your current Programme Officer scope.
+                            </span>
+                        </div>
+                    <?php else: ?>
+                        <div class="po-dashboard-modal__list">
+                            <?php foreach ($panelCandidates as $candidate): ?>
+                                <?php
+                                $candidateFirst = trim((string)($candidate['first_name'] ?? ''));
+                                $candidateLast = trim((string)($candidate['last_name'] ?? ''));
+                                $candidateName = trim($candidateFirst . ' ' . $candidateLast);
+
+                                if ($candidateName === '') {
+                                    $candidateName = 'Candidate';
+                                }
+                                ?>
+
+                                <a
+                                    class="po-dashboard-modal__row"
+                                    href="<?= url(
+                                        'programme_officer/candidate_view.php?id='
+                                        . (int) $candidate['candidate_id']
+                                        . '&cohort_id='
+                                        . (int) $candidate['cohort_id']
+                                    ) ?>"
+                                >
+                                    <span class="po-dashboard-modal__avatar">
+                                        <?= e(po_initials($candidateFirst, $candidateLast)) ?>
+                                    </span>
+
+                                    <span class="po-dashboard-modal__row-main">
+                                        <strong><?= e($candidateName) ?></strong>
+                                        <small>
+                                            <?= e($candidate['programme_name']) ?>
+                                            ·
+                                            <?= e($candidate['cohort_name']) ?>
+                                        </small>
+                                    </span>
+
+                                    <span class="po-status po-status--<?= e(
+                                        po_status_class(
+                                            $candidate['participant_status'] ?? ''
+                                        )
+                                    ) ?>">
+                                        <?= e(po_status_label(
+                                            $candidate['participant_status'] ?? ''
+                                        )) ?>
+                                    </span>
+
+                                    <i class="fas fa-chevron-right"></i>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+
+
+            <!-- ASSESSMENT MODAL PANEL -->
+            <div class="po-dashboard-modal__panel" data-po-panel="assessments">
+
+                <?php if (!$assessmentModalItems): ?>
+
+                    <div class="po-dashboard-modal__empty">
+                        <i class="fas fa-clipboard-check"></i>
+                        <strong>No outstanding assessments</strong>
+                        <span>Every candidate is up to date.</span>
+                    </div>
+
+                <?php else: ?>
+
+                    <div class="po-dashboard-modal__list">
+
+                        <?php foreach ($assessmentModalItems as $row): ?>
+
+                            <?php
+                            $fn = trim((string) ($row['first_name'] ?? ''));
+                            $ln = trim((string) ($row['last_name'] ?? ''));
+                            $name = trim($fn . ' ' . $ln) ?: 'Candidate';
+
+                            $dueTs = !empty($row['assessment_due_date'])
+                                ? strtotime((string) $row['assessment_due_date'])
+                                : null;
+
+                            $isOverdue = $dueTs !== null && $dueTs < time();
+                            ?>
+
+                            <a
+                                class="po-dashboard-modal__row"
+                                href="<?= url(
+                                    'programme_officer/candidate_view.php?id='
+                                    . (int) $row['candidate_id']
+                                    . '&cohort_id='
+                                    . (int) $row['cohort_id']
+                                ) ?>"
+                            >
+                                <span class="po-dashboard-modal__avatar">
+                                    <?= e(po_initials($fn, $ln)) ?>
+                                </span>
+
+                                <span class="po-dashboard-modal__row-main">
+                                    <strong><?= e($name) ?></strong>
+                                    <small>
+                                        <?= e($row['assessment_title'] ?? 'Assessment') ?>
+                                        ·
+                                        <?= e($row['programme_name'] ?? '') ?>
+                                        ·
+                                        <?= e(po_date($row['assessment_due_date'] ?? null)) ?>
+                                    </small>
+                                </span>
+
+                                <span class="po-status po-status--<?= $isOverdue
+                                    ? 'danger'
+                                    : e(po_status_class($row['submission_status'] ?? '')) ?>">
+                                    <?= $isOverdue
+                                        ? 'Overdue'
+                                        : e(po_mon_status_label(
+                                            $row['submission_status'] ?? ''
+                                        )) ?>
+                                </span>
+
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+
+                        <?php endforeach; ?>
+
+                    </div>
+
+                <?php endif; ?>
+
+            </div>
+
+
+            <!-- INTERVIEW MODAL PANEL -->
+            <div class="po-dashboard-modal__panel" data-po-panel="interviews">
+
+                <?php if (!$interviewModalItems): ?>
+
+                    <div class="po-dashboard-modal__empty">
+                        <i class="fas fa-calendar-check"></i>
+                        <strong>No scheduled interviews</strong>
+                        <span>No candidate interviews are currently scheduled.</span>
+                    </div>
+
+                <?php else: ?>
+
+                    <div class="po-dashboard-modal__list">
+
+                        <?php foreach ($interviewModalItems as $row): ?>
+
+                            <?php
+                            $fn = trim((string) ($row['first_name'] ?? ''));
+                            $ln = trim((string) ($row['last_name'] ?? ''));
+                            $name = trim($fn . ' ' . $ln) ?: 'Candidate';
+                            ?>
+
+                            <a
+                                class="po-dashboard-modal__row"
+                                href="<?= url(
+                                    'programme_officer/candidate_view.php?id='
+                                    . (int) $row['candidate_id']
+                                    . '&cohort_id='
+                                    . (int) $row['cohort_id']
+                                ) ?>"
+                            >
+                                <span class="po-dashboard-modal__avatar">
+                                    <?= e(po_initials($fn, $ln)) ?>
+                                </span>
+
+                                <span class="po-dashboard-modal__row-main">
+                                    <strong><?= e($name) ?></strong>
+                                    <small>
+                                        <?= e($row['interview_title'] ?? 'Interview') ?>
+                                        ·
+                                        <?= e($row['programme_name'] ?? '') ?>
+                                        ·
+                                        <?= e(po_datetime(
+                                            $row['effective_scheduled_at'] ?? null
+                                        )) ?>
+                                    </small>
+                                </span>
+
+                                <span class="po-status po-status--<?= e(
+                                    po_status_class($row['schedule_status'] ?? '')
+                                ) ?>">
+                                    <?= e(po_mon_status_label(
+                                        $row['schedule_status'] ?? ''
+                                    )) ?>
+                                </span>
+
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+
+                        <?php endforeach; ?>
+
+                    </div>
+
+                <?php endif; ?>
+
+            </div>
+
+        </div>
+
+        <footer class="po-dashboard-modal__footer">
+            <button
+                type="button"
+                class="po-btn po-btn--secondary"
+                data-po-modal-close
+            >
+                Close
+            </button>
+
+            <a
+                href="<?= url('programme_officer/programmes.php') ?>"
+                class="po-btn po-btn--primary"
+                id="poDashboardModalAction"
+            >
+                View all
+                <i class="fas fa-arrow-right"></i>
+            </a>
+        </footer>
+    </section>
+</div>
+
+<style>
+.po-stat--interactive {
+    position: relative;
+    cursor: pointer;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.po-stat--interactive:hover,
+.po-stat--interactive:focus-visible {
+    transform: translateY(-3px);
+    border-color: var(--po-primary);
+    box-shadow: var(--po-shadow-lg);
+    outline: none;
+}
+.po-stat__hint {
+    margin-top: 12px !important;
+    display: flex !important;
+    align-items: center;
+    gap: 6px;
+    color: var(--po-primary) !important;
+    font-size: .75rem !important;
+    font-weight: 700;
+}
+.po-stat__hint i { font-size: .7rem; }
+
+.po-dashboard-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+.po-dashboard-modal.is-open { display: flex; }
+.po-dashboard-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 6, 23, .66);
+    backdrop-filter: blur(4px);
+}
+.po-dashboard-modal__dialog {
+    width: min(820px, 100%);
+    max-height: min(760px, calc(100vh - 48px));
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--po-border);
+    border-radius: 20px;
+    background: var(--po-surface);
+    box-shadow: 0 30px 80px rgba(2, 6, 23, .3);
+}
+.po-dashboard-modal__header {
+    padding: 20px 22px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    border-bottom: 1px solid var(--po-border);
+}
+.po-dashboard-modal__eyebrow {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--po-primary);
+    font-size: .6875rem !important;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.po-dashboard-modal__header h3 {
+    margin: 0;
+    color: var(--po-text);
+    font-size: 1.125rem !important;
+}
+.po-dashboard-modal__header p {
+    margin: 5px 0 0;
+    color: var(--po-muted);
+    font-size: .8125rem !important;
+}
+.po-dashboard-modal__close {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--po-border);
+    border-radius: 10px;
+    background: var(--po-soft);
+    color: var(--po-muted);
+    cursor: pointer;
+}
+.po-dashboard-modal__body {
+    min-height: 180px;
+    padding: 12px 20px;
+    overflow-y: auto;
+}
+.po-dashboard-modal__panel { display: none; }
+.po-dashboard-modal__panel.is-active { display: block; }
+.po-dashboard-modal__list { display: grid; }
+.po-dashboard-modal__row {
+    min-width: 0;
+    padding: 14px 4px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--po-border-light);
+    color: var(--po-text);
+    text-decoration: none;
+}
+.po-dashboard-modal__row:last-child { border-bottom: 0; }
+.po-dashboard-modal__row:hover .po-dashboard-modal__row-main strong {
+    color: var(--po-primary);
+}
+.po-dashboard-modal__row-icon,
+.po-dashboard-modal__avatar {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 11px;
+    background: var(--po-primary-soft);
+    color: var(--po-primary);
+    font-size: .8125rem !important;
+    font-weight: 800;
+}
+.po-dashboard-modal__avatar {
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    color: #fff;
+}
+.po-dashboard-modal__row-main {
+    min-width: 0;
+    flex: 1;
+}
+.po-dashboard-modal__row-main strong {
+    display: block;
+    overflow: hidden;
+    color: var(--po-text);
+    font-size: .875rem !important;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.po-dashboard-modal__row-main small {
+    display: block;
+    margin-top: 4px;
+    overflow: hidden;
+    color: var(--po-muted);
+    font-size: .75rem !important;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.po-dashboard-modal__row > .fa-chevron-right {
+    color: var(--po-subtle);
+    font-size: .75rem;
+}
+.po-dashboard-modal__empty {
+    padding: 48px 20px;
+    display: grid;
+    justify-items: center;
+    text-align: center;
+}
+.po-dashboard-modal__empty > i {
+    width: 52px;
+    height: 52px;
+    margin-bottom: 12px;
+    display: grid;
+    place-items: center;
+    border-radius: 14px;
+    background: var(--po-primary-soft);
+    color: var(--po-primary);
+}
+.po-dashboard-modal__empty strong {
+    color: var(--po-text);
+    font-size: .875rem !important;
+}
+.po-dashboard-modal__empty span {
+    max-width: 420px;
+    margin-top: 5px;
+    color: var(--po-muted);
+    font-size: .8125rem !important;
+}
+.po-dashboard-modal__footer {
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 9px;
+    border-top: 1px solid var(--po-border);
+    background: var(--po-soft);
+}
+body.po-dashboard-modal-open { overflow: hidden; }
+
+/* =========================================================
+   Assessment & Interview Monitoring
+========================================================= */
+
+.po-monitoring__metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--po-border-light);
+}
+
+.po-monitoring-metric {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--po-border);
+    border-radius: 14px;
+    background: var(--po-soft);
+    cursor: pointer;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.po-monitoring-metric:hover,
+.po-monitoring-metric:focus-visible {
+    transform: translateY(-2px);
+    border-color: var(--po-primary);
+    box-shadow: var(--po-shadow-lg);
+    outline: none;
+}
+.po-monitoring-metric__icon {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 11px;
+    background: var(--po-primary-soft);
+    color: var(--po-primary);
+    font-size: .875rem;
+}
+.po-monitoring-metric--amber  .po-monitoring-metric__icon { background: #fef3c7; color: #b45309; }
+.po-monitoring-metric--red    .po-monitoring-metric__icon { background: #fee2e2; color: #b91c1c; }
+.po-monitoring-metric--blue   .po-monitoring-metric__icon { background: #dbeafe; color: #1d4ed8; }
+.po-monitoring-metric--purple .po-monitoring-metric__icon { background: #ede9fe; color: #6d28d9; }
+
+.po-monitoring-metric strong {
+    display: block;
+    color: var(--po-text);
+    font-size: 1.25rem !important;
+    line-height: 1.1;
+}
+.po-monitoring-metric span {
+    display: block;
+    margin-top: 2px;
+    color: var(--po-text);
+    font-size: .8125rem !important;
+    font-weight: 600;
+}
+.po-monitoring-metric small {
+    display: block;
+    margin-top: 4px;
+    color: var(--po-muted);
+    font-size: .6875rem !important;
+}
+
+.po-monitoring__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.po-monitoring-panel { padding: 18px 20px; }
+.po-monitoring-panel + .po-monitoring-panel {
+    border-left: 1px solid var(--po-border-light);
+}
+.po-monitoring-panel h4 {
+    margin: 0 0 4px;
+    color: var(--po-text);
+    font-size: .9375rem !important;
+}
+.po-monitoring-panel > p {
+    margin: 0 0 12px;
+    color: var(--po-muted);
+    font-size: .75rem !important;
+}
+
+.po-monitoring-list { display: grid; gap: 8px; }
+
+.po-monitoring-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--po-border-light);
+    border-radius: 12px;
+    background: var(--po-surface);
+    color: var(--po-text);
+    text-decoration: none;
+    transition: border-color .15s ease, background .15s ease;
+}
+.po-monitoring-row:hover {
+    border-color: var(--po-primary);
+    background: var(--po-soft);
+}
+.po-monitoring-row__main { min-width: 0; flex: 1; }
+.po-monitoring-row__main strong {
+    display: block;
+    overflow: hidden;
+    color: var(--po-text);
+    font-size: .8125rem !important;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.po-monitoring-row__main small {
+    display: block;
+    margin-top: 3px;
+    overflow: hidden;
+    color: var(--po-muted);
+    font-size: .6875rem !important;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.po-monitoring-row__meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    flex: 0 0 auto;
+}
+.po-monitoring-row__date {
+    color: var(--po-muted);
+    font-size: .6875rem !important;
+    font-weight: 600;
+}
+.po-monitoring-row__date--overdue { color: #b91c1c; }
+
+.po-empty--compact { padding: 24px 12px; }
+
+@media (max-width: 900px) {
+    .po-monitoring__metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .po-monitoring__grid {
+        grid-template-columns: 1fr;
+    }
+    .po-monitoring-panel + .po-monitoring-panel {
+        border-left: 0;
+        border-top: 1px solid var(--po-border-light);
+    }
+}
+@media (max-width: 520px) {
+    .po-monitoring__metrics {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .po-dashboard-modal {
+        padding: 10px;
+        align-items: flex-end;
+    }
+    .po-dashboard-modal__dialog {
+        max-height: calc(100vh - 20px);
+        border-radius: 18px;
+    }
+    .po-dashboard-modal__header {
+        padding: 16px;
+    }
+    .po-dashboard-modal__body {
+        padding: 8px 14px;
+    }
+    .po-dashboard-modal__row {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+    .po-dashboard-modal__row-main {
+        flex: 1 1 calc(100% - 58px);
+    }
+    .po-dashboard-modal__row .po-status {
+        margin-left: 54px;
+    }
+    .po-dashboard-modal__footer {
+        padding: 12px 14px;
+    }
+}
+</style>
+
+<script>
+(function () {
+    'use strict';
+
+    const modal = document.getElementById('poDashboardModal');
+
+    if (!modal) {
+        return;
+    }
+
+    const title = document.getElementById('poDashboardModalTitle');
+    const subtitle = document.getElementById('poDashboardModalSubtitle');
+    const action = document.getElementById('poDashboardModalAction');
+    const cards = document.querySelectorAll('[data-po-modal]');
+    const panels = modal.querySelectorAll('[data-po-panel]');
+    const closeButtons = modal.querySelectorAll('[data-po-modal-close]');
+
+    const config = {
+        programmes: {
+            title: 'My Programmes',
+            subtitle: 'Programmes assigned to your Programme Officer account.',
+            url: <?= json_encode(url('programme_officer/programmes.php')) ?>
+        },
+        cohorts: {
+            title: 'Cohorts',
+            subtitle: 'Cohorts within your assigned programmes.',
+            url: <?= json_encode(url('programme_officer/cohorts.php')) ?>
+        },
+        candidates: {
+            title: 'Current Candidates',
+            subtitle: 'Current non-withdrawn candidates across your programme portfolio.',
+            url: <?= json_encode(url('programme_officer/candidates.php')) ?>
+        },
+        active: {
+            title: 'Active Candidates',
+            subtitle: 'Candidates whose current participant status is Active.',
+            url: <?= json_encode(url('programme_officer/candidates.php?status=active')) ?>
+        },
+        completed: {
+            title: 'Completed Candidates',
+            subtitle: 'Candidates whose current participant status is Completed.',
+            url: <?= json_encode(url('programme_officer/candidates.php?status=completed')) ?>
+        },
+        assessments: {
+            title: 'Outstanding Assessments',
+            subtitle: 'Pending and overdue assessments across your programmes.',
+            url: <?= json_encode(url('programme_officer/candidates.php')) ?>
+        },
+        interviews: {
+            title: 'Scheduled Interviews',
+            subtitle: 'Upcoming candidate interviews across your programmes.',
+            url: <?= json_encode(url('programme_officer/candidates.php')) ?>
+        }
+    };
+
+    let lastTrigger = null;
+
+    function openModal(key, trigger) {
+        const item = config[key];
+
+        if (!item) {
+            return;
+        }
+
+        lastTrigger = trigger || null;
+
+        panels.forEach(function (panel) {
+            panel.classList.toggle(
+                'is-active',
+                panel.getAttribute('data-po-panel') === key
+            );
+        });
+
+        title.textContent = item.title;
+        subtitle.textContent = item.subtitle;
+        action.href = item.url;
+
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('po-dashboard-modal-open');
+
+        const closeButton = modal.querySelector('.po-dashboard-modal__close');
+
+        if (closeButton) {
+            closeButton.focus();
+        }
+    }
+
+    function closeModal() {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('po-dashboard-modal-open');
+
+        if (lastTrigger) {
+            lastTrigger.focus();
+        }
+    }
+
+    cards.forEach(function (card) {
+        card.addEventListener('click', function () {
+            openModal(card.getAttribute('data-po-modal'), card);
+        });
+
+        card.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openModal(card.getAttribute('data-po-modal'), card);
+            }
+        });
+    });
+
+    closeButtons.forEach(function (button) {
+        button.addEventListener('click', closeModal);
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+            closeModal();
+        }
+    });
+})();
+</script>
+
+
+<!-- =========================================================
+     ACCESS INFORMATION
+========================================================= -->
+
+<div class="po-security">
+
+    <i class="fas fa-shield-halved"></i>
+
+    <div>
+
+        <strong>
+            Programme Officer scoped access
+        </strong>
+
+        <span>
+
+            <?php if ($scopeMode === 'programme'): ?>
+
+                Information is restricted using
+                programmes.programme_officer_id.
+
+            <?php elseif ($scopeMode === 'cohort'): ?>
+
+                Information is restricted using
+                cohorts.programme_officer_id.
+
+            <?php elseif ($scopeMode === 'portfolio'): ?>
+
+                The current database has no Programme Officer
+                assignment column, so this account is operating
+                with portfolio-level Programme Officer access.
+
+            <?php else: ?>
+
+                No Programme Officer data scope is currently
+                available.
+
+            <?php endif; ?>
+
+        </span>
+
+    </div>
+
+</div>
+<?php
+
+//require __DIR__ . '/_layout_end.php';
+
+require_once __DIR__ . '/../includes/bootstrap.php';
+
+require_role('programme_officer');
+
+require_once __DIR__ . '/_helpers.php';
+
+/*
+|--------------------------------------------------------------------------
+| Current User
+|--------------------------------------------------------------------------
+*/
+$user = current_user();
+$flashes = render_flashes();
+$currentPage = 'dashboard';
+$pageTitle = 'Programme Officer Dashboard';
+$conn = Database::getConnection();
+/*
+|--------------------------------------------------------------------------
+| Programme Officer
+|--------------------------------------------------------------------------
+*/
 
 $officerId = (int) (
 
