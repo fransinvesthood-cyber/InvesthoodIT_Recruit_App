@@ -138,37 +138,111 @@ if ($hasTables) {
 
 require __DIR__.'/_layout_start.php';
 ?>
+
 <style>
+/* ---------- Theme Tokens ---------- */
+:root {
+    --doc-bg-soft: rgba(127,127,127,.08);
+    --doc-bg-hover: rgba(127,127,127,.04);
+    --doc-indigo: #4f46e5;
+    --doc-indigo-soft: rgba(79,70,229,.12);
+    --doc-orange: #b45309; 
+    --doc-orange-soft: rgba(245,158,11,.15);
+    --doc-green: #15803d; 
+    --doc-green-soft: rgba(34,197,94,.15);
+    --doc-red: #b91c1c; 
+    --doc-red-soft: rgba(239,68,68,.15);
+    --doc-blue: #1d4ed8; 
+    --doc-blue-soft: rgba(59,130,246,.15);
+    --doc-purple: #7e22ce; 
+    --doc-purple-soft: rgba(168,85,247,.15);
+}
+
+/* Automatic Dark Mode */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]):not(.light) {
+        --doc-bg-soft: rgba(255,255,255,.06);
+        --doc-bg-hover: rgba(255,255,255,.03);
+        --doc-indigo: #818cf8;
+        --doc-indigo-soft: rgba(129,140,248,.15);
+        --doc-orange: #fbbf24; 
+        --doc-orange-soft: rgba(251,191,36,.15);
+        --doc-green: #4ade80; 
+        --doc-green-soft: rgba(74,222,128,.15);
+        --doc-red: #f87171; 
+        --doc-red-soft: rgba(248,113,113,.15);
+        --doc-blue: #60a5fa; 
+        --doc-blue-soft: rgba(96,165,250,.15);
+        --doc-purple: #c084fc; 
+        --doc-purple-soft: rgba(192,132,252,.15);
+        color-scheme: dark;
+    }
+}
+
+/* Manual Dark Mode Toggles */
+[data-theme="dark"], .dark, .dark-mode {
+    --doc-bg-soft: rgba(255,255,255,.06);
+    --doc-bg-hover: rgba(255,255,255,.03);
+    --doc-indigo: #818cf8;
+    --doc-indigo-soft: rgba(129,140,248,.15);
+    --doc-orange: #fbbf24; 
+    --doc-orange-soft: rgba(251,191,36,.15);
+    --doc-green: #4ade80; 
+    --doc-green-soft: rgba(74,222,128,.15);
+    --doc-red: #f87171; 
+    --doc-red-soft: rgba(248,113,113,.15);
+    --doc-blue: #60a5fa; 
+    --doc-blue-soft: rgba(96,165,250,.15);
+    --doc-purple: #c084fc; 
+    --doc-purple-soft: rgba(192,132,252,.15);
+    color-scheme: dark;
+}
+
+/* ---------- Layout ---------- */
 .doc-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:18px}
 @media(max-width:1000px){.doc-stats{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:620px){.doc-stats{grid-template-columns:repeat(2,1fr)}}
-.doc-stat{display:flex;flex-direction:column;gap:6px;padding:16px 18px;border-radius:16px;background:var(--as-card,#fff);border:1px solid rgba(127,127,127,.12);cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;text-decoration:none;color:inherit}
-.doc-stat:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(15,23,42,.08)}
-.doc-stat strong{font-size:26px;line-height:1}
-.doc-stat span{font-size:12px;opacity:.65}
-.doc-stat small{font-size:10px;opacity:.5}
-.doc-filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 16px;margin-bottom:16px;border-radius:16px;background:var(--as-card,#fff);border:1px solid rgba(127,127,127,.12)}
-.doc-filters input,.doc-filters select{padding:9px 12px;border-radius:10px;border:1px solid rgba(127,127,127,.25);background:transparent;color:inherit;font-size:13px;min-width:160px}
+
+/* FIXED: Replaced var(--as-card, #fff) with --doc-bg-soft */
+.doc-stat{display:flex;flex-direction:column;gap:6px;padding:16px 18px;border-radius:16px;background:var(--doc-bg-soft);border:1px solid rgba(127,127,127,.15);cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;text-decoration:none;color:inherit}
+.doc-stat:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(15,23,42,.08);background:var(--doc-bg-hover)}
+.doc-stat strong{font-size:26px;line-height:1;color:inherit}
+.doc-stat span{font-size:12px;opacity:.75}
+.doc-stat small{font-size:10px;opacity:.55}
+
+/* FIXED: Replaced var(--as-card, #fff) with --doc-bg-soft */
+.doc-filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 16px;margin-bottom:16px;border-radius:16px;background:var(--doc-bg-soft);border:1px solid rgba(127,127,127,.15);color:inherit}
+.doc-filters input,.doc-filters select{padding:9px 12px;border-radius:10px;border:1px solid rgba(127,127,127,.25);background:rgba(127,127,127,.04);color:inherit;font-size:13px;min-width:160px}
+
 .doc-list{display:flex;flex-direction:column}
 .doc-row{display:flex;align-items:center;gap:14px;padding:14px 6px;border-bottom:1px solid rgba(127,127,127,.1);text-decoration:none;color:inherit}
-.doc-row:hover{background:rgba(127,127,127,.04)}
-.doc-row__check input{width:18px;height:18px;cursor:pointer}
-.doc-row__avatar{width:44px;height:44px;flex:0 0 44px;display:grid;place-items:center;border-radius:50%;background:rgba(79,70,229,.1);font-size:12px;font-weight:800}
+.doc-row:hover{background:var(--doc-bg-hover)}
+.doc-row__check input{width:18px;height:18px;cursor:pointer;accent-color:var(--doc-indigo)}
+
+/* FIXED: Avatar background */
+.doc-row__avatar{width:44px;height:44px;flex:0 0 44px;display:grid;place-items:center;border-radius:50%;background:var(--doc-indigo-soft);color:var(--doc-indigo);font-size:12px;font-weight:800}
+
 .doc-row__body{flex:1;min-width:0}
 .doc-row__top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
-.doc-row__body>span{display:block;margin-top:3px;font-size:12px;opacity:.7}
-.doc-row__meta{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px;font-size:11px;opacity:.6}
+.doc-row__body>span{display:block;margin-top:3px;font-size:12px;opacity:.75}
+.doc-row__meta{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px;font-size:11px;opacity:.6;color:inherit}
 .doc-row__actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+
+/* FIXED: Badges now use theme variables */
 .doc-badge{padding:3px 9px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
-.doc-badge--orange{background:rgba(245,158,11,.15);color:#b45309}
-.doc-badge--green{background:rgba(34,197,94,.15);color:#15803d}
-.doc-badge--red{background:rgba(239,68,68,.15);color:#b91c1c}
-.doc-badge--blue{background:rgba(59,130,246,.15);color:#1d4ed8}
-.doc-badge--purple{background:rgba(168,85,247,.15);color:#7e22ce}
+.doc-badge--orange{background:var(--doc-orange-soft);color:var(--doc-orange)}
+.doc-badge--green{background:var(--doc-green-soft);color:var(--doc-green)}
+.doc-badge--red{background:var(--doc-red-soft);color:var(--doc-red)}
+.doc-badge--blue{background:var(--doc-blue-soft);color:var(--doc-blue)}
+.doc-badge--purple{background:var(--doc-purple-soft);color:var(--doc-purple)}
+
 .doc-empty{padding:60px 20px;text-align:center;opacity:.7}
-.doc-bulkbar{display:none;align-items:center;gap:12px;padding:12px 16px;margin-bottom:12px;border-radius:14px;background:rgba(79,70,229,.08)}
+
+/* FIXED: Bulkbar now uses theme variables */
+.doc-bulkbar{display:none;align-items:center;gap:12px;padding:12px 16px;margin-bottom:12px;border-radius:14px;background:var(--doc-indigo-soft);color:inherit}
 .doc-bulkbar.is-active{display:flex}
-.doc-bulkbar button{padding:8px 14px;border:0;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;font-size:12px}
+.doc-bulkbar button{padding:8px 14px;border:0;border-radius:10px;background:var(--doc-indigo);color:#fff;font-weight:700;cursor:pointer;font-size:12px}
+
 @media(max-width:650px){.doc-row__actions{display:none}}
 </style>
 
