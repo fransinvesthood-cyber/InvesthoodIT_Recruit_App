@@ -284,13 +284,15 @@ if (
             type="button"
             class="ux-navbar__menu"
             id="uxMenuButton"
-            aria-label="Open navigation menu"
-            aria-expanded="false"
+            aria-label="Hide sidebar"
+            aria-expanded="true"
             aria-controls="uxSidebar"
+            title="Hide sidebar"
         >
 
             <i
-                class="fas fa-bars"
+                class="fas fa-angles-left"
+                id="uxMenuIcon"
                 aria-hidden="true"
             ></i>
 
