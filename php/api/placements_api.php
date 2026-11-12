@@ -82,7 +82,9 @@ if ($action === 'list') {
         foreach ([$s, $s, $s, $s, $s] as $v) { $params[] = $v; $types .= 's'; }
     }
     if ($status) { $conditions[] = "p.status = ?"; $params[] = $status; $types .= 's'; }
-       $conditions[] = "p.department LIKE ?"; $params[] = "%$department%"; $types .= 's'; }
+    if ($programmeId) { $conditions[] = "p.programme_id = ?"; $params[] = $programmeId; $types .= 'i'; }
+    if ($cohortId) { $conditions[] = "p.cohort_id = ?"; $params[] = $cohortId; $types .= 'i'; }
+    if ($department) { $conditions[] = "p.department LIKE ?"; $params[] = "%$department%"; $types .= 's'; }
     if ($location) { $conditions[] = "p.location LIKE ?"; $params[] = "%$location%"; $types .= 's'; }
     if ($supervisorId) { $conditions[] = "p.supervisor_id = ?"; $params[] = $supervisorId; $types .= 'i'; }
     if ($startDateFrom) { $conditions[] = "p.start_date >= ?"; $params[] = $startDateFrom; $types .= 's'; }
@@ -127,6 +129,32 @@ if ($action === 'list') {
             'supervisor_name' => trim($r['sup_first'] . ' ' . $r['sup_last']),
             'supervisor_email' => $r['sup_email'],
             'start_date' => $r['start_date'],
+            'end_date' => $r['end_date'],
+            'status' => $r['status'],
+            'notes' => $r['notes'],
+            'created_by' => $r['created_by'],
+            'created_at' => $r['created_at'],
+            'updated_at' => $r['updated_at']
+        ];
+    }
+
+    $stats = dbFetchOne("SELECT COUNT(*) as total,
+        SUM(CASE WHEN status = 'pending_placement' THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN status IN ('placement_in_progress', 'active', 'placed') THEN 1 ELSE 0 END) as active,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+        SUM(CASE WHEN status IN ('withdrawn', 'cancelled') THEN 1 ELSE 0 END) as withdrawn
+        FROM placements") ?: ['total' => 0, 'pending' => 0, 'active' => 0, 'completed' => 0, 'withdrawn' => 0];
+
+    sendResponse(true, [
+        'placements' => $placements,
+        'total' => $total,
+        'page' => $page,
+        'per_page' => $perPage,
+        'total_pages' => ceil($total / $perPage),
+        'stats' => $stats
+    ]);
+}
+
 // ============================================================
 // ACTION: GET ELIGIBLE CANDIDATES
 // ============================================================
@@ -254,33 +282,4 @@ if ($action === 'details') {
     sendResponse(true, $data);
 }
 
-            'end_date' => $r['end_date'],
-            'status' => $r['status'],
-            'notes' => $r['notes'],
-            'created_by' => $r['created_by'],
-            'created_at' => $r['created_at'],
-            'updated_at' => $r['updated_at']
-        ];
-    }
-
-    // Stats
-    $stats = dbFetchOne("SELECT COUNT(*) as total,
-        SUM(CASE WHEN status = 'pending_placement' THEN 1 ELSE 0 END) as pending,
-        SUM(CASE WHEN status IN ('placement_in_progress', 'active') THEN 1 ELSE 0 END) as active,
-        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-        SUM(CASE WHEN status IN ('withdrawn', 'cancelled') THEN 1 ELSE 0 END) as withdrawn
-        FROM placements") ?: ['total' => 0, 'pending' => 0, 'active' => 0, 'completed' => 0, 'withdrawn' => 0];
-
-    sendResponse(true, [
-        'placements' => $placements,
-        'total' => $total,
-        'page' => $page,
-        'per_page' => $perPage,
-        'total_pages' => ceil($total / $perPage),
-        'stats' => $stats
-    ]);
-}
-
-    if ($programmeId) { $conditions[] = "p.programme_id = ?"; $params[] = $programmeId; $types .= 'i'; }
-    if ($cohortId) { $conditions[] = "p.cohort_id = ?"; $params[] = $cohortId; $types .= 'i'; }
-    if ($department) { $c
+sendResponse(false, null, 'Unknown action', 400);

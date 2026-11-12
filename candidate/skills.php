@@ -27,19 +27,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } else {
             if (Skill::addToUser($userId, $skillId, $proficiency)) {
                 $success = 'Skill added.';
-
+                if (false) {
+?>
 <!-- ===== FLASH MESSAGES ===== -->
 <?php if ($error !== ''): ?>
-<div class="notification notification--error">
-<div class="notification__icon"><i class="fas fa-exclamation-circle"></i></div>
-<div class="notification__content"><div class="notification__title">Error</div><div class="notification__message"><?= e($error) ?></div></div>
-</div>
-<?php endif; ?>
-<?php if ($success !== ''): ?>
-<div class="notification notification--success">
-<div class="notification__icon"><i class="fas fa-check-circle"></i></div>
-<div class="notification__content"><div class="notification__title">Success</div><div class="notification__message"><?= e($success) ?></div></div>
-</div>
+    <div class="notification notification--error">
+    <div class="notification__icon"><i class="fas fa-exclamation-circle"></i></div>
+    <div class="notification__content"><div class="notification__title">Error</div><div class="notification__message"><?= e($error) ?></div></div>
+    </div>
+    <?php endif; ?>
+    <?php if ($success !== ''): ?>
+    <div class="notification notification--success">
+    <div class="notification__icon"><i class="fas fa-check-circle"></i></div>
+    <div class="notification__content"><div class="notification__title">Success</div><div class="notification__message"><?= e($success) ?></div></div>
+    </div>
 <?php endif; ?>
 
 <!-- ===== SELF-REPORTED SKILLS FORM ===== -->
@@ -150,8 +151,11 @@ foreach ($all['soft'] as $s) {
 <script src="<?= url('js/script.js') ?>"></script>
 <script src="<?= url('js/learning.js') ?>"></script>
 </body>
+<?php
+                }
+?>
 </html>
-
+<?php
                 $selfReported = Skill::forUser($userId);
             } else {
                 $error = 'Skill already added.';

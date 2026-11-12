@@ -2932,7 +2932,7 @@ body.po-dashboard-modal-open { overflow: hidden; }
 </div>
 <?php
 
-require __DIR__ . '/_layout_end.php';<?php
+require __DIR__ . '/_layout_end.php';
 
 
 
