@@ -95,7 +95,7 @@ $consentDefs = [
   <link rel="stylesheet" href="<?= url('css/settings.css') ?>">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
-  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-sidebar1">
+  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-profilemenu1">
 </head>
 <body class="dashboard-page settings-page">
 
@@ -171,8 +171,17 @@ $consentDefs = [
           <a href="<?= url('candidate/dashboard.php') ?>" class="dash-header__icon-btn" aria-label="Back to dashboard" title="Back to dashboard">
             <i class="fas fa-th-large"></i>
           </a>
-          <div class="dash-header__user">
-            <img src="<?= $avatar ?>" alt="Profile" class="dash-header__avatar">
+          <div class="dash-header__user profile-menu" data-profile-menu>
+            <button type="button" class="dash-header__avatar-trigger" data-profile-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Open profile menu">
+              <img src="<?= $avatar ?>" alt="Profile" class="dash-header__avatar">
+              <span class="profile-menu__chevron" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+            </button>
+            <div class="profile-menu__panel" data-profile-menu-panel aria-hidden="true">
+              <a href="<?= url('candidate/profile.php') ?>" class="profile-menu__item"><i class="fas fa-user"></i><span>Profile</span></a>
+              <a href="<?= url('candidate/settings.php') ?>" class="profile-menu__item"><i class="fas fa-cog"></i><span>Settings</span></a>
+              <div class="profile-menu__divider"></div>
+              <a href="<?= url('auth/logout.php') ?>" class="profile-menu__item profile-menu__item--logout"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
+            </div>
           </div>
         </div>
       </header>
@@ -874,6 +883,6 @@ $consentDefs = [
   <script src="<?= url('js/dashboard.js') ?>"></script>
   <script src="<?= url('js/settings.js') ?>"></script>
   <?= $flashes ?>
-  <script src="<?= url('candidate/theme.js') ?>?v=20261112-sidebar1" defer></script>
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-profilemenu1" defer></script>
 </body>
 </html>

@@ -123,3 +123,40 @@
     }
   });
 })();
+
+/* Accessible top-right profile menu: slide down, close on outside click/Escape. */
+(function () {
+  'use strict';
+  function closeMenus(except) {
+    document.querySelectorAll('[data-profile-menu].is-open').forEach(function (menu) {
+      if (menu === except) return;
+      menu.classList.remove('is-open');
+      var button = menu.querySelector('[data-profile-menu-toggle]');
+      var panel = menu.querySelector('[data-profile-menu-panel]');
+      if (button) button.setAttribute('aria-expanded', 'false');
+      if (panel) panel.setAttribute('aria-hidden', 'true');
+    });
+  }
+  document.addEventListener('click', function (event) {
+    var toggle = event.target.closest && event.target.closest('[data-profile-menu-toggle]');
+    if (toggle) {
+      event.preventDefault();
+      var menu = toggle.closest('[data-profile-menu]');
+      var opening = !menu.classList.contains('is-open');
+      closeMenus(menu);
+      menu.classList.toggle('is-open', opening);
+      toggle.setAttribute('aria-expanded', String(opening));
+      var panel = menu.querySelector('[data-profile-menu-panel]');
+      if (panel) panel.setAttribute('aria-hidden', String(!opening));
+      return;
+    }
+    if (!event.target.closest || !event.target.closest('[data-profile-menu]')) closeMenus();
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') {
+      closeMenus();
+      var active = document.querySelector('[data-profile-menu-toggle][aria-expanded="true"]');
+      if (active) active.focus();
+    }
+  });
+})();

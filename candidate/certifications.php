@@ -211,7 +211,7 @@ body[data-theme="dark"].certifications-page .certifications-timeline__meta { col
 
 <script src="<?= url('js/script.js') ?>"></script>
 <script src="<?= url('js/learning.js') ?>"></script>
-  <script src="<?= url('candidate/theme.js') ?>?v=20261112-sidebar1" defer></script>
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-profilemenu1" defer></script>
 </body>
 </html>
 

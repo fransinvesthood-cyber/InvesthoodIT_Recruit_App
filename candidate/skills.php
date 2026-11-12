@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_s
 <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
 <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
-<link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-sidebar1">
+<link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-profilemenu1">
 <style>
 .skills-page .dash-content { min-width:0; width:calc(100% - 260px); margin-left:260px; box-sizing:border-box; }
 .skills-page .dash-content > .container { width:100%; max-width:1200px; margin:0 auto; padding:1.5rem 2rem 3rem; box-sizing:border-box; }
@@ -175,6 +175,6 @@ body[data-theme="dark"].skills-page .skills-form__field select { background:#0d1
 </div>
 <script src="<?= url('js/script.js') ?>"></script>
 <script src="<?= url('js/learning.js') ?>"></script>
-<script src="<?= url('candidate/theme.js') ?>?v=20261112-sidebar1" defer></script>
+<script src="<?= url('candidate/theme.js') ?>?v=20261112-profilemenu1" defer></script>
 </body>
 </html>

@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
   <link rel="stylesheet" href="<?= url('css/applications.css') ?>">
-  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-sidebar1">
+  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-profilemenu1">
 </head>
 <body class="dashboard-page application-detail-page">
   <div class="dashboard">
@@ -74,6 +74,6 @@
       </div>
     </main>
   </div>
-  <script src="<?= url('candidate/theme.js') ?>?v=20261112-sidebar1" defer></script>
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-profilemenu1" defer></script>
 </body>
 </html>
