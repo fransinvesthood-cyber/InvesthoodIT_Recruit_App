@@ -13,7 +13,25 @@ function fo_local_flash(): string { if(session_status()!==PHP_SESSION_ACTIVE)ses
 function fo_config(mysqli $c): array { $d=['maker_checker_enabled'=>1,'default_daily_rate'=>150.00,'minimum_attendance_minutes'=>240]; if(!fo_has_table($c,'finance_stipend_settings'))return$d;$r=$c->query("SELECT * FROM finance_stipend_settings WHERE is_active=1 ORDER BY id DESC LIMIT 1");return array_merge($d,$r?$r->fetch_assoc()?:[]:[]); }
 function fo_can_approve(array $cfg,int $maker,int $user): bool { return (int)($cfg['maker_checker_enabled']??1)!==1 || $maker!==$user; }
 function fo_calc(int $minutes,float $rate,int $min): array { if($minutes<=0)return['days'=>0,'gross'=>0,'exception'=>'No approved attendance'];$days=$minutes/480;$gross=round($days*$rate,2);return['days'=>round($days,4),'gross'=>$gross,'exception'=>$minutes<$min?'Attendance below configured minimum':null]; }
-function fo_activity(mysqli $c,int $uid,string $a,string $d,?string $t=null,?int $eid=null): void { if(!fo_has_table($c,'finance_activity_log'))return;$ip=$_SERVER['REMOTE_ADDR']??null;$ua=substr((string)($_SERVER['HTTP_USER_AGENT']??''),0,255);$s=$c->prepare("INSERT INTO finance_activity_log(user_id,action,description,entity_type,entity_id,ip_address,user_agent) VALUES(?,?,?,?,?,?,?)");if(!$s)return;$s->bind_param('isssiss',$uid,$a,$d,$t,$eid,$ip,$ua);$s->execute();$s->close(); }
+function fo_audit_event(mysqli $c,int $uid,string $action,string $description,?string $entityType=null,?int $entityId=null,?float $amount=null,?string $reference=null,?array $before=null,?array $after=null): void {
+    if (!fo_has_table($c, 'finance_audit_trail')) return;
+    $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+    $ua = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255);
+    $beforeJson = $before === null ? null : json_encode($before, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+    $afterJson = $after === null ? null : json_encode($after, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+    $st = $c->prepare('INSERT INTO finance_audit_trail(user_id,action,description,entity_type,entity_id,amount,reference_no,before_data,after_data,ip_address,user_agent) VALUES(?,?,?,?,?,?,?,?,?,?,?)');
+    if (!$st) return;
+    $st->bind_param('isssidsssss',$uid,$action,$description,$entityType,$entityId,$amount,$reference,$beforeJson,$afterJson,$ip,$ua);
+    $st->execute(); $st->close();
+}
+function fo_activity(mysqli $c,int $uid,string $a,string $d,?string $t=null,?int $eid=null): void {
+    $ip=$_SERVER['REMOTE_ADDR']??null; $ua=substr((string)($_SERVER['HTTP_USER_AGENT']??''),0,255);
+    if (fo_has_table($c,'finance_activity_log')) {
+        $s=$c->prepare('INSERT INTO finance_activity_log(user_id,action,description,entity_type,entity_id,ip_address,user_agent) VALUES(?,?,?,?,?,?,?)');
+        if($s){$s->bind_param('isssiss',$uid,$a,$d,$t,$eid,$ip,$ua);$s->execute();$s->close();}
+    }
+    fo_audit_event($c,$uid,$a,$d,$t,$eid);
+}
 
 if (!function_exists('fo_notifications')) { function fo_notifications(mysqli $c,int $uid,int $limit=6): array { if($uid<=0)return ['items'=>[],'unread'=>0,'available'=>false];$r=$c->query("SHOW TABLES LIKE 'notifications'");if(!$r||!$r->num_rows)return ['items'=>[],'unread'=>0,'available'=>false];$cols=[];$cr=$c->query("SHOW COLUMNS FROM notifications");while($cr&&$x=$cr->fetch_assoc())$cols[$x['Field']]=true;$uc=isset($cols['user_id'])?'user_id':(isset($cols['recipient_id'])?'recipient_id':null);$mc=isset($cols['message'])?'message':(isset($cols['body'])?'body':(isset($cols['description'])?'description':null));$tc=isset($cols['title'])?'title':null;$rc=isset($cols['is_read'])?'is_read':(isset($cols['read_at'])?'read_at':null);$dc=isset($cols['created_at'])?'created_at':null;if(!$uc||!$mc)return ['items'=>[],'unread'=>0,'available'=>false];$te=$tc?$tc:"'Notification'";$de=$dc?$dc:'NULL';$re=$rc==='is_read'?'is_read':($rc==='read_at'?'CASE WHEN read_at IS NULL THEN 0 ELSE 1 END':'1');$sql="SELECT id,$te AS title,$mc AS message,$de AS created_at,$re AS is_read FROM notifications WHERE $uc=? ORDER BY ".($dc?$dc:'id')." DESC LIMIT ?";$st=$c->prepare($sql);if(!$st)return ['items'=>[],'unread'=>0,'available'=>false];$st->bind_param('ii',$uid,$limit);$st->execute();$items=$st->get_result()->fetch_all(MYSQLI_ASSOC);$st->close();$unread=0;foreach($items as $n)if((int)($n['is_read']??1)===0)$unread++;return ['items'=>$items,'unread'=>$unread,'available'=>true]; } }
 ?>

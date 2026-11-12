@@ -43,6 +43,7 @@ $titles = [
     'exceptions'          => 'Exceptions',
     'history'             => 'Approved History',
     'activity_log'        => 'Activity Log',
+    'audit_trail'         => 'Financial Audit Trail & Transaction History',
     'prepare_schedule'    => 'Stipend Schedules',
     'schedule_view'       => 'Stipend Schedule Details',
     'outstanding_payments'=> 'Outstanding Payments',
@@ -50,6 +51,9 @@ $titles = [
     'payment_verification'=> 'Payment Verification',
     'notifications'       => 'Notifications',
     'profile'             => 'My Profile',
+    'settings'            => 'Settings',
+    'budget'              => 'Budget Allocation & Expenditure',
+    'forecasting'         => 'Financial Forecasting & Budget Variance Analysis',
 ];
 
 $title = $titles[$currentPage] ?? 'Finance Officer Portal';
@@ -91,10 +95,12 @@ if ($financeDb instanceof mysqli && function_exists('fo_notifications')) {
             class="ux-navbar__menu"
             id="uxMenuButton"
             type="button"
-            aria-label="Toggle sidebar"
+            aria-label="Show or hide navigation menu"
             aria-expanded="false"
+            aria-controls="foSidebar"
+            title="Show or hide menu"
         >
-            <i class="fas fa-bars"></i>
+            <span class="ux-menu-lines" aria-hidden="true"><span></span><span></span><span></span></span>
         </button>
 
         <div class="ux-navbar__heading">
@@ -245,17 +251,17 @@ if ($financeDb instanceof mysqli && function_exists('fo_notifications')) {
 
                 <a
                     class="ux-profile-link"
-                    href="<?= e(url('finance/change_password.php')) ?>"
+                    href="<?= e(url('finance/settings.php')) ?>"
                 >
-                    <i class="fas fa-lock"></i>
-                    <span>Change Password</span>
+                    <i class="fas fa-gear"></i>
+                    <span>Settings</span>
                 </a>
 
                 <div class="ux-dropdown__divider"></div>
 
                 <a
                     class="ux-profile-link ux-profile-link--logout"
-                    href="<?= e(url('logout.php')) ?>"
+                    href="<?= e(url('auth/logout.php')) ?>"
                     onclick="return confirm('Are you sure you want to log out?');"
                 >
                     <i class="fas fa-right-from-bracket"></i>
@@ -325,6 +331,23 @@ if ($financeDb instanceof mysqli && function_exists('fo_notifications')) {
 
 .ux-navbar .ux-dropdown[hidden] {
     display: none !important;
+}
+
+.ux-navbar .ux-dropdown.is-open {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+.ux-navbar {
+    position: relative;
+    z-index: 5000;
+}
+
+.ux-navbar__right {
+    position: relative;
+    z-index: 5001;
 }
 
 .ux-dropdown__head {
@@ -472,85 +495,78 @@ body.dark .ux-navbar .ux-dropdown__head {
         font-size: 1rem;
     }
 }
+
+/* Always-visible responsive sidebar toggle (desktop, tablet and mobile). */
+.ux-navbar__left { display:flex; align-items:center; gap:12px; min-width:0; }
+.ux-navbar__menu {
+    display:inline-flex !important;
+    flex:0 0 42px;
+    align-items:center;
+    justify-content:center;
+    width:42px;
+    height:42px;
+    min-width:42px;
+    min-height:42px;
+    padding:0;
+    border:1px solid var(--ux-border, #d1d5db);
+    border-radius:10px;
+    background:var(--ux-surface, #fff);
+    color:var(--ux-text, #1f2937);
+    cursor:pointer;
+    visibility:visible !important;
+    opacity:1 !important;
+    position:relative;
+    z-index:5100;
+}
+.ux-navbar__menu:hover { background:var(--ux-hover-bg, #f3f4f6); }
+.ux-navbar__menu:focus-visible { outline:2px solid #6366f1; outline-offset:3px; }
+.ux-menu-lines { display:flex; width:18px; flex-direction:column; gap:4px; }
+.ux-menu-lines span { display:block; width:18px; height:2px; border-radius:2px; background:currentColor; }
+[data-theme="dark"] .ux-navbar__menu, body.dark .ux-navbar__menu, body.dark-mode .ux-navbar__menu {
+    background:var(--ux-surface, #1f2937); color:var(--ux-text, #f9fafb); border-color:var(--ux-border, #374151);
+}
+@media(max-width:600px) {
+    .ux-navbar__left { gap:8px; }
+    .ux-navbar__menu { flex-basis:40px; width:40px; height:40px; min-width:40px; min-height:40px; }
+    .ux-navbar__heading h1 { font-size:clamp(14px, 4vw, 18px); }
+}
+
+/* Reliable, visible theme control */
+.ux-theme-toggle {
+    display:inline-flex !important;
+    align-items:center;
+    justify-content:center;
+    width:42px;
+    height:42px;
+    min-width:42px;
+    min-height:42px;
+    padding:0;
+    border:1px solid var(--ux-border, #d1d5db);
+    border-radius:10px;
+    background:var(--ux-surface, #fff);
+    color:var(--ux-text, #1f2937);
+    cursor:pointer;
+    position:relative;
+    z-index:5200;
+    opacity:1 !important;
+    visibility:visible !important;
+    pointer-events:auto !important;
+    transition:background .2s ease, color .2s ease, transform .2s ease;
+}
+.ux-theme-toggle:hover { background:var(--ux-hover-bg, #f3f4f6); transform:translateY(-1px); }
+.ux-theme-toggle i { font-size:17px; line-height:1; pointer-events:none; }
+html[data-theme="dark"] .ux-theme-toggle,
+html[data-ux-theme="dark"] .ux-theme-toggle,
+body.dark .ux-theme-toggle,
+body.dark-mode .ux-theme-toggle {
+    background:#1f2937;
+    color:#f9fafb;
+    border-color:#4b5563;
+}
+@media(max-width:600px) {
+    .ux-theme-toggle { width:38px; height:38px; min-width:38px; min-height:38px; }
+}
+
 </style>
 
-<script>
-(() => {
-    const notificationButton =
-        document.getElementById('uxNotificationButton');
 
-    const notificationDropdown =
-        document.getElementById('uxNotificationDropdown');
-
-    const profileButton =
-        document.getElementById('uxProfileButton');
-
-    const profileDropdown =
-        document.getElementById('uxProfileDropdown');
-
-    function closeDropdown(button, dropdown) {
-        if (!button || !dropdown) return;
-
-        dropdown.hidden = true;
-        button.setAttribute('aria-expanded', 'false');
-    }
-
-    function toggleDropdown(button, dropdown, otherButton, otherDropdown) {
-        if (!button || !dropdown) return;
-
-        const shouldOpen = dropdown.hidden;
-
-        closeDropdown(otherButton, otherDropdown);
-
-        dropdown.hidden = !shouldOpen;
-        button.setAttribute('aria-expanded', String(shouldOpen));
-    }
-
-    notificationButton?.addEventListener('click', (event) => {
-        event.stopPropagation();
-
-        toggleDropdown(
-            notificationButton,
-            notificationDropdown,
-            profileButton,
-            profileDropdown
-        );
-    });
-
-    profileButton?.addEventListener('click', (event) => {
-        event.stopPropagation();
-
-        toggleDropdown(
-            profileButton,
-            profileDropdown,
-            notificationButton,
-            notificationDropdown
-        );
-    });
-
-    document.addEventListener('click', (event) => {
-        if (
-            notificationDropdown &&
-            !notificationDropdown.contains(event.target) &&
-            !notificationButton?.contains(event.target)
-        ) {
-            closeDropdown(notificationButton, notificationDropdown);
-        }
-
-        if (
-            profileDropdown &&
-            !profileDropdown.contains(event.target) &&
-            !profileButton?.contains(event.target)
-        ) {
-            closeDropdown(profileButton, profileDropdown);
-        }
-    });
-
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
-            closeDropdown(notificationButton, notificationDropdown);
-            closeDropdown(profileButton, profileDropdown);
-        }
-    });
-})();
-</script>

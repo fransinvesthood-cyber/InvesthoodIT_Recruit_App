@@ -1,2 +1,213 @@
-<?php $currentPage=$currentPage??'';if(!isset($user)||!is_array($user))$user=current_user();$name=trim((string)($user['full_name']??$user['fullname']??trim(($user['first_name']??'').' '.($user['last_name']??''))));if($name==='')$name='Finance Officer';?>
-<aside class="sidebar" id="portalSidebar"><div class="sidebar__header"><a href="<?=url('index.php')?>" class="logo"><span class="logo__icon"><i class="fas fa-code"></i></span><span class="logo__text">Investhood <span class="logo__accent">IT</span></span></a><button class="sidebar__close" id="portalSidebarClose" type="button"><i class="fas fa-times"></i></button></div><nav class="sidebar__nav"><div class="sidebar__section-label">Finance Officer</div><div class="sidebar__section-label">Main</div><ul class="sidebar__menu"><li><a class="sidebar__link <?= in_array($currentPage,['dashboard'],true)?'active':'' ?>" href="<?= url('finance/dashboard.php') ?>"><i class="fas fa-grid-2"></i> Dashboard</a></li></ul><div class="sidebar__section-label">Stipends</div><ul class="sidebar__menu"><li><a class="sidebar__link <?= in_array($currentPage,['attendance'],true)?'active':'' ?>" href="<?= url('finance/attendance.php') ?>"><i class="fas fa-calendar-check"></i> Approved Attendance</a></li><li><a class="sidebar__link <?= in_array($currentPage,['schedules','prepare_schedule','schedule_view'],true)?'active':'' ?>" href="<?= url('finance/schedules.php') ?>"><i class="fas fa-file-invoice-dollar"></i> Stipend Schedules</a></li><li><a class="sidebar__link <?= in_array($currentPage,['outstanding_payments'],true)?'active':'' ?>" href="<?= url('finance/outstanding_payments.php') ?>"><i class="fas fa-money-bill-transfer"></i> Outstanding Payments</a></li><li><a class="sidebar__link <?= in_array($currentPage,['reconciliation'],true)?'active':'' ?>" href="<?= url('finance/reconciliation.php') ?>"><i class="fas fa-scale-balanced"></i> Reconciliation &amp; Verification</a></li><li><a class="sidebar__link <?= in_array($currentPage,['approvals'],true)?'active':'' ?>" href="<?= url('finance/approvals.php') ?>"><i class="fas fa-user-check"></i> Approval Queue</a></li></ul><div class="sidebar__section-label">Governance</div><ul class="sidebar__menu"><li><a class="sidebar__link <?= in_array($currentPage,['exceptions'],true)?'active':'' ?>" href="<?= url('finance/exceptions.php') ?>"><i class="fas fa-triangle-exclamation"></i> Exceptions</a></li><li><a class="sidebar__link <?= in_array($currentPage,['history'],true)?'active':'' ?>" href="<?= url('finance/history.php') ?>"><i class="fas fa-lock"></i> Approved History</a></li><li><a class="sidebar__link <?= in_array($currentPage,['activity_log'],true)?'active':'' ?>" href="<?= url('finance/activity_log.php') ?>"><i class="fas fa-clock-rotate-left"></i> Activity Log</a></li></ul></nav><div class="sidebar__footer"><div class="sidebar__user"><div class="sidebar__user-avatar"><img src="https://ui-avatars.com/api/?name=<?=urlencode($name)?>&background=1a56db&color=fff&size=80" alt=""></div><div class="sidebar__user-info"><span class="sidebar__user-name"><?=e($name)?></span><span class="sidebar__user-role">Finance Officer</span></div></div><a href="<?=url('auth/logout.php')?>" class="sidebar__logout"><i class="fas fa-sign-out-alt"></i> Sign Out</a></div></aside><div class="sidebar-overlay" id="portalSidebarOverlay"></div>
+
+<?php
+
+$currentPage = $currentPage ?? '';
+
+if (!isset($user) || !is_array($user)) {
+    $user = current_user();
+}
+
+$firstName = trim((string)($user['first_name'] ?? ''));
+$lastName  = trim((string)($user['last_name'] ?? ''));
+
+$name = trim((string)(
+    $user['full_name']
+    ?? $user['fullname']
+    ?? ($firstName . ' ' . $lastName)
+));
+
+if ($name === '') {
+    $name = 'Finance Officer';
+}
+
+$initials = fo_initials($firstName, $lastName);
+
+/**
+ * Determine the active navigation item.
+ */
+if (!function_exists('fo_nav')) {
+    function fo_nav(string $current, $pages): string
+    {
+        $pages = is_array($pages) ? $pages : [$pages];
+
+        return in_array($current, $pages, true)
+            ? 'fo-nav__item--active'
+            : '';
+    }
+}
+
+?>
+
+<aside class="fo-sidebar" id="foSidebar">
+
+    <!-- BRAND -->
+    <div class="fo-sidebar__brand">
+
+        <div class="fo-sidebar__logo">
+            <i class="fas fa-coins"></i>
+        </div>
+
+        <div>
+            <strong>Investhood IT</strong>
+            <span>Finance Operations</span>
+        </div>
+
+        <button
+            type="button"
+            id="foSidebarClose"
+            aria-label="Close sidebar"
+        >
+            <i class="fas fa-xmark"></i>
+        </button>
+
+    </div>
+
+
+    <!-- PROFILE -->
+    <div class="fo-profile">
+
+        <div class="fo-avatar">
+            <?= e($initials) ?>
+        </div>
+
+        <div>
+            <strong><?= e($name) ?></strong>
+            <span>Finance Officer</span>
+        </div>
+
+    </div>
+
+
+    <!-- NAVIGATION -->
+    <nav class="fo-nav">
+
+        <!-- MAIN -->
+        <div class="fo-nav__label">Main</div>
+
+        <a
+            class="fo-nav__item <?= fo_nav($currentPage, 'dashboard') ?>"
+            href="<?= url('finance/dashboard.php') ?>"
+        >
+            <i class="fas fa-grid-2"></i>
+            <span>Dashboard</span>
+        </a>
+
+
+        <!-- STIPENDS -->
+        <div class="fo-nav__label">Stipends</div>
+
+        <a
+            class="fo-nav__item <?= fo_nav($currentPage, 'attendance') ?>"
+            href="<?= url('finance/attendance.php') ?>"
+        >
+            <i class="fas fa-calendar-check"></i>
+            <span>Approved Attendance</span>
+        </a>
+
+        <a
+            class="fo-nav__item <?= fo_nav(
+                $currentPage,
+                ['schedules', 'prepare_schedule', 'schedule_view']
+            ) ?>"
+            href="<?= url('finance/schedules.php') ?>"
+        >
+            <i class="fas fa-file-invoice-dollar"></i>
+            <span>Stipend Schedules</span>
+        </a>
+
+        <a
+            class="fo-nav__item <?= fo_nav($currentPage, 'approvals') ?>"
+            href="<?= url('finance/approvals.php') ?>"
+        >
+            <i class="fas fa-user-check"></i>
+            <span>Approval Queue</span>
+        </a>
+
+
+        <!-- BUDGETING -->
+        <div class="fo-nav__label">Budgeting</div>
+
+        <a
+            class="fo-nav__item <?= fo_nav($currentPage, 'budget') ?>"
+            href="<?= url('finance/budget.php') ?>"
+        >
+            <i class="fas fa-wallet"></i>
+            <span>Budget Allocation</span>
+        </a>
+
+
+        <!-- GOVERNANCE -->
+        <div class="fo-nav__label">Governance</div>
+
+        <a
+            class="fo-nav__item <?= fo_nav($currentPage, 'exceptions') ?>"
+            href="<?= url('finance/exceptions.php') ?>"
+        >
+            <i class="fas fa-triangle-exclamation"></i>
+            <span>Exceptions</span>
+        </a>
+
+        <a
+            class="fo-nav__item <?= fo_nav($currentPage, 'history') ?>"
+            href="<?= url('finance/history.php') ?>"
+        >
+            <i class="fas fa-lock"></i>
+            <span>Approved History</span>
+        </a>
+
+        <a
+            class="fo-nav__item <?= fo_nav($currentPage, 'activity_log') ?>"
+            href="<?= url('finance/activity_log.php') ?>"
+        >
+            <i class="fas fa-fingerprint"></i>
+            <span>Activity Log</span>
+        </a>
+
+
+        <!-- APPEARANCE -->
+        <div class="fo-nav__label">Appearance</div>
+
+        <button
+            type="button"
+            class="fo-theme"
+            data-fo-theme-toggle
+        >
+            <i class="fas fa-moon" data-fo-theme-icon></i>
+            <span>Dark Mode</span>
+        </button>
+
+    </nav>
+
+
+    <!-- FOOTER -->
+    <div class="fo-sidebar__footer">
+
+        <div class="fo-secure">
+
+            <i class="fas fa-user-shield"></i>
+
+            <div>
+                <strong>Maker / Checker</strong>
+
+                <span>
+                    Approval segregation protects payment integrity.
+                </span>
+            </div>
+
+        </div>
+
+        <a
+            class="fo-logout"
+            href="<?= url('auth/logout.php') ?>"
+        >
+            <i class="fas fa-arrow-right-from-bracket"></i>
+            Sign Out
+        </a>
+
+    </div>
+
+</aside>
+
+
+<!-- MOBILE OVERLAY -->
+<div class="fo-overlay" id="foOverlay"></div>
