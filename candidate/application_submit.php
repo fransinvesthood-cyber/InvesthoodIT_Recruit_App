@@ -88,6 +88,7 @@ $flashes = render_flashes();
   <link rel="stylesheet" href="<?= url('css/application_review.css') ?>">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
+  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-sidebar1">
 </head>
 <body class="dashboard-page application-submit-page">
 
@@ -127,7 +128,7 @@ $flashes = render_flashes();
     <main class="dashboard__main">
       <header class="dash-header">
         <div class="dash-header__left">
-          <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
+          <button type="button" class="dash-header__toggle" id="sidebarToggle" aria-label="Show or hide menu" aria-controls="sidebar" aria-expanded="false"><i class="fas fa-bars"></i></button>
           <a href="<?= url('candidate/application_review.php?id=' . (int) $applicationId) ?>" class="dash-header__back"><i class="fas fa-chevron-left"></i> Back</a>
         </div>
         <div class="dash-header__right">
@@ -231,5 +232,6 @@ $flashes = render_flashes();
       });
     });
   </script>
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-sidebar1" defer></script>
 </body>
 </html>

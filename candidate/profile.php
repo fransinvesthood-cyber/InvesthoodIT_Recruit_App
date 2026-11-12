@@ -56,6 +56,7 @@ $careerInterests = array_filter(array_map('trim', explode(',', (string)($profile
 <link rel="stylesheet" href="<?= url('css/profile.css') ?>">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
+  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-sidebar1">
 </head>
 <body class="dashboard-page profile-page">
 
@@ -117,7 +118,7 @@ $careerInterests = array_filter(array_map('trim', explode(',', (string)($profile
 
       <header class="dash-header" id="dashHeader">
         <div class="dash-header__left">
-          <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+          <button type="button" class="dash-header__toggle" id="sidebarToggle" aria-label="Show or hide menu" aria-controls="sidebar" aria-expanded="false">
             <i class="fas fa-bars"></i>
           </button>
         </div>
@@ -1156,5 +1157,6 @@ $careerInterests = array_filter(array_map('trim', explode(',', (string)($profile
   <script src="<?= url('js/dashboard.js') ?>"></script>
   <script src="<?= url('js/profile.js') ?>"></script>
   <?= $flashes ?>
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-sidebar1" defer></script>
 </body>
 </html>

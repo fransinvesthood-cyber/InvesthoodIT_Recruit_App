@@ -256,6 +256,7 @@ $flashes = render_flashes();
   <link rel="stylesheet" href="<?= url('css/candidate_notifications.css') ?>">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
+  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-sidebar1">
 </head>
 <body class="dashboard-page">
 
@@ -325,7 +326,7 @@ $flashes = render_flashes();
       <!-- ===== DASHBOARD HEADER ===== -->
       <header class="dash-header" id="dashHeader">
         <div class="dash-header__left">
-          <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+          <button type="button" class="dash-header__toggle" id="sidebarToggle" aria-label="Show or hide menu" aria-controls="sidebar" aria-expanded="false">
             <i class="fas fa-bars"></i>
           </button>
           <div class="dash-header__search" id="dashSearch">
@@ -1565,5 +1566,6 @@ $flashes = render_flashes();
   })();
   </script>
   <?= $flashes ?>
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-sidebar1" defer></script>
 </body>
 </html>

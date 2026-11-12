@@ -53,7 +53,8 @@ if ($readonly) {
       <link rel="stylesheet" href="<?= url('css/application_form.css') ?>">
       <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
       <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
-    </head>
+      <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-sidebar1">
+</head>
     <body class="dashboard-page application-form-page">
       <div class="dashboard">
         <aside class="sidebar" id="sidebar">
@@ -90,7 +91,7 @@ if ($readonly) {
         <main class="dashboard__main">
           <header class="dash-header">
             <div class="dash-header__left">
-              <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
+              <button type="button" class="dash-header__toggle" id="sidebarToggle" aria-label="Show or hide menu" aria-controls="sidebar" aria-expanded="false"><i class="fas fa-bars"></i></button>
               <a href="<?= url('candidate/application_detail.php?id=' . (int) $application['id']) ?>" class="dash-header__back"><i class="fas fa-chevron-left"></i> Back</a>
             </div>
             <div class="dash-header__right">
@@ -214,7 +215,7 @@ if (!$closingStatus) {
     <main class="dashboard__main">
       <header class="dash-header">
         <div class="dash-header__left">
-          <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
+          <button type="button" class="dash-header__toggle" id="sidebarToggle" aria-label="Show or hide menu" aria-controls="sidebar" aria-expanded="false"><i class="fas fa-bars"></i></button>
           <a href="<?= url('candidate/application_detail.php?id=' . (int) $application['id']) ?>" class="dash-header__back"><i class="fas fa-chevron-left"></i> Back</a>
         </div>
         <div class="dash-header__right">
@@ -797,5 +798,6 @@ if (!$closingStatus) {
   <script src="<?= url('js/applications.js') ?>"></script>
   <script src="<?= url('js/application_review.js') ?>"></script>
 
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-sidebar1" defer></script>
 </body>
 </html>

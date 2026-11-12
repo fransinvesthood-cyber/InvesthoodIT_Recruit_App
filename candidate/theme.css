@@ -1,0 +1,275 @@
+/* Candidate Portal theme. Loaded after page styles on every full page. */
+:root {
+  color-scheme: light;
+  --candidate-bg: #f4f7fb;
+  --candidate-surface: #ffffff;
+  --candidate-surface-alt: #eef3f9;
+  --candidate-text: #172033;
+  --candidate-muted: #64748b;
+  --candidate-border: #dce4ef;
+  --candidate-input: #ffffff;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --candidate-bg: #0b1220;
+  --candidate-surface: #162236;
+  --candidate-surface-alt: #1d2c43;
+  --candidate-text: #e7eef8;
+  --candidate-muted: #aab8cc;
+  --candidate-border: #34445c;
+  --candidate-input: #101c2e;
+}
+html[data-theme="dark"] body,
+body.dark-mode {
+  background: var(--candidate-bg) !important;
+  color: var(--candidate-text) !important;
+}
+html[data-theme="dark"] .dashboard,
+html[data-theme="dark"] .dash-content,
+html[data-theme="dark"] .dash-main,
+html[data-theme="dark"] .main-content,
+html[data-theme="dark"] main,
+html[data-theme="dark"] .page-content,
+html[data-theme="dark"] .content-wrapper,
+html[data-theme="dark"] .dashboard-page {
+  background: var(--candidate-bg) !important;
+  color: var(--candidate-text) !important;
+}
+/* Sidebar and fixed navigation */
+html[data-theme="dark"] .sidebar,
+html[data-theme="dark"] .sidebar__header,
+html[data-theme="dark"] .sidebar__nav,
+html[data-theme="dark"] .sidebar__footer,
+html[data-theme="dark"] .dash-sidebar,
+html[data-theme="dark"] .dash-sidebar__header,
+html[data-theme="dark"] .dash-sidebar__footer {
+  background: #111d30 !important;
+  color: #e7eef8 !important;
+  border-color: #34445c !important;
+}
+html[data-theme="dark"] .sidebar__link,
+html[data-theme="dark"] .sidebar__logout,
+html[data-theme="dark"] .sidebar__user-name,
+html[data-theme="dark"] .sidebar__user-role,
+html[data-theme="dark"] .sidebar__section-label,
+html[data-theme="dark"] .logo__text,
+html[data-theme="dark"] .dash-sidebar a {
+  color: #d5e2f3 !important;
+}
+html[data-theme="dark"] .sidebar__link:hover,
+html[data-theme="dark"] .sidebar__link.active,
+html[data-theme="dark"] .sidebar__link[aria-current="page"] {
+  background: #1c3150 !important;
+  color: #8dbaff !important;
+}
+/* Cards, panels, analytics, opportunity/application/learning content */
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .analytics-card,
+html[data-theme="dark"] .analytics-stat,
+html[data-theme="dark"] .analytics-chart-container,
+html[data-theme="dark"] .overview-card,
+html[data-theme="dark"] .welcome-card,
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] .app-card,
+html[data-theme="dark"] .application-card,
+html[data-theme="dark"] .opp-card,
+html[data-theme="dark"] .opportunity-card,
+html[data-theme="dark"] .learning-card,
+html[data-theme="dark"] .interview-card,
+html[data-theme="dark"] .placement-card,
+html[data-theme="dark"] .talent-profile__card,
+html[data-theme="dark"] .quick-action-card,
+html[data-theme="dark"] .settings-card,
+html[data-theme="dark"] .settings-section,
+html[data-theme="dark"] .settings-subsection,
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .widget,
+html[data-theme="dark"] .notif-centre,
+html[data-theme="dark"] .modal,
+html[data-theme="dark"] .modal-content,
+html[data-theme="dark"] .dropdown-menu,
+html[data-theme="dark"] .list-group-item,
+html[data-theme="dark"] .table-responsive,
+html[data-theme="dark"] .completeness-detail__card {
+  background: var(--candidate-surface) !important;
+  color: var(--candidate-text) !important;
+  border-color: var(--candidate-border) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+}
+/* Content text: override pale fixed colours used by older page-specific styles. */
+html[data-theme="dark"] .analytics-card *,
+html[data-theme="dark"] .opp-card *,
+html[data-theme="dark"] .application-card *,
+html[data-theme="dark"] .app-card *,
+html[data-theme="dark"] .learning-card *,
+html[data-theme="dark"] .interview-card *,
+html[data-theme="dark"] .placement-card *,
+html[data-theme="dark"] .settings-card *,
+html[data-theme="dark"] .settings-section *,
+html[data-theme="dark"] .modal-content *,
+html[data-theme="dark"] .list-group-item * {
+  border-color: var(--candidate-border);
+}
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3,
+html[data-theme="dark"] h4,
+html[data-theme="dark"] h5,
+html[data-theme="dark"] h6,
+html[data-theme="dark"] p,
+html[data-theme="dark"] label,
+html[data-theme="dark"] span,
+html[data-theme="dark"] strong,
+html[data-theme="dark"] b,
+html[data-theme="dark"] td,
+html[data-theme="dark"] th,
+html[data-theme="dark"] .opp-card__title,
+html[data-theme="dark"] .opp-card__description,
+html[data-theme="dark"] .opp-card__programme,
+html[data-theme="dark"] .opp-card__org,
+html[data-theme="dark"] .opp-card__meta,
+html[data-theme="dark"] .analytics-card h3,
+html[data-theme="dark"] .analytics-card h4 {
+  color: var(--candidate-text) !important;
+}
+html[data-theme="dark"] .text-muted,
+html[data-theme="dark"] small,
+html[data-theme="dark"] .form-text,
+html[data-theme="dark"] .text-secondary,
+html[data-theme="dark"] .muted {
+  color: var(--candidate-muted) !important;
+}
+/* Forms and filters */
+html[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select,
+html[data-theme="dark"] .form-control,
+html[data-theme="dark"] .form-select {
+  background: var(--candidate-input) !important;
+  color: var(--candidate-text) !important;
+  border-color: var(--candidate-border) !important;
+}
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder { color: var(--candidate-muted) !important; }
+html[data-theme="dark"] .dropdown-item { color: var(--candidate-text) !important; }
+html[data-theme="dark"] .dropdown-item:hover,
+html[data-theme="dark"] .dropdown-item:focus { background: var(--candidate-surface-alt) !important; }
+html[data-theme="dark"] table,
+html[data-theme="dark"] .table { color: var(--candidate-text) !important; --bs-table-bg: var(--candidate-surface); --bs-table-color: var(--candidate-text); --bs-table-border-color: var(--candidate-border); }
+html[data-theme="dark"] .table > :not(caption) > * > *,
+html[data-theme="dark"] .table thead th { background: var(--candidate-surface-alt) !important; color: var(--candidate-text) !important; border-color: var(--candidate-border) !important; }
+html[data-theme="dark"] a:not(.btn):not(.sidebar__link) { color: #91baff; }
+html[data-theme="dark"] .btn-close { filter: invert(1); }
+html[data-theme="dark"] .modal-header,
+html[data-theme="dark"] .modal-footer { border-color: var(--candidate-border) !important; }
+html[data-theme="dark"] [style*="background:#fff"],
+html[data-theme="dark"] [style*="background: #fff"],
+html[data-theme="dark"] [style*="background-color: white"],
+html[data-theme="dark"] [style*="background-color:#fff"],
+html[data-theme="dark"] [style*="background-color: #fff"] {
+  background: var(--candidate-surface) !important;
+  color: var(--candidate-text) !important;
+}
+@media (prefers-reduced-motion: no-preference) {
+  body, .sidebar, .card, .analytics-card, .opp-card, .modal-content { transition: background-color .18s ease, color .18s ease, border-color .18s ease; }
+}
+
+/* Learning Hub: page-specific surfaces were hard-coded in learning.php and need
+   explicit dark-theme tokens (rather than relying on generic .card rules). */
+html[data-theme="dark"] body.learning-page .dashboard__main,
+html[data-theme="dark"] body.learning-page .dash-content,
+html[data-theme="dark"] body.learning-page .programmes-section,
+html[data-theme="dark"] body.learning-page .learning-overview {
+  background: var(--candidate-bg) !important;
+  color: var(--candidate-text) !important;
+}
+html[data-theme="dark"] body.learning-page .progress-card,
+html[data-theme="dark"] body.learning-page .filter-bar,
+html[data-theme="dark"] body.learning-page .learning-card,
+html[data-theme="dark"] body.learning-page .empty-state {
+  background: var(--candidate-surface) !important;
+  color: var(--candidate-text) !important;
+  border-color: var(--candidate-border) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18) !important;
+}
+html[data-theme="dark"] body.learning-page .progress-stat {
+  background: var(--candidate-surface-alt) !important;
+  color: var(--candidate-text) !important;
+  border-color: var(--candidate-border) !important;
+}
+html[data-theme="dark"] body.learning-page .progress-card__header h3,
+html[data-theme="dark"] body.learning-page .progress-card__value,
+html[data-theme="dark"] body.learning-page .progress-stat__value,
+html[data-theme="dark"] body.learning-page .progress-stat__label,
+html[data-theme="dark"] body.learning-page .filter-bar__title,
+html[data-theme="dark"] body.learning-page .filter-form__group label,
+html[data-theme="dark"] body.learning-page .programmes-section__title,
+html[data-theme="dark"] body.learning-page .learning-card__header h4,
+html[data-theme="dark"] body.learning-page .learning-card__stats,
+html[data-theme="dark"] body.learning-page .empty-state__title {
+  color: var(--candidate-text) !important;
+}
+html[data-theme="dark"] body.learning-page .filter-bar__hint,
+html[data-theme="dark"] body.learning-page .programmes-section__count,
+html[data-theme="dark"] body.learning-page .learning-card__meta,
+html[data-theme="dark"] body.learning-page .empty-state__text,
+html[data-theme="dark"] body.learning-page .learning-card p,
+html[data-theme="dark"] body.learning-page .learning-card span {
+  color: var(--candidate-muted) !important;
+}
+html[data-theme="dark"] body.learning-page .progress-card__bar,
+html[data-theme="dark"] body.learning-page .learning-card__progress .progress-bar {
+  background: #263750 !important;
+}
+html[data-theme="dark"] body.learning-page .filter-form__group input,
+html[data-theme="dark"] body.learning-page .filter-form__group select {
+  background-color: var(--candidate-input) !important;
+  color: var(--candidate-text) !important;
+  border-color: var(--candidate-border) !important;
+}
+html[data-theme="dark"] body.learning-page .filter-form__group input::placeholder {
+  color: var(--candidate-muted) !important;
+}
+html[data-theme="dark"] body.learning-page .learning-card__stats {
+  border-color: var(--candidate-border) !important;
+}
+html[data-theme="dark"] body.learning-page .learning-card a:not(.btn),
+html[data-theme="dark"] body.learning-page .empty-state a:not(.btn) {
+  color: #91baff !important;
+}
+
+
+/* Candidate portal sidebar show/hide control */
+.dash-header__toggle,
+.candidate-sidebar-trigger {
+  display:inline-flex !important; align-items:center; justify-content:center;
+  width:42px; height:42px; min-width:42px; border:1px solid var(--candidate-border, #dce4ef);
+  border-radius:10px; background:var(--candidate-surface, #fff); color:var(--candidate-text, #172033);
+  cursor:pointer; font-size:1.05rem; line-height:1; z-index:1201; transition:background .18s ease,color .18s ease,border-color .18s ease;
+}
+.dash-header__toggle:hover,.candidate-sidebar-trigger:hover { background:#eaf1fb; }
+html[data-theme="dark"] .dash-header__toggle,
+html[data-theme="dark"] .candidate-sidebar-trigger { background:#1d2c43; color:#e7eef8; border-color:#40516b; }
+html[data-theme="dark"] .dash-header__toggle:hover,
+html[data-theme="dark"] .candidate-sidebar-trigger:hover { background:#294365; }
+.candidate-sidebar-trigger { position:fixed; top:12px; left:272px; }
+.sidebar__close { display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+.sidebar-overlay { display:none; }
+.sidebar-overlay.is-visible { display:block !important; position:fixed; inset:0; z-index:1098; background:rgba(2,8,23,.58); }
+@media (min-width:901px) {
+  .dashboard.sidebar-collapsed #sidebar,
+  .dashboard #sidebar.is-collapsed { transform:translateX(-100%) !important; visibility:hidden; }
+  .dashboard.sidebar-collapsed .dashboard__main,
+  .dashboard.sidebar-collapsed .dash-content { margin-left:0 !important; width:100% !important; max-width:none; }
+  .dashboard.sidebar-collapsed { --candidate-sidebar-width:0px; }
+  .dashboard #sidebar { transition:transform .22s ease,visibility .22s ease; }
+}
+@media (max-width:900px) {
+  #sidebar.sidebar { position:fixed !important; top:0; bottom:0; left:0; height:100dvh; max-height:100dvh; width:min(280px,86vw) !important; z-index:1100; transform:translateX(-105%); visibility:hidden; transition:transform .22s ease,visibility .22s ease; }
+  #sidebar.sidebar.is-open { transform:translateX(0); visibility:visible; }
+  .sidebar__close { display:inline-flex !important; }
+  .dashboard__main,.dash-content { width:100% !important; margin-left:0 !important; min-width:0; }
+  .dash-header__toggle { position:relative; z-index:1201; }
+  .candidate-sidebar-trigger { position:fixed; top:12px; left:12px; z-index:1201; }
+  body.sidebar-drawer-open { overflow:hidden; }
+}

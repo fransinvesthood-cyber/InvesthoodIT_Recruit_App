@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="<?= url('css/candidate_offers.css') ?>">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
+  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-sidebar1">
 </head>
 <body class="dashboard-page applications-page candidate-offers-page">
   <div class="dashboard">
@@ -42,7 +43,7 @@
     <main class="dashboard__main">
       <header class="dash-header">
         <div class="dash-header__left">
-          <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
+          <button type="button" class="dash-header__toggle" id="sidebarToggle" aria-label="Show or hide menu" aria-controls="sidebar" aria-expanded="false"><i class="fas fa-bars"></i></button>
           <a href="<?= url('candidate/dashboard.php#dashboard-offers') ?>" class="dash-header__back"><i class="fas fa-chevron-left"></i> Dashboard</a>
         </div>
         <div class="dash-header__right">
@@ -132,5 +133,6 @@
     </main>
   </div>
   <script src="<?= url('js/candidate_offers.js') ?>"></script>
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-sidebar1" defer></script>
 </body>
 </html>

@@ -164,6 +164,7 @@ $flashes = render_flashes();
 </style>
 <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
+  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-sidebar1">
 </head>
 <body class="dashboard-page learning-page">
 <div class="dashboard">
@@ -201,7 +202,7 @@ $flashes = render_flashes();
 <main class="dashboard__main">
 <header class="dash-header">
   <div class="dash-header__left">
-    <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
+    <button type="button" class="dash-header__toggle" id="sidebarToggle" aria-label="Show or hide menu" aria-controls="sidebar" aria-expanded="false"><i class="fas fa-bars"></i></button>
   </div>
   <div class="dash-header__right">
     <button class="dash-header__icon-btn" id="themeToggle" aria-label="Toggle dark mode"><i class="fas fa-moon"></i></button>
@@ -340,5 +341,6 @@ $flashes = render_flashes();
 </div>
 <script src="<?= url('js/script.js') ?>"></script>
 <script src="<?= url('js/learning.js') ?>"></script>
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-sidebar1" defer></script>
 </body>
 </html>
