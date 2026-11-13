@@ -7,6 +7,7 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 require_role('candidate');
 
 $userId = (int) current_user_id();
+$user = current_user();
 
 $certificationsView = CandidateLearningController::certificationsView($userId);
 $certifications = $certificationsView['certificates'];
@@ -33,6 +34,68 @@ foreach ($stats['assignments'] as $a) {
 <link rel="stylesheet" href="<?= url('css/applications.css') ?>">
 <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
+  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-cert-layout1">
+<style>
+/* Certifications page layout: keep content clear of the fixed candidate sidebar. */
+.certifications-page .dashboard { min-height:100vh; }
+.certifications-page .dash-content {
+  display:block; min-width:0; width:calc(100% - 260px); margin-left:260px;
+  padding:0 2rem 3rem; box-sizing:border-box;
+}
+.certifications-page .dash-content > .container {
+  width:100%; max-width:1180px; margin:0 auto; padding:0;
+  box-sizing:border-box;
+}
+.certifications-page .page-header { margin:0 -2rem 1.75rem; padding:1.75rem 2rem; }
+.certifications-page .learning-overview { display:block; margin:0 0 1.5rem; }
+.certifications-page .progress-card,
+.certifications-page .certifications-section__card,
+.certifications-page .skills-section__card {
+  width:100%; padding:1.4rem; box-sizing:border-box; border:1px solid #e2e8f0;
+  border-radius:14px; background:#fff; box-shadow:0 5px 18px rgba(15,23,42,.05);
+}
+.certifications-page .progress-card__header { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1.1rem; }
+.certifications-page .progress-card__stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.85rem; }
+.certifications-page .progress-stat { display:flex; flex-direction:column; gap:.3rem; min-width:0; padding:1rem; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; }
+.certifications-page .certifications-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); gap:1rem; margin:0 0 1.5rem; }
+.certifications-page .cert-card { min-width:0; padding:1.25rem; border:1px solid #e2e8f0; border-radius:14px; background:#fff; box-shadow:0 5px 18px rgba(15,23,42,.05); overflow-wrap:anywhere; }
+.certifications-page .cert-card__header { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:.75rem; margin-bottom:1rem; }
+.certifications-page .cert-card__title { flex:1 1 100%; margin:.15rem 0 0; font-size:1.1rem; line-height:1.35; }
+.certifications-page .cert-card__organisation,
+.certifications-page .cert-card__meta { display:flex; flex-wrap:wrap; gap:.65rem 1rem; color:#64748b; }
+.certifications-page .cert-card__meta { margin-top:.8rem; font-size:.85rem; }
+.certifications-page .cert-card__actions { display:flex; flex-wrap:wrap; margin-top:1rem; }
+.certifications-page .certifications-section { margin-top:1.5rem; }
+.certifications-page .certifications-section__header { margin-bottom:1rem; }
+.certifications-page .certifications-timeline { display:grid; gap:.85rem; }
+.certifications-page .certifications-timeline__item { display:flex; gap:.9rem; padding:.9rem; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; }
+.certifications-page .certifications-timeline__content { display:flex; flex-direction:column; gap:.25rem; min-width:0; }
+.certifications-page .certifications-timeline__title { font-weight:700; overflow-wrap:anywhere; }
+.certifications-page .certifications-timeline__meta { color:#64748b; font-size:.85rem; }
+body.dark-mode.certifications-page .progress-card,
+body.dark-mode.certifications-page .cert-card,
+body.dark-mode.certifications-page .certifications-section__card,
+body.dark-mode.certifications-page .skills-section__card,
+body[data-theme="dark"].certifications-page .progress-card,
+body[data-theme="dark"].certifications-page .cert-card,
+body[data-theme="dark"].certifications-page .certifications-section__card,
+body[data-theme="dark"].certifications-page .skills-section__card { background:#111c2e; color:#e5edf8; border-color:#2b3b53; }
+body.dark-mode.certifications-page .progress-stat,
+body.dark-mode.certifications-page .certifications-timeline__item,
+body[data-theme="dark"].certifications-page .progress-stat,
+body[data-theme="dark"].certifications-page .certifications-timeline__item { background:#17263b; border-color:#344761; }
+body.dark-mode.certifications-page .cert-card__organisation,
+body.dark-mode.certifications-page .cert-card__meta,
+body.dark-mode.certifications-page .certifications-timeline__meta,
+body[data-theme="dark"].certifications-page .cert-card__organisation,
+body[data-theme="dark"].certifications-page .cert-card__meta,
+body[data-theme="dark"].certifications-page .certifications-timeline__meta { color:#aebdd1; }
+@media(max-width:900px) {
+  .certifications-page .dash-content { width:100%; margin-left:0; padding:0 1rem 2rem; }
+  .certifications-page .page-header { margin:0 -1rem 1.25rem; padding:1.4rem 1rem; }
+  .certifications-page .progress-card__stats { grid-template-columns:1fr; }
+}
+</style>
 </head>
 <body class="dashboard-page certifications-page">
 <div class="dashboard">
@@ -67,6 +130,7 @@ foreach ($stats['assignments'] as $a) {
 </div>
 </aside>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
+<button type="button" class="dash-header__toggle candidate-sidebar-trigger" id="sidebarToggle" aria-label="Show or hide menu" aria-controls="sidebar" aria-expanded="false"><i class="fas fa-bars" aria-hidden="true"></i></button>
 <main class="dash-content">
 <header class="page-header">
 <div class="container">
@@ -84,6 +148,7 @@ foreach ($stats['assignments'] as $a) {
 <div class="progress-stat"><span class="progress-stat__value"><?= count(array_filter($certifications, fn($c) => $c['expired'])) ?></span><span class="progress-stat__label">Expired</span></div>
 </div>
 </div>
+</section>
 
 <!-- ===== CERTIFICATIONS ===== -->
 <?php if (empty($certifications)): ?>
@@ -146,6 +211,7 @@ foreach ($stats['assignments'] as $a) {
 
 <script src="<?= url('js/script.js') ?>"></script>
 <script src="<?= url('js/learning.js') ?>"></script>
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-profilemenu1" defer></script>
 </body>
 </html>
 

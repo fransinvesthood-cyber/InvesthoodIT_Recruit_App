@@ -1,0 +1,116 @@
+/* Supervisor portal sidebar layout and show/hide control */
+:root { --sv-sidebar-width:272px; --sv-sidebar-collapsed-width:78px; }
+html, body { min-height:100%; }
+body.ux-body { margin:0; }
+.ux-app {
+    display:flex !important; align-items:stretch; min-height:100vh;
+    width:100%; overflow-x:clip;
+}
+#uxSidebar.sidebar {
+    box-sizing:border-box; flex:0 0 var(--sv-sidebar-width);
+    width:var(--sv-sidebar-width); min-width:var(--sv-sidebar-width);
+    height:100vh; min-height:100vh; position:sticky; top:0; left:auto;
+    z-index:1100; display:flex; flex-direction:column; overflow:hidden;
+    transition:width .22s ease,min-width .22s ease,flex-basis .22s ease,transform .22s ease;
+}
+#uxSidebar .sidebar__header { flex:0 0 auto; min-height:72px; }
+#uxSidebar .sidebar__nav {
+    flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;
+    overscroll-behavior:contain; padding-bottom:18px;
+}
+#uxSidebar .sidebar__footer { flex:0 0 auto; margin-top:auto; }
+#uxSidebar .sidebar__menu { list-style:none; margin:0; padding:0; }
+#uxSidebar .sidebar__link {
+    display:flex; align-items:center; gap:12px; min-height:44px;
+    box-sizing:border-box; white-space:nowrap; text-decoration:none;
+}
+#uxSidebar .sidebar__link > i { width:20px; min-width:20px; text-align:center; }
+.ux-main {
+    flex:1 1 0 !important; min-width:0; width:auto; max-width:none;
+    margin:0 !important; display:flex; flex-direction:column; min-height:100vh;
+    transition:width .22s ease,max-width .22s ease;
+}
+.ux-content { flex:1 0 auto; min-width:0; }
+.ux-navbar { position:sticky; top:0; z-index:900; }
+
+/* Desktop collapsed state */
+.ux-app.sv-sidebar-collapsed #uxSidebar.sidebar {
+    flex-basis:var(--sv-sidebar-collapsed-width);
+    width:var(--sv-sidebar-collapsed-width);
+    min-width:var(--sv-sidebar-collapsed-width);
+}
+.ux-app.sv-sidebar-collapsed #uxSidebar .logo__text,
+.ux-app.sv-sidebar-collapsed #uxSidebar .sidebar__section-label,
+.ux-app.sv-sidebar-collapsed #uxSidebar .sidebar__user-info,
+.ux-app.sv-sidebar-collapsed #uxSidebar .sidebar__logout { display:none; }
+.ux-app.sv-sidebar-collapsed #uxSidebar .sidebar__link {
+    justify-content:center; padding-left:0; padding-right:0; font-size:0;
+}
+.ux-app.sv-sidebar-collapsed #uxSidebar .sidebar__link > i { font-size:17px; }
+.ux-app.sv-sidebar-collapsed #uxSidebar .sidebar__user { justify-content:center; }
+
+.sidebar-overlay {
+    display:none !important; position:fixed !important; inset:0 !important;
+    width:auto !important; height:auto !important; flex:none !important;
+    margin:0 !important; padding:0 !important; pointer-events:none;
+}
+.ux-app.sv-sidebar-open .sidebar-overlay {
+    display:block !important; pointer-events:auto; z-index:1050;
+    background:rgba(15,23,42,.52);
+}
+
+/* Visible navbar show/hide menu button */
+#uxMenuButton.ux-navbar__menu {
+    display:inline-flex !important; align-items:center; justify-content:center;
+    flex:0 0 40px; width:40px; height:40px; padding:0; margin:0 12px 0 0;
+    border:1px solid var(--ux-border,rgba(148,163,184,.28));
+    border-radius:10px; color:var(--ux-text,#e5e7eb);
+    background:var(--ux-surface,rgba(255,255,255,.04));
+    cursor:pointer; font-size:15px; line-height:1;
+    transition:background .18s ease,border-color .18s ease;
+}
+#uxMenuButton.ux-navbar__menu:hover {
+    background:var(--ux-primary-soft,rgba(59,130,246,.14));
+    border-color:var(--ux-primary,#3b82f6);
+}
+#uxMenuButton.ux-navbar__menu:focus-visible {
+    outline:2px solid var(--ux-primary,#3b82f6); outline-offset:2px;
+}
+@media (max-width:900px) {
+    .ux-app { display:block !important; }
+    #uxSidebar.sidebar {
+        position:fixed; top:0; bottom:0; left:0;
+        width:min(var(--sv-sidebar-width),86vw);
+        min-width:min(var(--sv-sidebar-width),86vw);
+        height:100dvh; min-height:100dvh;
+        transform:translateX(-105%); box-shadow:12px 0 32px rgba(0,0,0,.18);
+    }
+    .ux-app.sv-sidebar-open #uxSidebar.sidebar { transform:translateX(0); }
+    .ux-main { width:100%; max-width:100%; min-height:100vh; }
+    .ux-app.sv-sidebar-collapsed #uxSidebar .logo__text,
+    .ux-app.sv-sidebar-collapsed #uxSidebar .sidebar__section-label,
+    .ux-app.sv-sidebar-collapsed #uxSidebar .sidebar__user-info,
+    .ux-app.sv-sidebar-collapsed #uxSidebar .sidebar__logout { display:initial; }
+    .ux-app.sv-sidebar-collapsed #uxSidebar .sidebar__link {
+        justify-content:flex-start; font-size:inherit;
+    }
+    .ux-app.sv-sidebar-collapsed #uxSidebar .sidebar__link > i { font-size:inherit; }
+    .ux-navbar { z-index:950; }
+    #uxMenuButton.ux-navbar__menu { margin-right:9px; }
+    .ux-app.sv-sidebar-open .sidebar-overlay { display:block !important; }
+    #portalSidebarClose { display:inline-flex !important; }
+}
+@media (min-width:901px) { #portalSidebarClose { display:none !important; } }
+@media (prefers-reduced-motion:reduce) {
+    #uxSidebar.sidebar, .ux-main { transition:none !important; }
+}
+
+/* Keep the sidebar toggle above decorative navbar layers and clickable. */
+.ux-navbar__left { position: relative; z-index: 2; }
+#uxMenuButton {
+    position: relative !important;
+    z-index: 5 !important;
+    pointer-events: auto !important;
+    touch-action: manipulation;
+}
+body.sv-sidebar-lock { overflow: hidden; }

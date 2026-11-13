@@ -75,6 +75,7 @@ $flashes = render_flashes();
   <link rel="stylesheet" href="<?= url('css/opportunities.css') ?>">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
+  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-profilemenu1">
 </head>
 <body class="dashboard-page opportunities-page">
 
@@ -121,11 +122,22 @@ $flashes = render_flashes();
     <main class="dashboard__main">
       <header class="dash-header">
         <div class="dash-header__left">
-          <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
+          <button type="button" class="dash-header__toggle" id="sidebarToggle" aria-label="Show or hide menu" aria-controls="sidebar" aria-expanded="false"><i class="fas fa-bars"></i></button>
         </div>
         <div class="dash-header__right">
           <button class="dash-header__icon-btn" id="themeToggle" aria-label="Toggle dark mode"><i class="fas fa-moon"></i></button>
-          <div class="dash-header__user"><img src="<?= url('candidate/avatar.php') ?>" alt="Profile" class="dash-header__avatar"></div>
+          <div class="dash-header__user profile-menu" data-profile-menu>
+            <button type="button" class="dash-header__avatar-trigger" data-profile-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Open profile menu">
+              <img src="<?= url('candidate/avatar.php') ?>" alt="Profile" class="dash-header__avatar">
+              <span class="profile-menu__chevron" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+            </button>
+            <div class="profile-menu__panel" data-profile-menu-panel aria-hidden="true">
+              <a href="<?= url('candidate/profile.php') ?>" class="profile-menu__item"><i class="fas fa-user"></i><span>Profile</span></a>
+              <a href="<?= url('candidate/settings.php') ?>" class="profile-menu__item"><i class="fas fa-cog"></i><span>Settings</span></a>
+              <div class="profile-menu__divider"></div>
+              <a href="<?= url('auth/logout.php') ?>" class="profile-menu__item profile-menu__item--logout"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -474,5 +486,6 @@ $flashes = render_flashes();
   <!-- Scripts -->
   <script src="<?= url('js/opportunities.js') ?>"></script>
 
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-profilemenu1" defer></script>
 </body>
 </html>
