@@ -1,1 +1,1 @@
-<?php $_GET['module']='consents'; require __DIR__.'/_module.php';
+<?php $_GET['tab']='consents'; require __DIR__.'/consent_processing.php';

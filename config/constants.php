@@ -32,6 +32,8 @@ const ROLE_DASHBOARD_MAP = [
     'assessor'           => 'assessor/dashboard.php',
     'finance_officer'    => 'finance/dashboard.php',
     'information_officer'=> 'privacy/dashboard.php',
+    'sponsor'            => 'sponsor/dashboard.php',
+    'commercial_manager' => 'commercial_manager/dashboard.php',
     'candidate'          => 'candidate/dashboard.php',
 ];
 

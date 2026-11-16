@@ -151,10 +151,12 @@ $unread = (int) (
             type="button"
             class="ux-navbar__menu"
             id="uxMenuButton"
-            aria-label="Toggle sidebar"
-            title="Show/Hide Menu"
+            aria-label="Hide sidebar"
+            aria-expanded="true"
+            aria-controls="uxSidebar"
+            title="Hide sidebar"
         >
-            <i class="fas fa-bars"></i>
+            <i class="fas fa-angles-left" id="uxMenuIcon" aria-hidden="true"></i>
         </button>
 
         <!-- Page Heading -->

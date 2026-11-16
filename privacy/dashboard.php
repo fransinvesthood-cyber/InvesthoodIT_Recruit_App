@@ -83,7 +83,9 @@ $recentActions=[];
 if (iod_has_table($db,'io_audit_events')) {
     $recentActions = iod_rows($db, "SELECT action, entity_type, entity_id, outcome, created_at FROM io_audit_events ORDER BY created_at DESC, id DESC LIMIT 8");
 }
-$links = ['requests.php'=>'Data Subject Requests','incidents.php'=>'Privacy Incidents','consents.php'=>'Consent Monitoring','access_reviews.php'=>'Access Reviews','retention.php'=>'Retention Reviews','audit.php'=>'Audit Trail','reports.php'=>'Reports','settings.php'=>'Settings'];
+$processingActivities = iod_count($db, 'io_processing_activities');
+$operators = iod_count($db, 'io_operator_register');
+$links = ['requests.php'=>'Data Subject Requests','incidents.php'=>'Privacy Incidents','consents.php'=>'Consent Monitoring','access_reviews.php'=>'Access Reviews','retention.php'=>'Retention Reviews','audit.php'=>'Audit Trail','processing.php'=>'Processing Inventory','operators.php'=>'Operators','reports.php'=>'Reports','settings.php'=>'Settings'];
 function iod_status_class($status): string {
     $s=strtolower((string)$status);
     if (in_array($s,['urgent','critical','high','overdue','rejected','failure','denied','remediation_required'],true)) return 'danger';
