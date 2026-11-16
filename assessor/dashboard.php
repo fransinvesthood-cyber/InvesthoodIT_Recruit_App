@@ -99,6 +99,60 @@ if (as_has_table($conn, 'candidate_documents')) {
     }
 }
 
+/* -------------------------------------------------------------------------
+ * Evidence & competency verification snapshot (Evidence module)
+ * ---------------------------------------------------------------------- */
+$evStats = ['pending'=>0,'needs_more'=>0,'rejected'=>0,'verified'=>0];
+if (as_has_table($conn, 'assessment_evidence')) {
+    $es = $conn->prepare(
+        "SELECT COALESCE(SUM(ae.status='pending'),0)     pending,
+                COALESCE(SUM(ae.status='needs_more'),0)  needs_more,
+                COALESCE(SUM(ae.status='rejected'),0)    rejected,
+                COALESCE(SUM(ae.status='verified'),0)    verified
+           FROM assessment_evidence ae
+           JOIN assessment_attempts aa ON aa.id = ae.attempt_id
+          WHERE aa.assessor_id = ?"
+    );
+    if ($es) {
+        $es->bind_param('i', $assessorId);
+        $es->execute();
+        $r = $es->get_result()->fetch_assoc() ?: [];
+        foreach ($evStats as $k => $_) $evStats[$k] = (int)($r[$k] ?? 0);
+        $es->close();
+    }
+}
+
+/* -------------------------------------------------------------------------
+ * Assessment appeals snapshot (Appeals & Reassessment module)
+ * ---------------------------------------------------------------------- */
+$appealStats = [
+    'assigned'   => 0,   // appeals assigned to me, currently open
+    'unassigned' => 0,   // appeals in the shared pool awaiting claim
+    'info'       => 0,   // appeals where I've requested more info
+    'scheduled'  => 0,   // reassessments I've scheduled
+    'closed'     => 0,   // my appeals closed (upheld/overturned/withdrawn/closed)
+];
+if (as_has_table($conn, 'assessment_appeals')) {
+    $q = $conn->prepare(
+        "SELECT
+            COALESCE(SUM(assigned_assessor_id = ? AND status IN ('submitted','under_review')),0)      assigned,
+            COALESCE(SUM(assigned_assessor_id IS NULL AND status = 'submitted'),0)                    unassigned,
+            COALESCE(SUM(assigned_assessor_id = ? AND status = 'info_requested'),0)                   info,
+            COALESCE(SUM(assigned_assessor_id = ? AND status = 'reassessment_scheduled'),0)           scheduled,
+            COALESCE(SUM(assigned_assessor_id = ? AND status IN ('upheld','overturned','closed','withdrawn')),0) closed
+           FROM assessment_appeals"
+    );
+    if ($q) {
+        $q->bind_param('iiii', $assessorId, $assessorId, $assessorId, $assessorId);
+        $q->execute();
+        $r = $q->get_result()->fetch_assoc() ?: [];
+        foreach ($appealStats as $k => $_) $appealStats[$k] = (int)($r[$k] ?? 0);
+        $q->close();
+    }
+}
+$appealOpenTotal = $appealStats['assigned'] + $appealStats['unassigned']
+                 + $appealStats['info']     + $appealStats['scheduled'];
+
 $first=trim((string)($user['first_name']??'Assessor'));
 $defs=[
  'assigned'=>['label'=>'Assigned assessment attempts','icon'=>'fas fa-list-check','empty'=>'No assigned attempts'],
@@ -124,6 +178,16 @@ body.dark-mode .as-dashboard-modal__dialog,html[data-theme="dark"] .as-dashboard
 .doc-dash strong{font-size:22px;line-height:1}
 .doc-dash span{font-size:12px;opacity:.65}
 @media(max-width:720px){.doc-dash{grid-template-columns:repeat(2,1fr)}}
+
+/* Appeals card (Appeals module) */
+.appeal-dash{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:6px 4px 14px}
+.appeal-dash a{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:14px;background:rgba(127,127,127,.05);text-decoration:none;color:inherit;transition:transform .15s ease,background .15s ease;position:relative}
+.appeal-dash a:hover{transform:translateY(-2px);background:rgba(79,70,229,.08)}
+.appeal-dash strong{font-size:22px;line-height:1}
+.appeal-dash span{font-size:12px;opacity:.65}
+.appeal-dash__flag{position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:50%;background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.15)}
+.appeal-note{margin-top:4px;font-size:12px;opacity:.7}
+@media(max-width:720px){.appeal-dash{grid-template-columns:repeat(2,1fr)}}
 </style>
 
 <section class="as-hero"><div class="as-hero__content"><span class="as-hero__eyebrow"><i class="fas fa-award"></i> Quality Assessment Workspace</span><h2>Welcome back, <?=e($first?:'Assessor')?>.</h2><p>Review evidence against outcomes, record criterion-level decisions, provide clear feedback and maintain a complete audit trail for every assessment.</p><div class="as-hero__actions"><a class="as-btn as-btn--light" href="<?=url('assessor/assessments.php')?>"><i class="fas fa-clipboard-check"></i> Open Assessment Queue</a><a class="as-btn as-btn--glass" href="<?=url('assessor/decisions.php')?>"><i class="fas fa-gavel"></i> View My Decisions</a></div></div><div class="as-hero__visual"><div class="as-quality-orb"><div class="as-quality-orb__icon"><i class="fas fa-scale-balanced"></i></div><strong>Consistent</strong><span>Evidence-led assessment</span></div></div></section>
@@ -170,6 +234,80 @@ body.dark-mode .as-dashboard-modal__dialog,html[data-theme="dark"] .as-dashboard
       <strong><?=number_format($docStats['verified'])?></strong>
       <span><i class="fas fa-circle-check"></i> Verified</span>
     </a>
+  </div>
+</section>
+
+<!-- ===================================================================
+     Evidence & competency verification card (Evidence module)
+     =================================================================== -->
+<section class="as-card" style="margin-top:18px">
+  <div class="as-card__header">
+    <div>
+      <h3>Evidence &amp; verification</h3>
+      <p>Candidate evidence captured against your assessment attempts and its verification state.</p>
+    </div>
+    <a class="as-link" href="<?=url('assessor/evidence.php')?>">Open queue <i class="fas fa-arrow-right"></i></a>
+  </div>
+  <div class="doc-dash">
+    <a href="<?=url('assessor/evidence.php?status=pending')?>">
+      <strong><?=number_format($evStats['pending'])?></strong>
+      <span><i class="fas fa-hourglass-half"></i> Pending review</span>
+    </a>
+    <a href="<?=url('assessor/evidence.php?status=needs_more')?>">
+      <strong><?=number_format($evStats['needs_more'])?></strong>
+      <span><i class="fas fa-circle-info"></i> Needs more info</span>
+    </a>
+    <a href="<?=url('assessor/evidence.php?status=rejected')?>">
+      <strong><?=number_format($evStats['rejected'])?></strong>
+      <span><i class="fas fa-circle-xmark"></i> Rejected</span>
+    </a>
+    <a href="<?=url('assessor/evidence.php?status=verified')?>">
+      <strong><?=number_format($evStats['verified'])?></strong>
+      <span><i class="fas fa-circle-check"></i> Verified</span>
+    </a>
+  </div>
+</section>
+
+<!-- ===================================================================
+     Assessment appeals card (Appeals & Reassessment module)
+     =================================================================== -->
+<section class="as-card" style="margin-top:18px">
+  <div class="as-card__header">
+    <div>
+      <h3>Assessment appeals</h3>
+      <p>Challenges to assessment outcomes that you are reviewing, plus unclaimed appeals in the shared pool.</p>
+    </div>
+    <a class="as-link" href="<?=url('assessor/appeals.php')?>">Open queue <i class="fas fa-arrow-right"></i></a>
+  </div>
+  <?php if ($appealOpenTotal === 0): ?>
+    <div class="appeal-note"><i class="fas fa-circle-check"></i> Nothing awaiting your attention — you have no open appeals.</div>
+  <?php endif; ?>
+  <div class="appeal-dash">
+    <a href="<?=url('assessor/appeals.php?tab=assigned')?>">
+      <strong><?=number_format($appealStats['assigned'])?></strong>
+      <span><i class="fas fa-user-check"></i> Assigned to me</span>
+    </a>
+    <a href="<?=url('assessor/appeals.php?tab=unassigned')?>">
+      <?php if ($appealStats['unassigned'] > 0): ?><span class="appeal-dash__flag" aria-hidden="true"></span><?php endif; ?>
+      <strong><?=number_format($appealStats['unassigned'])?></strong>
+      <span><i class="fas fa-inbox"></i> Unassigned</span>
+    </a>
+    <a href="<?=url('assessor/appeals.php?tab=info')?>">
+      <strong><?=number_format($appealStats['info'])?></strong>
+      <span><i class="fas fa-circle-info"></i> Info requested</span>
+    </a>
+    <a href="<?=url('assessor/appeals.php?tab=scheduled')?>">
+      <strong><?=number_format($appealStats['scheduled'])?></strong>
+      <span><i class="fas fa-calendar-plus"></i> Reassessments</span>
+    </a>
+  </div>
+  <div class="appeal-note">
+    <i class="fas fa-shield-halved"></i> You cannot review an appeal against your own original decision.
+    <?php if ($appealStats['closed'] > 0): ?>
+      · <a href="<?=url('assessor/appeals.php?tab=closed')?>" style="color:inherit;text-decoration:underline">
+        <?=number_format($appealStats['closed'])?> recently closed
+      </a>
+    <?php endif; ?>
   </div>
 </section>
 
