@@ -173,6 +173,9 @@ $titles = [
     'notifications'
         => 'Notifications',
 
+    'announcements'
+        => 'Announcement Centre',
+
 ];
 
 
