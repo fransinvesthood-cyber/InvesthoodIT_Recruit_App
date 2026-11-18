@@ -11,7 +11,7 @@ $pageTitle = 'Communication Centre';
 $flashes = render_flashes();
 $errors = [];
 $tableReady = pm_table_exists($conn, 'programme_announcements');
-if (!$tableReady) $errors[] = 'The announcement database table is not installed yet. Run database/programme_communication_centre.sql in your Investhood platform database before publishing announcements.';
+if (!$tableReady) $errors[] = 'Announcements are not available because the required database table is missing. Ask the system administrator to import database/programme_communication_centre.sql into the active Investhood database, then refresh this page.';
 $editing = null;
 $allowedRoles = ['all', 'candidate', 'supervisor', 'programme_officer', 'recruiter', 'assessor', 'finance_officer', 'information_officer', 'programme_manager'];
 $allowedCategories = ['general', 'deadline', 'event', 'programme_update', 'assessment', 'interview', 'policy'];
@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $status = $action === 'archive' ? 'archived' : 'published';
                 $stmt = $conn->prepare("UPDATE programme_announcements SET status=?, published_at=CASE WHEN ?='published' THEN COALESCE(published_at,NOW()) ELSE published_at END, updated_at=NOW() WHERE id=? AND author_id=?");
                 if ($stmt) { $stmt->bind_param('ssii', $status, $status, $id, $managerId); $stmt->execute(); $stmt->close(); set_flash('success', 'Announcement updated', $status === 'published' ? 'The announcement is now published.' : 'The announcement has been archived.'); safe_redirect('programme/announcements.php'); }
-                $errors[] = 'The announcement could not be updated.';
+                $errors[] = 'The announcement status could not be updated. Please confirm the announcement database migration is installed and try again. If the problem continues, provide the system administrator with the application error log.';
             }
         } else {
             $title = trim((string)($_POST['title'] ?? ''));
@@ -90,8 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 if ($stmt) {
                     if ($stmt->execute()) { $stmt->close(); set_flash('success', 'Announcement saved', $status === 'published' ? 'Your announcement has been published.' : 'Your announcement has been saved as a draft.'); safe_redirect('programme/announcements.php'); }
-                    error_log('[Announcements] Save failed: '.$stmt->error); $stmt->close(); $errors[] = 'The announcement could not be saved. Please check the database migration and try again.';
-                } else { $errors[] = 'The announcement could not be prepared for saving.'; }
+                    error_log('[Announcements] Save failed: '.$stmt->error); $stmt->close(); $errors[] = 'Your announcement was not saved. The database rejected the request. Please check that the Communication Centre migration is installed and that all required fields are available, then try again.';
+                } else { error_log('[Announcements] Prepare failed: '.$conn->error); $errors[] = 'The announcement could not be prepared for saving because the database structure is not ready. Ask the system administrator to verify the Communication Centre migration.'; }
             }
             $editing = ['id'=>$id,'title'=>$title,'message'=>$message,'category'=>$category,'priority'=>$priority,'target_role'=>$targetRole,'programme_id'=>$programmeId,'cohort_id'=>$cohortId,'status'=>$status];
         }

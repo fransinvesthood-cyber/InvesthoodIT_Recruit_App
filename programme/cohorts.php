@@ -607,7 +607,7 @@ $capacityBarClasses = [
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
 
     <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
-    <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20260927">
+    <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20261118">
 
     <style>
         /* ============================================================
@@ -1101,6 +1101,57 @@ $capacityBarClasses = [
             padding: 24px 16px; text-align: center;
             color: #667085; font-size: 13px;
         }
+
+
+        /* Explicit dark-theme treatment for all cohort and stat modal surfaces. */
+        html[data-theme="dark"] .pm-cohort-modal__dialog {
+            background: #111c2d !important;
+            border-color: #334155 !important;
+            color: #e5edf8 !important;
+        }
+        html[data-theme="dark"] .pm-cohort-modal__header,
+        html[data-theme="dark"] .pm-cohort-modal__footer {
+            background: #111c2d !important;
+            border-color: #334155 !important;
+        }
+        html[data-theme="dark"] .pm-cohort-modal__title,
+        html[data-theme="dark"] .pm-cohort-modal__body h3,
+        html[data-theme="dark"] .pm-stat-modal-row__title,
+        html[data-theme="dark"] .pm-cohort-meta-grid strong,
+        html[data-theme="dark"] .pm-cohort-summary__value,
+        html[data-theme="dark"] .pm-sup-hero__name {
+            color: #f8fafc !important;
+        }
+        html[data-theme="dark"] .pm-cohort-modal__body,
+        html[data-theme="dark"] .pm-cohort-summary,
+        html[data-theme="dark"] .pm-stat-modal-row,
+        html[data-theme="dark"] .pm-sup-hero,
+        html[data-theme="dark"] .pm-sup-table-mini {
+            background: #172337 !important;
+            border-color: #334155 !important;
+            color: #e2e8f0 !important;
+        }
+        html[data-theme="dark"] .pm-cohort-modal__eyebrow,
+        html[data-theme="dark"] .pm-stat-modal-row__value { color: #7db4ff !important; }
+        html[data-theme="dark"] .pm-cohort-summary__label,
+        html[data-theme="dark"] .pm-cohort-modal__body p,
+        html[data-theme="dark"] .pm-stat-modal-row__sub,
+        html[data-theme="dark"] .pm-sup-hero__meta,
+        html[data-theme="dark"] .pm-stat-modal-empty { color: #a9b8cc !important; }
+        html[data-theme="dark"] .pm-cohort-modal__close,
+        html[data-theme="dark"] .pm-cohort-modal__cancel {
+            background: #223149 !important;
+            color: #e5edf8 !important;
+            border-color: #475569 !important;
+        }
+        html[data-theme="dark"] .pm-stat-modal-row:hover {
+            background: #20314a !important;
+            border-color: #5275a8 !important;
+        }
+        html[data-theme="dark"] .pm-sup-table-mini th {
+            background: #0f1929 !important; color: #cbd5e1 !important; border-color: #334155 !important;
+        }
+        html[data-theme="dark"] .pm-sup-table-mini td { color: #e2e8f0 !important; border-color: #334155 !important; }
 
         @media (max-width: 620px) {
             .pm-cohort-modal { padding: 12px; }

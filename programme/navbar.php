@@ -37,6 +37,7 @@ $titles = [
     'notifications' => 'Notifications',
     'announcements' => 'Communication Centre',
     'milestones' => 'Milestones & Deadlines',
+    'profile' => 'My Profile',
 ];
 
 $navbarTitle = $titles[$currentPage] ?? ($pageTitle ?? 'Programme Manager Portal');
@@ -156,16 +157,16 @@ $unread = (int)$notificationData['unread'];
             </div>
         </div>
 
-        <div class="pm-navbar__user">
-            <div class="pm-navbar__avatar">
+        <a class="pm-navbar__user" href="<?= url('programme/profile.php') ?>" aria-label="View your Programme Manager profile">
+            <span class="pm-navbar__avatar">
                 <?= e($initials) ?>
-            </div>
+            </span>
 
-            <div class="pm-navbar__user-copy">
+            <span class="pm-navbar__user-copy">
                 <strong><?= e($fullName) ?></strong>
-                <span>Programme Manager</span>
-            </div>
-        </div>
+                <span>Programme Manager · My Profile</span>
+            </span>
+        </a>
     </div>
 </header>
 
