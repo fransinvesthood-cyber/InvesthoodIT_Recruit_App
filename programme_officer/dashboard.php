@@ -1244,6 +1244,89 @@ if ($stmt) {
     $stmt->close();
 }
 
+/* Open deliverables that are overdue or awaiting submission review. */
+$deliverablesTable = $conn->query("SHOW TABLES LIKE 'programme_deliverables'");
+$submissionsTable = $conn->query("SHOW TABLES LIKE 'deliverable_submissions'");
+if ($deliverablesTable && $deliverablesTable->num_rows > 0 && $submissionsTable && $submissionsTable->num_rows > 0) {
+    $sql = "
+        SELECT
+            d.id AS deliverable_id,
+            d.title AS deliverable_title,
+            d.due_date,
+            p.name AS programme_name,
+            c.name AS cohort_name,
+            (SELECT COUNT(DISTINCT cp2.user_id)
+             FROM cohort_participants cp2
+             INNER JOIN cohorts c2 ON c2.id = cp2.cohort_id
+             WHERE c2.programme_id = d.programme_id
+               AND (d.cohort_id IS NULL OR c2.id = d.cohort_id)
+               AND cp2.status <> 'withdrawn') AS expected_count,
+            (SELECT COUNT(DISTINCT s.candidate_id)
+             FROM deliverable_submissions s
+             WHERE s.deliverable_id = d.id AND s.status = 'verified') AS verified_count,
+            (SELECT COUNT(DISTINCT s.candidate_id)
+             FROM deliverable_submissions s
+             WHERE s.deliverable_id = d.id AND s.status = 'submitted') AS awaiting_count
+        FROM programme_deliverables d
+        INNER JOIN programmes p ON p.id = d.programme_id
+        LEFT JOIN cohorts c ON c.id = d.cohort_id
+        WHERE {$scopeCondition}
+          AND d.status = 'open'
+          AND (
+              d.due_date < CURDATE()
+              OR EXISTS (
+                  SELECT 1
+                  FROM deliverable_submissions pending_submission
+                  WHERE pending_submission.deliverable_id = d.id
+                    AND pending_submission.status = 'submitted'
+              )
+          )
+        ORDER BY d.due_date ASC, d.id DESC
+        LIMIT 12
+    ";
+    $stmt = $conn->prepare($sql);
+    if ($stmt) {
+        $stmt->bind_param('i', $officerId);
+        if ($stmt->execute()) {
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $meta = $row['programme_name'] . ' · ' . ($row['cohort_name'] ?? 'All cohorts');
+                $deliverableUrl = url('programme_officer/deliverable_view.php?id=' . (int) $row['deliverable_id']);
+                $expected = (int) $row['expected_count'];
+                $verified = (int) $row['verified_count'];
+                $awaiting = (int) $row['awaiting_count'];
+
+                if ($row['due_date'] < date('Y-m-d') && $verified < $expected) {
+                    po_add_action(
+                        $actionItems,
+                        'deliverable_overdue',
+                        'high',
+                        'Overdue deliverable',
+                        $row['deliverable_title'] . ' is overdue with ' . max(0, $expected - $verified) . ' candidate(s) outstanding.',
+                        $meta . ' · due ' . date('d M Y', strtotime($row['due_date'])),
+                        $deliverableUrl,
+                        'fa-clock'
+                    );
+                }
+
+                if ($awaiting > 0) {
+                    po_add_action(
+                        $actionItems,
+                        'deliverable_verification',
+                        'high',
+                        'Deliverable awaiting verification',
+                        $row['deliverable_title'] . ' has ' . $awaiting . ' submission(s) awaiting review.',
+                        $meta,
+                        $deliverableUrl,
+                        'fa-inbox'
+                    );
+                }
+            }
+        }
+        $stmt->close();
+    }
+}
+
 $priorityOrder = ['high' => 0, 'medium' => 1, 'low' => 2];
 usort($actionItems, static function (array $a, array $b) use ($priorityOrder): int {
     return ($priorityOrder[$a['priority']] ?? 9) <=> ($priorityOrder[$b['priority']] ?? 9);
@@ -1737,7 +1820,7 @@ require __DIR__ . '/_layout_start.php';
             <span class="po-action-centre__empty-icon"><i class="fas fa-circle-check"></i></span>
             <div>
                 <strong>You're all caught up</strong>
-                <span>No outstanding programme actions were identified from the available programme, cohort, candidate, application and interview data.</span>
+                <span>No outstanding programme actions were identified from the available programme, cohort, candidate, application, interview and deliverable data.</span>
             </div>
         </div>
     <?php else: ?>

@@ -39,12 +39,13 @@ class CandidateNotification
         'interview'   => ['label' => 'Interviews',                 'icon' => 'fa-calendar-check',     'tone' => 'interview'],
         'offer'       => ['label' => 'Selection & Offers',         'icon' => 'fa-envelope-open-text', 'tone' => 'offer'],
         'placement'   => ['label' => 'Placements',                 'icon' => 'fa-map-marker-alt',     'tone' => 'placement'],
+        'deliverables' => ['label' => 'Deliverables',                'icon' => 'fa-list-check',          'tone' => 'learning'],
         'account'     => ['label' => 'Account & System',           'icon' => 'fa-user-shield',        'tone' => 'account'],
         'learning'    => ['label' => 'Learning & Skills',            'icon' => 'fa-book-open',          'tone' => 'account'],
     ];
 
     /** @var string[] Destination modules a notification can link to */
-    public const MODULES = ['application', 'interview', 'offer', 'opportunity', 'placement', 'settings', 'notifications', 'learning'];
+    public const MODULES = ['application', 'interview', 'offer', 'opportunity', 'placement', 'settings', 'notifications', 'learning', 'deliverables'];
 
     /** @var bool Lazily applied schema guard (per request) */
     private static bool $schemaChecked = false;
@@ -159,6 +160,8 @@ class CandidateNotification
                 return $recordId > 0
                     ? 'candidate/course.php?id=' . $recordId
                     : 'candidate/learning.php';
+            case 'deliverables':
+                return 'candidate/deliverables.php' . ($recordId > 0 ? '#deliverable-' . $recordId : '');
             default:
                 return 'candidate/notifications.php';
         }

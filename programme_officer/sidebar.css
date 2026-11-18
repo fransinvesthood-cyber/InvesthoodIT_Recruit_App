@@ -88,3 +88,43 @@ body.ux-body { margin: 0; }
 @media (max-width: 900px) {
     #uxMenuButton.ux-navbar__menu { margin-right: 9px; }
 }
+
+/* ============================================================
+   FIXES (20261117)
+   ============================================================ */
+
+/* --- Scroll lock: only on mobile, only while the drawer is open --- */
+body.po-sidebar-lock { overflow: hidden; }
+@media (min-width:901px) {
+    /* desktop never needs a body lock or the mobile overlay */
+    body.ux-menu-open,
+    body.po-menu-open,
+    body.po-sidebar-lock { overflow: auto !important; }
+    .ux-overlay,
+    .ux-overlay--show { display: none !important; }
+}
+
+/* --- Activity Schedule: form + table layout --- */
+.po-activity-layout { display:grid; grid-template-columns:minmax(300px,360px) minmax(0,1fr); align-items:start; gap:16px; }
+.po-activity-layout > * { min-width:0; }
+
+/* stack earlier when the sidebar is open (it takes 272px) */
+@media (max-width:1600px) { .ux-app:not(.po-sidebar-collapsed) .po-activity-layout { grid-template-columns:minmax(0,1fr); } }
+@media (max-width:1420px) { .po-activity-layout { grid-template-columns:minmax(0,1fr); } }
+
+.po-activity-table { min-width:860px; }
+.po-activity-table td { max-width:none; vertical-align:top; }
+.po-activity-actions { white-space:nowrap; }
+.po-activity-actions form { display:inline-block; margin:0; }
+
+/* keep Edit/Delete pinned so they never scroll out of sight */
+.po-activity-table th:last-child,
+.po-activity-table td:last-child { position:sticky; right:0; background:var(--po-surface); box-shadow:-8px 0 12px -8px rgba(0,0,0,.35); }
+.po-activity-table th:last-child { background:var(--po-soft); z-index:1; }
+
+/* dark thin scrollbars instead of the white native ones */
+.po-table-wrap, #uxSidebar .sidebar__nav { scrollbar-width:thin; scrollbar-color:#334155 transparent; }
+.po-table-wrap::-webkit-scrollbar { height:8px; }
+.po-table-wrap::-webkit-scrollbar-thumb { background:#334155; border-radius:8px; }
+#uxSidebar .sidebar__nav::-webkit-scrollbar { width:8px; }
+#uxSidebar .sidebar__nav::-webkit-scrollbar-thumb { background:#334155; border-radius:8px; }

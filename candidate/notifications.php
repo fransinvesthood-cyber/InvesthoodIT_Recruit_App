@@ -101,7 +101,7 @@ $flashes = render_flashes();
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
   <link rel="stylesheet" href="<?= url('css/settings.css') ?>">
   <link rel="stylesheet" href="<?= url('css/applications.css') ?>">
-  <link rel="stylesheet" href="<?= url('css/candidate_notifications.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/candidate_notifications.css') ?>?v=20261117-deliverable-links">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
   <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-profilemenu1">
@@ -270,7 +270,7 @@ $flashes = render_flashes();
             <div class="empty-state">
               <div class="empty-state__icon"><i class="fas fa-bell-slash"></i></div>
               <h3 class="empty-state__title"><?= ($q !== '' || $category !== '' || $status !== 'all') ? 'No notifications match your filters' : 'No notifications yet' ?></h3>
-              <p class="empty-state__text"><?= ($q !== '' || $category !== '' || $status !== 'all') ? 'Try adjusting your search or clearing the filters.' : 'Notifications about your applications, interviews, offers and placements will appear here.' ?></p>
+              <p class="empty-state__text"><?= ($q !== '' || $category !== '' || $status !== 'all') ? 'Try adjusting your search or clearing the filters.' : 'Notifications about your applications, interviews, offers, placements and deliverables will appear here.' ?></p>
               <?php if ($q !== '' || $category !== '' || $status !== 'all'): ?>
                 <a href="<?= url('candidate/notifications.php') ?>" class="btn btn--outline btn--sm"><i class="fas fa-times"></i> Clear Filters</a>
               <?php else: ?>
@@ -292,16 +292,18 @@ $flashes = render_flashes();
                      data-notif-id="<?= (int) $n['id'] ?>"
                      data-category="<?= e($nCat) ?>"
                      data-notif-url="<?= e($nUrl) ?>">
-                  <div class="notif-item__icon notif-item__icon--<?= e($nCat) ?>"><i class="fas <?= e(CandidateNotification::categoryIcon($nCat)) ?>"></i></div>
-                  <div class="notif-item__content">
-                    <div class="notif-item__head">
-                      <a class="notif-item__title" href="<?= e($nUrl) ?>" data-notif-open><?= e($n['title']) ?></a>
-                      <span class="notif-item__tag notif-item__tag--<?= e($nCat) ?>"><?= e(CandidateNotification::categoryLabel($nCat)) ?></span>
-                      <?php if ($nUnread): ?><span class="notif-item__unread-dot" title="Unread"></span><?php endif; ?>
+                  <a class="notif-feed__link" href="<?= e($nUrl) ?>" data-notif-open>
+                    <div class="notif-item__icon notif-item__icon--<?= e($nCat) ?>"><i class="fas <?= e(CandidateNotification::categoryIcon($nCat)) ?>"></i></div>
+                    <div class="notif-item__content">
+                      <div class="notif-item__head">
+                        <span class="notif-item__title"><?= e($n['title']) ?></span>
+                        <span class="notif-item__tag notif-item__tag--<?= e($nCat) ?>"><?= e(CandidateNotification::categoryLabel($nCat)) ?></span>
+                        <?php if ($nUnread): ?><span class="notif-item__unread-dot" title="Unread"></span><?php endif; ?>
+                      </div>
+                      <div class="notif-item__message"><?= e(strip_tags((string) $n['message'])) ?></div>
+                      <div class="notif-item__time"><i class="far fa-clock"></i> <?= e(format_date((string) $n['created_at'], 'd M Y, H:i')) ?> &middot; <?= e(time_ago((string) $n['created_at'])) ?></div>
                     </div>
-                    <div class="notif-item__message"><?= e(strip_tags((string) $n['message'])) ?></div>
-                    <div class="notif-item__time"><i class="far fa-clock"></i> <?= e(format_date((string) $n['created_at'], 'd M Y, H:i')) ?> &middot; <?= e(time_ago((string) $n['created_at'])) ?></div>
-                  </div>
+                  </a>
                   <div class="notif-item__actions">
                     <?php if ($nUnread): ?>
                       <button type="button" class="notif-item__mark-read" data-notif-mark-read title="Mark as read" aria-label="Mark as read"><i class="fas fa-check"></i></button>
