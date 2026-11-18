@@ -180,6 +180,7 @@ $flashes = render_flashes();
 <li><a href="<?= url('candidate/opportunities.php') ?>" class="sidebar__link"><i class="fas fa-briefcase"></i> Opportunities</a></li>
 <li><a href="<?= url('candidate/applications.php') ?>" class="sidebar__link"><i class="fas fa-file-alt"></i> Applications</a></li>
 <li><a href="<?= url('candidate/learning.php') ?>" class="sidebar__link active"><i class="fas fa-graduation-cap"></i> My Learning</a></li>
+<li><a href="<?= url('candidate/deliverables.php') ?>" class="sidebar__link"><i class="fas fa-list-check"></i> Deliverables</a></li>
 <li><a href="<?= url('candidate/skills.php') ?>" class="sidebar__link"><i class="fas fa-star"></i> Skills</a></li>
 <li><a href="<?= url('candidate/certifications.php') ?>" class="sidebar__link"><i class="fas fa-certificate"></i> Certifications</a></li>
 <li><a href="<?= url('candidate/notifications.php') ?>" class="sidebar__link"><i class="fas fa-bell"></i> Notifications</a></li>
