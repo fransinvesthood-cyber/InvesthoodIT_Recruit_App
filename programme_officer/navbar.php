@@ -173,6 +173,12 @@ $titles = [
     'notifications'
         => 'Notifications',
 
+    'deliverables'
+        => 'Deliverables & Milestones',
+
+    'announcements'
+        => 'Announcement Centre',
+
 ];
 
 
@@ -284,13 +290,15 @@ if (
             type="button"
             class="ux-navbar__menu"
             id="uxMenuButton"
-            aria-label="Open navigation menu"
-            aria-expanded="false"
+            aria-label="Hide sidebar"
+            aria-expanded="true"
             aria-controls="uxSidebar"
+            title="Hide sidebar"
         >
 
             <i
-                class="fas fa-bars"
+                class="fas fa-angles-left"
+                id="uxMenuIcon"
                 aria-hidden="true"
             ></i>
 
@@ -486,9 +494,28 @@ if (
                                     ?? 1
                                 ) === 1;
 
+                            $notificationUrl = trim(
+                                (string) (
+                                    $notification['url']
+                                    ?? ''
+                                )
+                            );
+
                             ?>
 
 
+                            <?php if ($notificationUrl !== ''): ?>
+                            <a
+                                href="<?= e(url($notificationUrl)) ?>"
+                                class="
+                                    ux-notification-item
+                                    <?= !$isRead
+                                        ? 'ux-notification-item--unread'
+                                        : ''
+                                    ?>
+                                "
+                            >
+                            <?php else: ?>
                             <div
                                 class="
                                     ux-notification-item
@@ -498,6 +525,7 @@ if (
                                     ?>
                                 "
                             >
+                            <?php endif; ?>
 
                                 <!-- Notification Icon -->
 
@@ -540,7 +568,11 @@ if (
 
                                 </div>
 
+                            <?php if ($notificationUrl !== ''): ?>
+                            </a>
+                            <?php else: ?>
                             </div>
+                            <?php endif; ?>
 
 
                         <?php endforeach; ?>

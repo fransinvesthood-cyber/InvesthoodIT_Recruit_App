@@ -253,9 +253,10 @@ $flashes = render_flashes();
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
   <link rel="stylesheet" href="<?= url('css/opportunities.css') ?>">
   <link rel="stylesheet" href="<?= url('css/candidate_offers.css') ?>">
-  <link rel="stylesheet" href="<?= url('css/candidate_notifications.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/candidate_notifications.css') ?>?v=20261117-deliverable-links">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
+  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-profilemenu1">
 </head>
 <body class="dashboard-page">
 
@@ -286,6 +287,7 @@ $flashes = render_flashes();
           <li><a href="#dashboard-programmes" class="sidebar__link" data-section="programmes"><i class="fas fa-graduation-cap"></i> Programmes</a></li>
           <li><a href="#dashboard-placements" class="sidebar__link" data-section="placements"><i class="fas fa-briefcase"></i> Placements</a></li>
           <li><a href="#dashboard-learning" class="sidebar__link" data-section="learning"><i class="fas fa-book-open"></i> Learning & Skills</a></li>
+          <li><a href="<?= url('candidate/deliverables.php') ?>" class="sidebar__link"><i class="fas fa-list-check"></i> Deliverables</a></li>
           <li><a href="#dashboard-interviews" class="sidebar__link" data-section="interviews"><i class="fas fa-calendar-check"></i> Interviews</a></li>
           <li><a href="#dashboard-offers" class="sidebar__link" data-section="offers"><i class="fas fa-envelope-open-text"></i> Offers</a></li>
 <li><a href="#dashboard-notifications" class="sidebar__link" data-section="notifications"><i class="fas fa-bell"></i> Notifications</a></li>
@@ -325,7 +327,7 @@ $flashes = render_flashes();
       <!-- ===== DASHBOARD HEADER ===== -->
       <header class="dash-header" id="dashHeader">
         <div class="dash-header__left">
-          <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+          <button type="button" class="dash-header__toggle" id="sidebarToggle" aria-label="Show or hide menu" aria-controls="sidebar" aria-expanded="false">
             <i class="fas fa-bars"></i>
           </button>
           <div class="dash-header__search" id="dashSearch">
@@ -377,8 +379,17 @@ $flashes = render_flashes();
               </div>
             </div>
           </div>
-<div class="dash-header__user">
-            <img src="<?= $avatar ?>" alt="Profile" class="dash-header__avatar">
+<div class="dash-header__user profile-menu" data-profile-menu>
+            <button type="button" class="dash-header__avatar-trigger" data-profile-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Open profile menu">
+              <img src="<?= $avatar ?>" alt="Profile" class="dash-header__avatar">
+              <span class="profile-menu__chevron" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+            </button>
+            <div class="profile-menu__panel" data-profile-menu-panel aria-hidden="true">
+              <a href="<?= url('candidate/profile.php') ?>" class="profile-menu__item"><i class="fas fa-user"></i><span>Profile</span></a>
+              <a href="<?= url('candidate/settings.php') ?>" class="profile-menu__item"><i class="fas fa-cog"></i><span>Settings</span></a>
+              <div class="profile-menu__divider"></div>
+              <a href="<?= url('auth/logout.php') ?>" class="profile-menu__item profile-menu__item--logout"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
+            </div>
           </div>
         </div>
       </header>
@@ -1337,13 +1348,14 @@ $flashes = render_flashes();
                 <button class="notif-centre__filter" data-filter="interview">Interviews</button>
                 <button class="notif-centre__filter" data-filter="offer">Offers</button>
                 <button class="notif-centre__filter" data-filter="placement">Placements</button>
+                <button class="notif-centre__filter" data-filter="deliverables">Deliverables</button>
                 <button class="notif-centre__filter" data-filter="account">Account</button>
               </div>
               <button class="btn btn--ghost btn--sm" id="markAllRead" data-notif-mark-all><i class="fas fa-check-double"></i> Mark All Read</button>
             </div>
             <div class="notif-centre__list" id="notifList">
               <?php if (empty($notifCentre['records'])): ?>
-                <div class="notif-dropdown__empty" id="notifCentreEmpty"><i class="fas fa-bell-slash"></i> You are all caught up! New notifications about your applications, interviews, offers and placements will appear here.</div>
+                <div class="notif-dropdown__empty" id="notifCentreEmpty"><i class="fas fa-bell-slash"></i> You are all caught up! New notifications about your applications, interviews, offers, placements and deliverables will appear here.</div>
               <?php else: foreach ($notifCentre['records'] as $n): ?>
                 <?php
                   $nCat    = CandidateNotification::normaliseCategory((string) $n['category']);
@@ -1357,15 +1369,17 @@ $flashes = render_flashes();
                      data-notif-id="<?= (int) $n['id'] ?>"
                      data-category="<?= e($nCat) ?>"
                      data-notif-url="<?= e($nUrl) ?>">
-                  <div class="notif-item__icon notif-item__icon--<?= e($nCat) ?>"><i class="fas <?= e(CandidateNotification::categoryIcon($nCat)) ?>"></i></div>
-                  <div class="notif-item__content">
-                    <div class="notif-item__head">
-                      <a class="notif-item__title" href="<?= e($nUrl) ?>" data-notif-open><?= e($n['title']) ?></a>
-                      <?php if ($nUnread): ?><span class="notif-item__unread-dot" title="Unread"></span><?php endif; ?>
+                  <a class="notif-centre__link" href="<?= e($nUrl) ?>" data-notif-open>
+                    <div class="notif-item__icon notif-item__icon--<?= e($nCat) ?>"><i class="fas <?= e(CandidateNotification::categoryIcon($nCat)) ?>"></i></div>
+                    <div class="notif-item__content">
+                      <div class="notif-item__head">
+                        <span class="notif-item__title"><?= e($n['title']) ?></span>
+                        <?php if ($nUnread): ?><span class="notif-item__unread-dot" title="Unread"></span><?php endif; ?>
+                      </div>
+                      <div class="notif-item__message"><?= e($n['message']) ?></div>
+                      <div class="notif-item__time"><?= e(time_ago((string) $n['created_at'])) ?></div>
                     </div>
-                    <div class="notif-item__message"><?= e($n['message']) ?></div>
-                    <div class="notif-item__time"><?= e(time_ago((string) $n['created_at'])) ?></div>
-                  </div>
+                  </a>
                   <div class="notif-item__actions">
                     <?php if ($nUnread): ?>
                       <button type="button" class="notif-item__mark-read" data-notif-mark-read title="Mark as read" aria-label="Mark as read"><i class="fas fa-check"></i></button>
@@ -1565,5 +1579,6 @@ $flashes = render_flashes();
   })();
   </script>
   <?= $flashes ?>
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-profilemenu1" defer></script>
 </body>
 </html>

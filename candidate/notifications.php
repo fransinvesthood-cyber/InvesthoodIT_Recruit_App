@@ -101,9 +101,10 @@ $flashes = render_flashes();
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
   <link rel="stylesheet" href="<?= url('css/settings.css') ?>">
   <link rel="stylesheet" href="<?= url('css/applications.css') ?>">
-  <link rel="stylesheet" href="<?= url('css/candidate_notifications.css') ?>">
+  <link rel="stylesheet" href="<?= url('css/candidate_notifications.css') ?>?v=20261117-deliverable-links">
   <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
   <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
+  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-profilemenu1">
 </head>
 <body class="dashboard-page applications-page notifications-page">
 
@@ -148,7 +149,7 @@ $flashes = render_flashes();
     <main class="dashboard__main">
       <header class="dash-header">
         <div class="dash-header__left">
-          <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
+          <button type="button" class="dash-header__toggle" id="sidebarToggle" aria-label="Show or hide menu" aria-controls="sidebar" aria-expanded="false"><i class="fas fa-bars"></i></button>
           <div class="dash-header__search" id="dashSearch">
             <i class="fas fa-search"></i>
             <input type="text" class="dash-header__search-input" placeholder="Search notifications..." aria-label="Search notifications">
@@ -197,7 +198,18 @@ $flashes = render_flashes();
             </div>
           </div>
           <a href="<?= url('candidate/dashboard.php') ?>" class="dash-header__icon-btn" aria-label="Back to dashboard" title="Back to dashboard"><i class="fas fa-th-large"></i></a>
-          <div class="dash-header__user"><img src="<?= url('candidate/avatar.php') ?>" alt="Profile" class="dash-header__avatar"></div>
+          <div class="dash-header__user profile-menu" data-profile-menu>
+            <button type="button" class="dash-header__avatar-trigger" data-profile-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Open profile menu">
+              <img src="<?= url('candidate/avatar.php') ?>" alt="Profile" class="dash-header__avatar">
+              <span class="profile-menu__chevron" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+            </button>
+            <div class="profile-menu__panel" data-profile-menu-panel aria-hidden="true">
+              <a href="<?= url('candidate/profile.php') ?>" class="profile-menu__item"><i class="fas fa-user"></i><span>Profile</span></a>
+              <a href="<?= url('candidate/settings.php') ?>" class="profile-menu__item"><i class="fas fa-cog"></i><span>Settings</span></a>
+              <div class="profile-menu__divider"></div>
+              <a href="<?= url('auth/logout.php') ?>" class="profile-menu__item profile-menu__item--logout"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -258,7 +270,7 @@ $flashes = render_flashes();
             <div class="empty-state">
               <div class="empty-state__icon"><i class="fas fa-bell-slash"></i></div>
               <h3 class="empty-state__title"><?= ($q !== '' || $category !== '' || $status !== 'all') ? 'No notifications match your filters' : 'No notifications yet' ?></h3>
-              <p class="empty-state__text"><?= ($q !== '' || $category !== '' || $status !== 'all') ? 'Try adjusting your search or clearing the filters.' : 'Notifications about your applications, interviews, offers and placements will appear here.' ?></p>
+              <p class="empty-state__text"><?= ($q !== '' || $category !== '' || $status !== 'all') ? 'Try adjusting your search or clearing the filters.' : 'Notifications about your applications, interviews, offers, placements and deliverables will appear here.' ?></p>
               <?php if ($q !== '' || $category !== '' || $status !== 'all'): ?>
                 <a href="<?= url('candidate/notifications.php') ?>" class="btn btn--outline btn--sm"><i class="fas fa-times"></i> Clear Filters</a>
               <?php else: ?>
@@ -280,16 +292,18 @@ $flashes = render_flashes();
                      data-notif-id="<?= (int) $n['id'] ?>"
                      data-category="<?= e($nCat) ?>"
                      data-notif-url="<?= e($nUrl) ?>">
-                  <div class="notif-item__icon notif-item__icon--<?= e($nCat) ?>"><i class="fas <?= e(CandidateNotification::categoryIcon($nCat)) ?>"></i></div>
-                  <div class="notif-item__content">
-                    <div class="notif-item__head">
-                      <a class="notif-item__title" href="<?= e($nUrl) ?>" data-notif-open><?= e($n['title']) ?></a>
-                      <span class="notif-item__tag notif-item__tag--<?= e($nCat) ?>"><?= e(CandidateNotification::categoryLabel($nCat)) ?></span>
-                      <?php if ($nUnread): ?><span class="notif-item__unread-dot" title="Unread"></span><?php endif; ?>
+                  <a class="notif-feed__link" href="<?= e($nUrl) ?>" data-notif-open>
+                    <div class="notif-item__icon notif-item__icon--<?= e($nCat) ?>"><i class="fas <?= e(CandidateNotification::categoryIcon($nCat)) ?>"></i></div>
+                    <div class="notif-item__content">
+                      <div class="notif-item__head">
+                        <span class="notif-item__title"><?= e($n['title']) ?></span>
+                        <span class="notif-item__tag notif-item__tag--<?= e($nCat) ?>"><?= e(CandidateNotification::categoryLabel($nCat)) ?></span>
+                        <?php if ($nUnread): ?><span class="notif-item__unread-dot" title="Unread"></span><?php endif; ?>
+                      </div>
+                      <div class="notif-item__message"><?= e(strip_tags((string) $n['message'])) ?></div>
+                      <div class="notif-item__time"><i class="far fa-clock"></i> <?= e(format_date((string) $n['created_at'], 'd M Y, H:i')) ?> &middot; <?= e(time_ago((string) $n['created_at'])) ?></div>
                     </div>
-                    <div class="notif-item__message"><?= e(strip_tags((string) $n['message'])) ?></div>
-                    <div class="notif-item__time"><i class="far fa-clock"></i> <?= e(format_date((string) $n['created_at'], 'd M Y, H:i')) ?> &middot; <?= e(time_ago((string) $n['created_at'])) ?></div>
-                  </div>
+                  </a>
                   <div class="notif-item__actions">
                     <?php if ($nUnread): ?>
                       <button type="button" class="notif-item__mark-read" data-notif-mark-read title="Mark as read" aria-label="Mark as read"><i class="fas fa-check"></i></button>
@@ -341,5 +355,6 @@ $flashes = render_flashes();
 
   <script src="<?= url('js/script.js') ?>"></script>
   <script src="<?= url('js/notifications.js') ?>"></script>
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-profilemenu1" defer></script>
 </body>
 </html>

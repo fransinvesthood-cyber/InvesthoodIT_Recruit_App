@@ -15,10 +15,8 @@ $pageTitle = $pageTitle ?? 'Supervisor Portal';
 <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
 <link rel="stylesheet" href="<?= url('css/supervisor.css') ?>?v=2">
 <link rel="stylesheet" href="<?= url('css/unified_portal.css') ?>?v=1">
-
-  <link rel="stylesheet" href="<?=url('css/styles_original_pm.css')?>">
-  <link rel="stylesheet" href="<?=url('css/original_pm_sidebar_compat.css')?>">
 <link rel="stylesheet" href="<?= url('css/dashboard_card_modals.css') ?>?v=20260919">
+<link rel="stylesheet" href="<?= url('supervisor/sidebar.css') ?>?v=20261111-togglefix2">
 </head>
 <body class="ux-body">
 <div class="ux-app">

@@ -1,0 +1,97 @@
+/* Commercial Manager sidebar alignment + desktop/mobile show/hide controls.
+   Scoped to this portal's legacy #portalSidebar markup to avoid affecting other roles. */
+:root { --cm-sidebar-expanded:260px; --cm-sidebar-collapsed:72px; }
+#portalSidebar.sidebar {
+  width:var(--cm-sidebar-expanded)!important;
+  min-width:var(--cm-sidebar-expanded)!important;
+  max-width:var(--cm-sidebar-expanded)!important;
+  z-index:1200!important;
+  transition:width .22s ease,transform .22s ease!important;
+}
+body.ux-body > .ux-app > main.ux-main {
+  margin-left:var(--cm-sidebar-expanded)!important;
+  width:calc(100% - var(--cm-sidebar-expanded))!important;
+  min-width:0!important;
+  max-width:calc(100% - var(--cm-sidebar-expanded))!important;
+  transition:margin-left .22s ease,width .22s ease!important;
+}
+body.portal-sidebar-collapsed #portalSidebar.sidebar {
+  width:var(--cm-sidebar-collapsed)!important;
+  min-width:var(--cm-sidebar-collapsed)!important;
+  max-width:var(--cm-sidebar-collapsed)!important;
+}
+body.portal-sidebar-collapsed > .ux-app > main.ux-main {
+  margin-left:var(--cm-sidebar-collapsed)!important;
+  width:calc(100% - var(--cm-sidebar-collapsed))!important;
+  max-width:calc(100% - var(--cm-sidebar-collapsed))!important;
+}
+body.portal-sidebar-collapsed #portalSidebar .logo__text,
+body.portal-sidebar-collapsed #portalSidebar .sidebar__section-label,
+body.portal-sidebar-collapsed #portalSidebar .sidebar__user-info,
+body.portal-sidebar-collapsed #portalSidebar .sidebar__logout {
+  font-size:0!important;
+  opacity:0!important;
+  overflow:hidden!important;
+}
+body.portal-sidebar-collapsed #portalSidebar .sidebar__header {
+  justify-content:center!important;
+  padding-left:8px!important;padding-right:8px!important;
+}
+body.portal-sidebar-collapsed #portalSidebar .logo {
+  justify-content:center!important;gap:0!important;
+}
+body.portal-sidebar-collapsed #portalSidebar .sidebar__link,
+body.portal-sidebar-collapsed #portalSidebar .sidebar__logout {
+  justify-content:center!important;gap:0!important;padding-left:0!important;padding-right:0!important;
+}
+body.portal-sidebar-collapsed #portalSidebar .sidebar__link i,
+body.portal-sidebar-collapsed #portalSidebar .sidebar__logout i {
+  margin:0!important;font-size:15px!important;
+}
+body.portal-sidebar-collapsed #portalSidebar .sidebar__user {
+  justify-content:center!important;margin-left:0!important;margin-right:0!important;
+}
+#uxMenuButton.ux-navbar__menu {
+  display:grid!important;
+  place-items:center!important;
+  flex:0 0 40px!important;
+  width:40px!important;height:40px!important;
+  border:1px solid var(--ux-border)!important;
+  border-radius:10px!important;
+  background:var(--ux-surface)!important;
+  color:var(--ux-muted)!important;
+  cursor:pointer!important;
+}
+#uxMenuButton:hover {background:var(--ux-primary-soft)!important;color:var(--ux-primary)!important}
+#portalSidebarOverlay.sidebar-overlay {z-index:1190!important}
+@media(max-width:1023px) {
+  body.ux-body > .ux-app > main.ux-main {
+    margin-left:0!important;width:100%!important;max-width:100%!important;
+  }
+  #portalSidebar.sidebar {
+    width:min(280px,86vw)!important;
+    min-width:min(280px,86vw)!important;
+    max-width:min(280px,86vw)!important;
+    transform:translateX(-105%)!important;
+    transition:transform .22s ease!important;
+  }
+  #portalSidebar.sidebar.open {transform:translateX(0)!important}
+  #portalSidebar .sidebar__close {display:flex!important}
+  #portalSidebarOverlay.sidebar-overlay {
+    position:fixed!important;inset:0!important;
+    background:rgba(2,6,23,.58)!important;
+    opacity:0!important;visibility:hidden!important;pointer-events:none!important;
+    transition:opacity .2s ease,visibility .2s ease!important;
+  }
+  #portalSidebarOverlay.sidebar-overlay.open {
+    opacity:1!important;visibility:visible!important;pointer-events:auto!important;
+  }
+  body.portal-sidebar-mobile-open {overflow:hidden!important}
+  body.portal-sidebar-collapsed #portalSidebar.sidebar {
+    width:min(280px,86vw)!important;min-width:min(280px,86vw)!important;max-width:min(280px,86vw)!important;
+  }
+}
+@media(min-width:1024px) {
+  #portalSidebar.sidebar {transform:translateX(0)!important}
+  #portalSidebarOverlay.sidebar-overlay {display:none!important}
+}

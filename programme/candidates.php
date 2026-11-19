@@ -583,6 +583,16 @@ function candidate_status_class($status)
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+    (function () {
+        try {
+            var savedTheme = localStorage.getItem('investhood-programme-manager-theme');
+            if (savedTheme === 'dark' || savedTheme === 'light') {
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            }
+        } catch (error) { /* Theme script below will apply its safe default. */ }
+    }());
+    </script>
     <meta charset="UTF-8">
     <meta
         name="viewport"
@@ -613,6 +623,7 @@ function candidate_status_class($status)
         rel="stylesheet"
         href="<?= url('css/styles.css') ?>"
     >
+    <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20261118">
     <style>
         .candidate-filters {
             display: grid;
@@ -745,10 +756,18 @@ function candidate_status_class($status)
            RECRUITMENT PROGRESS TRACKING
            ============================================================ */
 
+        .pm-recruitment-pipeline { padding: 1.5rem; }
+        .pm-recruitment-pipeline .welcome-card__content { display: block; margin: 0; }
+        .pm-recruitment-pipeline h2 {
+            display: flex; align-items: center; gap: .7rem;
+            margin: 0 0 1.15rem !important; color: #fff;
+            font-size: 1.2rem; font-weight: 800;
+        }
+        .pm-recruitment-pipeline h2 i { color: #93c5fd; }
         .stage-summary {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 0.75rem;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: .8rem;
         }
 
         .stage-summary__item {
@@ -757,8 +776,22 @@ function candidate_status_class($status)
             gap: 0.65rem;
             padding: 0.75rem 0.85rem;
             border-radius: 10px;
-            background: #f8fafc;
-            border: 1px solid #e5e7eb;
+            background: rgba(255,255,255,.96);
+            border: 1px solid rgba(226,232,240,.9);
+            min-width: 0;
+            min-height: 76px;
+            box-shadow: 0 5px 16px rgba(2,6,23,.08);
+            transition: transform .18s ease, box-shadow .18s ease;
+        }
+        .stage-summary__item:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(2,6,23,.15); }
+        html[data-theme="dark"] .stage-summary__item { background: #111c2d; border-color: #334155; }
+        html[data-theme="dark"] .stage-summary__count { color: #f8fafc; }
+        html[data-theme="dark"] .stage-summary__label { color: #a9b8cc; }
+        @media (max-width: 1100px) { .stage-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 620px) {
+            .pm-recruitment-pipeline { padding: 1.1rem; }
+            .stage-summary { grid-template-columns: 1fr; }
+            .stage-summary__item { min-height: 66px; }
         }
 
         .stage-summary__icon {
@@ -1170,7 +1203,7 @@ function candidate_status_class($status)
             }
         }
     </style>
-    <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20261021">
+    <link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20261118">
 </head>
 <body class="dashboard-page">
 <div class="dashboard">
@@ -1318,12 +1351,13 @@ function candidate_status_class($status)
             <!-- =================================================
                  RECRUITMENT PIPELINE
             ================================================== -->
-            <div
-                class="welcome-card"
+            <section
+                class="welcome-card pm-recruitment-pipeline"
                 style="margin-top:2rem;"
+                aria-labelledby="pmRecruitmentPipelineTitle"
             >
                 <div class="welcome-card__content">
-                    <h2 style="margin-bottom:1rem;">
+                    <h2 id="pmRecruitmentPipelineTitle">
                         <i class="fas fa-diagram-project"></i>
                         Recruitment Pipeline
                     </h2>
@@ -1349,7 +1383,7 @@ function candidate_status_class($status)
                         <?php endforeach; ?>
                     </div>
                 </div>
-            </div>
+            </section>
 
             <!-- =================================================
                  FILTERS

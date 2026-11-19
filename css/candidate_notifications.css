@@ -108,11 +108,28 @@
 /* ----- Missing category icon tones (offer / placement / account) ----- */
 .notif-item__icon--offer { background: rgba(245, 158, 11, 0.12); color: #d97706; }
 .notif-item__icon--placement { background: rgba(139, 92, 246, 0.12); color: #7c3aed; }
+.notif-item__icon--deliverables { background: rgba(139, 92, 246, 0.12); color: #7c3aed; }
 .notif-item__icon--account { background: rgba(100, 116, 139, 0.12); color: #64748b; }
 
 /* ----- Feed items (notifications page) ----- */
 .notif-feed__item {
   cursor: default;
+}
+
+.notif-feed__link,
+.notif-centre__link {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.notif-feed__link:hover .notif-item__title,
+.notif-centre__link:hover .notif-item__title {
+  color: var(--primary);
 }
 
 .notif-item__head {

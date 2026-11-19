@@ -71,6 +71,9 @@ function render_flashes(): string
     }
 
     $html .= '</div>';
+    // Server-rendered flash notifications need the same auto-dismiss
+    // behaviour as notifications created by the JavaScript notification API.
+    $html .= '<script>(function(){var container=document.currentScript&&document.currentScript.previousElementSibling;if(!container||!container.classList.contains("notification-container")){container=document.querySelector(".notification-container");}if(!container)return;Array.prototype.forEach.call(container.querySelectorAll(".notification"),function(item){var timer=window.setTimeout(function(){if(!item.isConnected)return;item.classList.add("removing");window.setTimeout(function(){if(item.isConnected)item.remove();},320);},5000);var close=item.querySelector(".notification__close");if(close){close.addEventListener("click",function(){window.clearTimeout(timer);});}});})();</script>';
     return $html;
 }
 

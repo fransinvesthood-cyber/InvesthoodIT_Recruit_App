@@ -61,7 +61,7 @@ $countBase = "(a.status IN ('interview_completed','selected','offer_sent','offer
 foreach ([
     'no-role-join selected' => ["SELECT COUNT(*) c FROM applications a WHERE $countBase AND a.status='selected'", '', []],
     'with-role-join selected' => ["SELECT COUNT(*) c FROM applications a INNER JOIN users u ON u.id=a.candidate_id INNER JOIN roles ur ON ur.id=u.role_id AND ur.slug='candidate' WHERE $countBase AND a.status='selected'", '', []],
-) as $label => [$sql, $ty, $pa]) {
+] as $label => [$sql, $ty, $pa]) {
     try {
         dbg($label, Database::fetchOne($sql, $ty, $pa));
     } catch (Throwable $e) { dbg($label.' ERROR', $e->getMessage()); }

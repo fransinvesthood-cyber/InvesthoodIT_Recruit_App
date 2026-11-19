@@ -246,4 +246,91 @@ if (!function_exists('po_query_int')) {
     }
 }
 
-if (!function_exists('po_notifications')) { function po_notifications(mysqli $c,int $uid,int $limit=6): array { if($uid<=0)return ['items'=>[],'unread'=>0,'available'=>false];$r=$c->query("SHOW TABLES LIKE 'notifications'");if(!$r||!$r->num_rows)return ['items'=>[],'unread'=>0,'available'=>false];$cols=[];$cr=$c->query("SHOW COLUMNS FROM notifications");while($cr&&$x=$cr->fetch_assoc())$cols[$x['Field']]=true;$uc=isset($cols['user_id'])?'user_id':(isset($cols['recipient_id'])?'recipient_id':null);$mc=isset($cols['message'])?'message':(isset($cols['body'])?'body':(isset($cols['description'])?'description':null));$tc=isset($cols['title'])?'title':null;$rc=isset($cols['is_read'])?'is_read':(isset($cols['read_at'])?'read_at':null);$dc=isset($cols['created_at'])?'created_at':null;if(!$uc||!$mc)return ['items'=>[],'unread'=>0,'available'=>false];$te=$tc?$tc:"'Notification'";$de=$dc?$dc:'NULL';$re=$rc==='is_read'?'is_read':($rc==='read_at'?'CASE WHEN read_at IS NULL THEN 0 ELSE 1 END':'1');$sql="SELECT id,$te AS title,$mc AS message,$de AS created_at,$re AS is_read FROM notifications WHERE $uc=? ORDER BY ".($dc?$dc:'id')." DESC LIMIT ?";$st=$c->prepare($sql);if(!$st)return ['items'=>[],'unread'=>0,'available'=>false];$st->bind_param('ii',$uid,$limit);$st->execute();$items=$st->get_result()->fetch_all(MYSQLI_ASSOC);$st->close();$unread=0;foreach($items as $n)if((int)($n['is_read']??1)===0)$unread++;return ['items'=>$items,'unread'=>$unread,'available'=>true]; } }
+if (!function_exists('po_notifications')) {
+    function po_notifications(mysqli $conn, int $officerId, int $limit = 6): array
+    {
+        if ($officerId <= 0) {
+            return ['items' => [], 'unread' => 0, 'available' => false];
+        }
+
+        $items = [];
+        $available = false;
+        $genericTables = $conn->query("SHOW TABLES LIKE 'notifications'");
+        if ($genericTables && $genericTables->num_rows > 0) {
+            $columns = [];
+            $columnResult = $conn->query('SHOW COLUMNS FROM notifications');
+            while ($columnResult && $column = $columnResult->fetch_assoc()) {
+                $columns[$column['Field']] = true;
+            }
+
+            $userColumn = isset($columns['user_id']) ? 'user_id' : (isset($columns['recipient_id']) ? 'recipient_id' : null);
+            $messageColumn = isset($columns['message']) ? 'message' : (isset($columns['body']) ? 'body' : (isset($columns['description']) ? 'description' : null));
+            $titleColumn = isset($columns['title']) ? 'title' : null;
+            $readColumn = isset($columns['is_read']) ? 'is_read' : (isset($columns['read_at']) ? 'read_at' : null);
+            $dateColumn = isset($columns['created_at']) ? 'created_at' : null;
+
+            if ($userColumn && $messageColumn) {
+                $titleExpression = $titleColumn ? $titleColumn : "'Notification'";
+                $dateExpression = $dateColumn ? $dateColumn : 'NULL';
+                $readExpression = $readColumn === 'is_read'
+                    ? 'is_read'
+                    : ($readColumn === 'read_at' ? 'CASE WHEN read_at IS NULL THEN 0 ELSE 1 END' : '1');
+                $sql = "SELECT id, {$titleExpression} AS title, {$messageColumn} AS message,
+                               {$dateExpression} AS created_at, {$readExpression} AS is_read,
+                               NULL AS url
+                        FROM notifications
+                        WHERE {$userColumn} = ?
+                        ORDER BY " . ($dateColumn ?: 'id') . ' DESC LIMIT ?';
+                $stmt = $conn->prepare($sql);
+                if ($stmt) {
+                    $stmt->bind_param('ii', $officerId, $limit);
+                    if ($stmt->execute()) {
+                        $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                        $available = true;
+                    }
+                    $stmt->close();
+                }
+            }
+        }
+
+        $deliverableTables = $conn->query("SHOW TABLES LIKE 'programme_officer_notifications'");
+        if (!$deliverableTables) {
+            error_log('[Programme Officer Notifications] Unable to check deliverable notification schema: ' . $conn->error);
+        }
+        if ($deliverableTables && $deliverableTables->num_rows > 0) {
+            $stmt = $conn->prepare("
+                SELECT id, title, message, created_at, is_read,
+                       CONCAT('programme_officer/deliverable_view.php?id=', deliverable_id) AS url
+                FROM programme_officer_notifications
+                WHERE programme_officer_id = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+            ");
+            if ($stmt) {
+                $stmt->bind_param('ii', $officerId, $limit);
+                if ($stmt->execute()) {
+                    $items = array_merge($items, $stmt->get_result()->fetch_all(MYSQLI_ASSOC));
+                    $available = true;
+                } else {
+                    error_log('[Programme Officer Notifications] Unable to load deliverable notifications: ' . $stmt->error);
+                }
+                $stmt->close();
+            } else {
+                error_log('[Programme Officer Notifications] Unable to prepare deliverable notifications: ' . $conn->error);
+            }
+        }
+
+        usort($items, static function (array $first, array $second): int {
+            return strcmp((string) ($second['created_at'] ?? ''), (string) ($first['created_at'] ?? ''));
+        });
+        $items = array_slice($items, 0, max(0, $limit));
+        $unread = 0;
+        foreach ($items as $item) {
+            if ((int) ($item['is_read'] ?? 1) === 0) {
+                $unread++;
+            }
+        }
+
+        return ['items' => $items, 'unread' => $unread, 'available' => $available];
+    }
+}

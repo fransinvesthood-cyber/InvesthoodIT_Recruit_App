@@ -164,6 +164,7 @@ $flashes = render_flashes();
 </style>
 <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <script>window.APP_URL = <?= json_encode(APP_URL) ?>;</script>
+  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-profilemenu1">
 </head>
 <body class="dashboard-page learning-page">
 <div class="dashboard">
@@ -179,6 +180,7 @@ $flashes = render_flashes();
 <li><a href="<?= url('candidate/opportunities.php') ?>" class="sidebar__link"><i class="fas fa-briefcase"></i> Opportunities</a></li>
 <li><a href="<?= url('candidate/applications.php') ?>" class="sidebar__link"><i class="fas fa-file-alt"></i> Applications</a></li>
 <li><a href="<?= url('candidate/learning.php') ?>" class="sidebar__link active"><i class="fas fa-graduation-cap"></i> My Learning</a></li>
+<li><a href="<?= url('candidate/deliverables.php') ?>" class="sidebar__link"><i class="fas fa-list-check"></i> Deliverables</a></li>
 <li><a href="<?= url('candidate/skills.php') ?>" class="sidebar__link"><i class="fas fa-star"></i> Skills</a></li>
 <li><a href="<?= url('candidate/certifications.php') ?>" class="sidebar__link"><i class="fas fa-certificate"></i> Certifications</a></li>
 <li><a href="<?= url('candidate/notifications.php') ?>" class="sidebar__link"><i class="fas fa-bell"></i> Notifications</a></li>
@@ -201,11 +203,22 @@ $flashes = render_flashes();
 <main class="dashboard__main">
 <header class="dash-header">
   <div class="dash-header__left">
-    <button class="dash-header__toggle" id="sidebarToggle" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
+    <button type="button" class="dash-header__toggle" id="sidebarToggle" aria-label="Show or hide menu" aria-controls="sidebar" aria-expanded="false"><i class="fas fa-bars"></i></button>
   </div>
   <div class="dash-header__right">
     <button class="dash-header__icon-btn" id="themeToggle" aria-label="Toggle dark mode"><i class="fas fa-moon"></i></button>
-    <div class="dash-header__user"><img src="<?= url('candidate/avatar.php') ?>" alt="Profile" class="dash-header__avatar"></div>
+    <div class="dash-header__user profile-menu" data-profile-menu>
+            <button type="button" class="dash-header__avatar-trigger" data-profile-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Open profile menu">
+              <img src="<?= url('candidate/avatar.php') ?>" alt="Profile" class="dash-header__avatar">
+              <span class="profile-menu__chevron" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+            </button>
+            <div class="profile-menu__panel" data-profile-menu-panel aria-hidden="true">
+              <a href="<?= url('candidate/profile.php') ?>" class="profile-menu__item"><i class="fas fa-user"></i><span>Profile</span></a>
+              <a href="<?= url('candidate/settings.php') ?>" class="profile-menu__item"><i class="fas fa-cog"></i><span>Settings</span></a>
+              <div class="profile-menu__divider"></div>
+              <a href="<?= url('auth/logout.php') ?>" class="profile-menu__item profile-menu__item--logout"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
+            </div>
+          </div>
   </div>
 </header>
 <div class="dash-content">
@@ -340,5 +353,6 @@ $flashes = render_flashes();
 </div>
 <script src="<?= url('js/script.js') ?>"></script>
 <script src="<?= url('js/learning.js') ?>"></script>
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-profilemenu1" defer></script>
 </body>
 </html>

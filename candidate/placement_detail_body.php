@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
   <link rel="stylesheet" href="<?= url('css/applications.css') ?>">
+  <link rel="stylesheet" href="<?= url('candidate/theme.css') ?>?v=20261112-profilemenu1">
 </head>
 <body class="dashboard-page application-detail-page">
   <div class="dashboard">
@@ -36,9 +37,11 @@
         <a href="<?= url('auth/logout.php') ?>" class="sidebar__logout"><i class="fas fa-sign-out-alt"></i> Sign Out</a>
       </div>
     </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
     <main class="dashboard__main">
       <header class="dash-header">
         <div class="dash-header__left">
+          <button type="button" class="dash-header__toggle" id="sidebarToggle" aria-label="Show or hide menu" aria-controls="sidebar" aria-expanded="false"><i class="fas fa-bars" aria-hidden="true"></i></button>
           <a href="<?= url('candidate/dashboard.php#dashboard-placements') ?>" class="dash-header__back"><i class="fas fa-chevron-left"></i> Back to Placements</a>
         </div>
       </header>
@@ -71,5 +74,6 @@
       </div>
     </main>
   </div>
+  <script src="<?= url('candidate/theme.js') ?>?v=20261112-profilemenu1" defer></script>
 </body>
 </html>
