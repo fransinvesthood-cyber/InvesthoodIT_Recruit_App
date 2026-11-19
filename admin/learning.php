@@ -230,28 +230,6 @@ body.dark-mode .learning-admin__control .form-input,body.dark-mode .learning-adm
 </tbody></table></div>
 </section>
 </div>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  var sidebar = document.getElementById('adminSidebar');
-  var toggle = document.getElementById('sidebarToggle');
-  var close = document.getElementById('sidebarClose');
-  var overlay = document.getElementById('sidebarOverlay');
-  function closeSidebar() {
-    if (sidebar) sidebar.classList.remove('open');
-    if (overlay) overlay.classList.remove('open');
-    document.body.classList.remove('sidebar-open');
-    document.body.style.overflow = '';
-  }
-  if (toggle) toggle.addEventListener('click', function () {
-    if (sidebar) sidebar.classList.add('open');
-    if (overlay) overlay.classList.add('open');
-    document.body.classList.add('sidebar-open');
-    document.body.style.overflow = 'hidden';
-  });
-  if (close) close.addEventListener('click', closeSidebar);
-  if (overlay) overlay.addEventListener('click', closeSidebar);
-});
-</script>
 <script src="<?= url('js/script.js') ?>"></script>
 <script src="<?= url('js/admin_dashboard.js') ?>"></script>
 <script src="<?= url('js/admin_programmes.js') ?>"></script>

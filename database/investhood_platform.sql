@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 15, 2026 at 11:38 AM
+-- Generation Time: Nov 02, 2026 at 07:09 AM
 -- Server version: 10.4.24-MariaDB
 -- PHP Version: 8.1.6
 
@@ -38,6 +38,13 @@ CREATE TABLE `admin_notifications` (
   `dedupe_key` varchar(160) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `admin_notifications`
+--
+
+INSERT INTO `admin_notifications` (`id`, `category`, `priority`, `title`, `message`, `module`, `record_id`, `dedupe_key`, `created_at`) VALUES
+(1, 'programme', 'action', 'Deadline approaching: Software Developer Intern', 'Applications for \"Software Developer Intern\" close on 30 Oct 2026.', 'opportunity', 3, 'opp_deadline_3', '2026-10-28 09:28:55');
 
 -- --------------------------------------------------------
 
@@ -81,7 +88,8 @@ INSERT INTO `applications` (`id`, `application_reference`, `candidate_id`, `oppo
 (3, 'APP-2026-000003', 10, 3, 'submitted', '2026-09-03 20:35:55', '2026-09-06 17:49:55', '2026-09-06 19:49:55'),
 (4, 'APP-2026-000004', 10, 2, 'submitted', '2026-09-03 20:36:24', '2026-09-06 17:46:54', '2026-09-06 19:46:54'),
 (5, 'APP-2026-000005', 11, 3, 'submitted', '2026-09-07 22:35:33', '2026-09-08 08:55:34', '2026-09-08 10:55:34'),
-(6, 'APP-2026-000006', 11, 1, 'draft', '2026-09-08 09:54:09', '2026-09-08 10:03:52', NULL);
+(6, 'APP-2026-000006', 11, 1, 'draft', '2026-09-08 09:54:09', '2026-09-08 10:03:52', NULL),
+(7, 'APP-2026-000007', 12, 3, 'draft', '2026-10-30 09:51:13', '2026-10-30 10:16:53', NULL);
 
 -- --------------------------------------------------------
 
@@ -124,7 +132,10 @@ INSERT INTO `application_documents` (`id`, `application_id`, `document_type`, `o
 (23, 3, 'CV', 'Delani Sibande CV.pdf', '834433f9131a44c887988d788e1d245f.pdf', 'application/pdf', 281480, '0df8573bbca7c0df360509f7bcf0d318773de7a9e99003623fa09d728a387d89', 0, NULL, '2026-09-06 17:49:16', '2026-09-06 17:49:16', '2026-09-06 17:49:16'),
 (24, 5, 'CV', 'Bafana Mangena CV.pdf', '1d4459edb5d014b118fd2c45ff86cb27.pdf', 'application/pdf', 153176, '39303ec468fe1248dcc898cd57e4d4e1f6a2b4a4f909b1de7972e4b5aa23523a', 1, 6, '2026-09-08 07:26:07', '2026-09-08 07:26:07', '2026-09-08 07:26:07'),
 (25, 5, 'ACADEMIC_RECORD', 'Bafana Mangena CV.pdf', 'a2ffa66a6cbfa5c283c85865ba6b586c.pdf', 'application/pdf', 153176, '39303ec468fe1248dcc898cd57e4d4e1f6a2b4a4f909b1de7972e4b5aa23523a', 0, NULL, '2026-09-08 08:54:41', '2026-09-08 08:54:41', '2026-09-08 08:54:41'),
-(26, 5, 'RECOMMENDATION_LETTER_WIL_LETTER_', 'Bafana Mangena CV.pdf', '3bc933f2f915e1b6f39f007dd6f0a7d8.pdf', 'application/pdf', 153176, '39303ec468fe1248dcc898cd57e4d4e1f6a2b4a4f909b1de7972e4b5aa23523a', 0, NULL, '2026-09-08 08:54:50', '2026-09-08 08:54:50', '2026-09-08 08:54:50');
+(26, 5, 'RECOMMENDATION_LETTER_WIL_LETTER_', 'Bafana Mangena CV.pdf', '3bc933f2f915e1b6f39f007dd6f0a7d8.pdf', 'application/pdf', 153176, '39303ec468fe1248dcc898cd57e4d4e1f6a2b4a4f909b1de7972e4b5aa23523a', 0, NULL, '2026-09-08 08:54:50', '2026-09-08 08:54:50', '2026-09-08 08:54:50'),
+(27, 7, 'RECOMMENDATION_LETTER_WIL_LETTER_', 'Fridah Masilela CV.pdf', '37162254be60bdd4d893261ed28ea57f.pdf', 'application/pdf', 176758, 'd54cd8ecf6523f3351121896ee1ae2d7de20e1b2b8a28b6b1dc7b04af425dc5d', 0, NULL, '2026-10-30 10:16:43', '2026-10-30 10:16:43', '2026-10-30 10:16:43'),
+(28, 7, 'ACADEMIC_RECORD', 'Fridah Masilela CV.pdf', '721ba05ffd6e6c581007aefeaad8d749.pdf', 'application/pdf', 176758, 'd54cd8ecf6523f3351121896ee1ae2d7de20e1b2b8a28b6b1dc7b04af425dc5d', 0, NULL, '2026-10-30 10:16:45', '2026-10-30 10:16:45', '2026-10-30 10:16:45'),
+(29, 7, 'CV', 'Fridah Masilela CV.pdf', '9c02d8c1f0e8e1e2c64cc6558be7be7d.pdf', 'application/pdf', 176758, 'd54cd8ecf6523f3351121896ee1ae2d7de20e1b2b8a28b6b1dc7b04af425dc5d', 0, NULL, '2026-10-30 10:16:52', '2026-10-30 10:16:52', '2026-10-30 10:16:52');
 
 -- --------------------------------------------------------
 
@@ -614,6 +625,60 @@ CREATE TABLE `candidate_attendance` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `candidate_learning_assignments`
+--
+
+CREATE TABLE `candidate_learning_assignments` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `programme_id` int(10) UNSIGNED NOT NULL,
+  `candidate_id` int(10) UNSIGNED NOT NULL,
+  `assigned_by` int(10) UNSIGNED DEFAULT NULL,
+  `assigned_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `start_date` date DEFAULT NULL,
+  `due_date` date DEFAULT NULL,
+  `status` enum('assigned','in_progress','completed','overdue') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'assigned',
+  `started_at` datetime DEFAULT NULL,
+  `completed_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `candidate_learning_assignments`
+--
+
+INSERT INTO `candidate_learning_assignments` (`id`, `programme_id`, `candidate_id`, `assigned_by`, `assigned_at`, `start_date`, `due_date`, `status`, `started_at`, `completed_at`, `created_at`, `updated_at`) VALUES
+(1, 1, 9, 1, '2026-10-28 11:01:22', NULL, '2026-11-03', 'completed', '2026-10-28 11:07:18', '2026-10-29 12:51:09', '2026-10-28 11:01:22', '2026-10-29 11:51:09');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `candidate_lesson_progress`
+--
+
+CREATE TABLE `candidate_lesson_progress` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `assignment_id` int(10) UNSIGNED NOT NULL,
+  `lesson_id` int(10) UNSIGNED NOT NULL,
+  `candidate_id` int(10) UNSIGNED NOT NULL,
+  `completed` tinyint(1) NOT NULL DEFAULT 0,
+  `completed_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `candidate_lesson_progress`
+--
+
+INSERT INTO `candidate_lesson_progress` (`id`, `assignment_id`, `lesson_id`, `candidate_id`, `completed`, `completed_at`, `updated_at`) VALUES
+(1, 1, 1, 9, 1, '2026-10-28 14:14:53', '2026-10-28 14:16:17'),
+(10, 1, 2, 9, 1, '2026-10-28 14:34:48', '2026-10-28 14:35:22'),
+(11, 1, 3, 9, 1, '2026-10-28 14:34:49', '2026-10-28 14:35:21'),
+(63, 1, 4, 9, 1, '2026-10-29 12:51:00', '2026-10-29 12:51:09');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `candidate_notifications`
 --
 
@@ -630,6 +695,19 @@ CREATE TABLE `candidate_notifications` (
   `dedupe_key` varchar(160) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `candidate_notifications`
+--
+
+INSERT INTO `candidate_notifications` (`id`, `user_id`, `category`, `title`, `message`, `module`, `record_id`, `is_read`, `read_at`, `dedupe_key`, `created_at`) VALUES
+(1, 9, 'learning', 'New course assigned', '<strong>Web Development Fundamentals</strong> has been assigned to you. The completion deadline is <strong>03 Nov 2026</strong>.', 'learning', 1, 0, NULL, 'assign_1_9', '2026-10-28 11:01:23'),
+(2, 9, 'learning', 'Lesson completed', 'One of your lessons in <strong>Web Development Fundamentals</strong> is complete.', 'learning', 1, 0, NULL, 'lesson_complete_1_1', '2026-10-28 13:14:53'),
+(5, 9, 'learning', 'Lesson completed', 'One of your lessons in <strong>Web Development Fundamentals</strong> is complete.', 'learning', 1, 0, NULL, 'lesson_complete_1_2', '2026-10-28 13:34:48'),
+(6, 9, 'learning', 'Lesson completed', 'One of your lessons in <strong>Web Development Fundamentals</strong> is complete.', 'learning', 1, 0, NULL, 'lesson_complete_1_3', '2026-10-28 13:34:49'),
+(58, 9, 'learning', 'Lesson completed', 'One of your lessons in <strong>Web Development Fundamentals</strong> is complete.', 'learning', 1, 0, NULL, 'lesson_complete_1_4', '2026-10-29 11:51:00'),
+(60, 11, 'opportunity', 'Application deadline approaching', 'The application window for Software Developer Intern closes on 30 Oct 2026. Make sure your application is complete and submitted before the deadline.', 'application', 5, 0, NULL, 'app_deadline_3_11', '2026-10-30 10:42:52'),
+(63, 12, 'opportunity', 'Application deadline approaching', 'The application window for Software Developer Intern closes on 30 Oct 2026. Make sure your application is complete and submitted before the deadline.', 'application', 7, 0, NULL, 'app_deadline_3_12', '2026-10-30 11:27:18');
 
 -- --------------------------------------------------------
 
@@ -662,7 +740,8 @@ CREATE TABLE `candidate_profiles` (
 INSERT INTO `candidate_profiles` (`id`, `user_id`, `professional_title`, `professional_summary`, `career_interests`, `employment_status`, `availability_status_id`, `availability_date`, `address`, `city`, `profile_picture`, `completion_percent`, `is_active`, `created_at`, `updated_at`) VALUES
 (1, 9, 'Software Developer', 'I am a motivated Software Developer holding a Degree in Computer Science, with two years of hands-on experience developing web-based applications, databases, and software solutions. I have a strong understanding of Object-Oriented Programming principles and experience working with HTML, CSS, JavaScript, PHP, and MySQL in Agile development environments. I am passionate about learning new technologies, including Java and cloud platforms, and enjoy building reliable, scalable, and user-friendly software solutions while contributing effectively within collaborative development teams.', 'Back-end development', 'unemployed', 1, NULL, '1056 Madiba DR', 'Bronkhorstspruit', NULL, 78, 1, '2026-08-05 00:22:14', '2026-09-11 10:10:11'),
 (2, 10, 'Software Developer', NULL, 'Full-Stack Development', 'recent-graduate', 1, NULL, NULL, 'Pretoria', '7312ac65cbb3ad289608ade541b80e89.jpg', 67, 1, '2026-08-06 14:31:12', '2026-09-11 10:19:59'),
-(3, 11, 'Software Developer', NULL, 'Back-end development', 'recent-graduate', 1, NULL, NULL, NULL, NULL, 44, 1, '2026-09-07 22:30:46', '2026-09-08 10:03:34');
+(3, 11, 'Software Developer', NULL, 'Back-end development', 'recent-graduate', 1, NULL, NULL, NULL, NULL, 44, 1, '2026-09-07 22:30:46', '2026-09-08 10:03:34'),
+(4, 12, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 1, '2026-10-30 09:50:11', '2026-10-30 09:50:11');
 
 -- --------------------------------------------------------
 
@@ -689,6 +768,7 @@ CREATE TABLE `candidate_skills` (
   `skill_id` int(10) UNSIGNED NOT NULL,
   `proficiency` enum('beginner','intermediate','advanced','expert') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'intermediate',
   `verification_status` enum('unverified','pending','verified','failed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'unverified',
+  `source` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'manual',
   `verified_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -697,28 +777,28 @@ CREATE TABLE `candidate_skills` (
 -- Dumping data for table `candidate_skills`
 --
 
-INSERT INTO `candidate_skills` (`id`, `user_id`, `skill_id`, `proficiency`, `verification_status`, `verified_at`, `created_at`) VALUES
-(5, 9, 39, 'intermediate', 'unverified', NULL, '2026-08-06 13:51:27'),
-(7, 9, 15, 'intermediate', 'unverified', NULL, '2026-08-06 13:52:18'),
-(8, 9, 10, 'beginner', 'unverified', NULL, '2026-08-06 14:15:40'),
-(9, 9, 1, 'advanced', 'unverified', NULL, '2026-08-06 14:15:57'),
-(10, 9, 4, 'expert', 'unverified', NULL, '2026-08-06 14:16:30'),
-(11, 9, 40, 'advanced', 'unverified', NULL, '2026-08-06 14:16:57'),
-(12, 9, 38, 'advanced', 'unverified', NULL, '2026-08-06 14:17:13'),
-(13, 9, 47, 'intermediate', 'unverified', NULL, '2026-08-06 14:17:46'),
-(14, 11, 38, 'advanced', 'unverified', NULL, '2026-09-08 07:19:30'),
-(15, 11, 40, 'intermediate', 'unverified', NULL, '2026-09-08 07:19:48'),
-(16, 11, 47, 'intermediate', 'unverified', NULL, '2026-09-08 07:22:07'),
-(17, 11, 3, 'intermediate', 'unverified', NULL, '2026-09-08 08:51:12'),
-(18, 10, 1, 'intermediate', 'unverified', NULL, '2026-09-11 10:03:01'),
-(19, 10, 4, 'intermediate', 'unverified', NULL, '2026-09-11 10:03:13'),
-(20, 10, 15, 'intermediate', 'unverified', NULL, '2026-09-11 10:03:21'),
-(21, 10, 10, 'intermediate', 'unverified', NULL, '2026-09-11 10:03:29'),
-(22, 10, 30, 'intermediate', 'unverified', NULL, '2026-09-11 10:03:51'),
-(23, 10, 38, 'intermediate', 'unverified', NULL, '2026-09-11 10:04:09'),
-(24, 10, 47, 'intermediate', 'unverified', NULL, '2026-09-11 10:04:24'),
-(25, 10, 40, 'intermediate', 'unverified', NULL, '2026-09-11 10:04:35'),
-(26, 10, 43, 'intermediate', 'unverified', NULL, '2026-09-11 10:04:47');
+INSERT INTO `candidate_skills` (`id`, `user_id`, `skill_id`, `proficiency`, `verification_status`, `source`, `verified_at`, `created_at`) VALUES
+(5, 9, 39, 'intermediate', 'unverified', 'manual', NULL, '2026-08-06 13:51:27'),
+(7, 9, 15, 'intermediate', 'unverified', 'manual', NULL, '2026-08-06 13:52:18'),
+(8, 9, 10, 'beginner', 'unverified', 'manual', NULL, '2026-08-06 14:15:40'),
+(9, 9, 1, 'advanced', 'unverified', 'manual', NULL, '2026-08-06 14:15:57'),
+(10, 9, 4, 'expert', 'unverified', 'manual', NULL, '2026-08-06 14:16:30'),
+(11, 9, 40, 'advanced', 'unverified', 'manual', NULL, '2026-08-06 14:16:57'),
+(12, 9, 38, 'advanced', 'unverified', 'manual', NULL, '2026-08-06 14:17:13'),
+(13, 9, 47, 'intermediate', 'unverified', 'manual', NULL, '2026-08-06 14:17:46'),
+(14, 11, 38, 'advanced', 'unverified', 'manual', NULL, '2026-09-08 07:19:30'),
+(15, 11, 40, 'intermediate', 'unverified', 'manual', NULL, '2026-09-08 07:19:48'),
+(16, 11, 47, 'intermediate', 'unverified', 'manual', NULL, '2026-09-08 07:22:07'),
+(17, 11, 3, 'intermediate', 'unverified', 'manual', NULL, '2026-09-08 08:51:12'),
+(18, 10, 1, 'intermediate', 'unverified', 'manual', NULL, '2026-09-11 10:03:01'),
+(19, 10, 4, 'intermediate', 'unverified', 'manual', NULL, '2026-09-11 10:03:13'),
+(20, 10, 15, 'intermediate', 'unverified', 'manual', NULL, '2026-09-11 10:03:21'),
+(21, 10, 10, 'intermediate', 'unverified', 'manual', NULL, '2026-09-11 10:03:29'),
+(22, 10, 30, 'intermediate', 'unverified', 'manual', NULL, '2026-09-11 10:03:51'),
+(23, 10, 38, 'intermediate', 'unverified', 'manual', NULL, '2026-09-11 10:04:09'),
+(24, 10, 47, 'intermediate', 'unverified', 'manual', NULL, '2026-09-11 10:04:24'),
+(25, 10, 40, 'intermediate', 'unverified', 'manual', NULL, '2026-09-11 10:04:35'),
+(26, 10, 43, 'intermediate', 'unverified', 'manual', NULL, '2026-09-11 10:04:47');
 
 -- --------------------------------------------------------
 
@@ -1119,6 +1199,35 @@ INSERT INTO `consents` (`id`, `user_id`, `purpose`, `status`, `granted_at`, `wit
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `course_lessons`
+--
+
+CREATE TABLE `course_lessons` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `programme_id` int(10) UNSIGNED NOT NULL,
+  `title` varchar(160) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type` enum('pdf','video','link','document','lesson','quiz') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'lesson',
+  `content_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `content_text` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `duration_min` int(10) UNSIGNED DEFAULT 0,
+  `lesson_order` int(10) UNSIGNED DEFAULT 0,
+  `is_required` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `course_lessons`
+--
+
+INSERT INTO `course_lessons` (`id`, `programme_id`, `title`, `type`, `content_url`, `content_text`, `duration_min`, `lesson_order`, `is_required`, `created_at`) VALUES
+(1, 1, 'Introduction to HTML, CSS and JavaScript', 'link', 'https://www.youtube.com/results?search_query=html+tutorial+for+beginners', NULL, 0, 1, 1, '2026-10-28 10:49:32'),
+(2, 1, 'Introduction to Python', 'link', 'https://www.youtube.com/results?search_query=python+for+beginners', NULL, 0, 2, 1, '2026-10-28 13:30:50'),
+(3, 1, 'Introduction to SQL', 'link', 'https://www.youtube.com/results?search_query=sql+for+beginners', NULL, 0, 3, 1, '2026-10-28 13:33:37'),
+(4, 1, 'Introduction to React JS', 'link', 'https://www.youtube.com/results?search_query=react+js+for+beginners', NULL, 0, 4, 1, '2026-10-29 11:02:47');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `deletion_requests`
 --
 
@@ -1186,7 +1295,8 @@ CREATE TABLE `email_verifications` (
 INSERT INTO `email_verifications` (`id`, `user_id`, `token_hash`, `expires_at`, `used_at`, `created_at`) VALUES
 (1, 10, '0e0a14b6986fbb2d6cbc1247d5e55e86e9e3689a847086187e8e2f9afd8a5c53', '2026-08-05 02:12:29', NULL, '2026-08-04 00:12:29'),
 (2, 9, 'c805ab866437e624ee24d5a10a9629f571cfd768ba4ac78644b1577b7c0c2bbb', '2026-08-09 14:10:08', NULL, '2026-08-08 12:10:08'),
-(3, 11, '9ea14f3c1108e63a71c6b02dabc6becd4f9393bf6dac4f8ba814ef7d55da7e4b', '2026-09-04 23:46:28', NULL, '2026-09-03 21:46:28');
+(3, 11, '9ea14f3c1108e63a71c6b02dabc6becd4f9393bf6dac4f8ba814ef7d55da7e4b', '2026-09-04 23:46:28', NULL, '2026-09-03 21:46:28'),
+(4, 12, '0242ac2d043613a7a5187c67fc6002a4a6660db023ad355a4a59106b588ddd9c', '2026-10-31 10:46:39', NULL, '2026-10-30 09:46:39');
 
 -- --------------------------------------------------------
 
@@ -1337,6 +1447,33 @@ CREATE TABLE `interview_status_history` (
 
 INSERT INTO `interview_status_history` (`id`, `interview_id`, `previous_status`, `new_status`, `changed_by`, `change_reason`, `created_at`) VALUES
 (8, 3, 'scheduled', 'completed', 1, 'Marked as completed by administrator.', '2026-09-20 08:54:08');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `learning_programmes`
+--
+
+CREATE TABLE `learning_programmes` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `title` varchar(160) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `slug` varchar(180) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `description` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `objectives` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `category` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'general',
+  `provider` varchar(160) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `duration_hours` int(10) UNSIGNED DEFAULT 0,
+  `status` enum('active','archived') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `learning_programmes`
+--
+
+INSERT INTO `learning_programmes` (`id`, `title`, `slug`, `description`, `objectives`, `category`, `provider`, `duration_hours`, `status`, `created_at`, `updated_at`) VALUES
+(1, 'Web Development Fundamentals', 'web-development-fundamentals', 'This learning programme introduces candidates to the fundamentals of web development, including HTML, CSS, JavaScript, and responsive web design. Learners will explore how websites are structured, styled, and made interactive through practical exercises.', 'By the end of this programme, learners should be able to:\r\n- Explain the basic structure of an HTML document.\r\n- Create and style web pages using HTML and CSS.\r\n- Understand basic JavaScript concepts and interactions.\r\n- Apply responsive design principles to different screen sizes.\r\n- Identify and troubleshoot common front-end development issues.', 'IT & Software Development', 'Investhood IT Academy', 8, 'active', '2026-10-28 10:45:01', '2026-10-28 10:45:01');
 
 -- --------------------------------------------------------
 
@@ -1922,6 +2059,27 @@ INSERT INTO `programme_eligibility` (`id`, `programme_id`, `qualification_level`
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `programme_milestones`
+--
+
+CREATE TABLE `programme_milestones` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `programme_id` int(10) UNSIGNED NOT NULL,
+  `cohort_id` int(10) UNSIGNED DEFAULT NULL,
+  `created_by` int(10) UNSIGNED NOT NULL,
+  `title` varchar(180) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `due_date` date NOT NULL,
+  `status` enum('planned','in_progress','completed','on_hold') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'planned',
+  `priority` enum('low','normal','high','urgent') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'normal',
+  `progress` tinyint(3) UNSIGNED NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `programme_officer_activity_log`
 --
 
@@ -2432,7 +2590,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `role_id`, `first_name`, `last_name`, `username`, `email`, `phone`, `date_of_birth`, `gender`, `province`, `employment_status`, `qualification_level`, `professional_title`, `password_hash`, `profile_picture`, `status`, `email_verified_at`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 1, 'Platform', 'Administrator', 'admin', 'admin@investhoodit.co.za', '+27 11 234 5678', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'masters', 'Platform Administrator', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-10-15 10:00:07', '2026-08-02 23:00:17', '2026-10-15 08:00:07'),
+(1, 1, 'Platform', 'Administrator', 'admin', 'admin@investhoodit.co.za', '+27 11 234 5678', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'masters', 'Platform Administrator', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-10-29 11:17:51', '2026-08-02 23:00:17', '2026-10-29 10:17:51'),
 (2, 2, 'Programme', 'Manager', 'programme.manager', 'programme.manager@investhoodit.co.za', '+27 11 234 5679', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'masters', 'Programme Manager', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-08-04 02:09:22', '2026-08-02 23:00:17', '2026-08-04 00:09:22'),
 (3, 3, 'Programme', 'Officer', 'programme.officer', 'programme.officer@investhoodit.co.za', '+27 11 234 5680', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Programme Officer', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', NULL, '2026-08-02 23:00:17', '2026-08-02 23:00:17'),
 (4, 4, 'Recruitment', 'Specialist', 'recruiter', 'recruiter@investhoodit.co.za', '+27 11 234 5681', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Recruiter', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', NULL, '2026-08-02 23:00:17', '2026-08-02 23:00:17'),
@@ -2440,9 +2598,10 @@ INSERT INTO `users` (`id`, `role_id`, `first_name`, `last_name`, `username`, `em
 (6, 6, 'Skills', 'Assessor', 'assessor', 'assessor@investhoodit.co.za', '+27 11 234 5683', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Skills Assessor', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', NULL, '2026-08-02 23:00:17', '2026-08-02 23:00:17'),
 (7, 7, 'Finance', 'Officer', 'finance.officer', 'finance.officer@investhoodit.co.za', '+27 11 234 5684', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Finance Officer', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', '2026-10-15 11:37:40', '2026-08-02 23:00:17', '2026-10-15 09:37:40'),
 (8, 8, 'Information', 'Officer', 'info.officer', 'info.officer@investhoodit.co.za', '+27 11 234 5685', '1995-06-15', 'prefer-not-to-say', 'gauteng', 'employed', 'degree', 'Information Officer', '$2y$10$UFHCguRSSHaoRZcitgV.b.McBGkqgPa0we0pGwUyBiq1W2V8aJolu', NULL, 'active', '2026-08-03 01:00:17', NULL, '2026-08-02 23:00:17', '2026-08-02 23:00:17'),
-(9, 9, 'Hlobisile', 'Mthembu', 'Sky', 'candidate@gmail.com', '+27 12 345 3433', '1995-06-15', 'female', 'gauteng', 'employed', 'degree', 'Software Developer', '$2y$10$Jq3Y1/jog.te/JjECRSyHefx/o.Qolq3WNSLK1dxq4W7UbEffWb4C', NULL, 'active', NULL, '2026-09-14 16:35:12', '2026-08-02 23:00:17', '2026-09-14 14:35:12'),
+(9, 9, 'Hlobisile', 'Mthembu', 'Sky', 'candidate@gmail.com', '+27 12 345 3433', '1995-06-15', 'female', 'gauteng', 'employed', 'degree', 'Software Developer', '$2y$10$Jq3Y1/jog.te/JjECRSyHefx/o.Qolq3WNSLK1dxq4W7UbEffWb4C', NULL, 'active', NULL, '2026-11-02 06:04:48', '2026-08-02 23:00:17', '2026-11-02 05:04:48'),
 (10, 9, 'Delani', 'Sibande', 'Deco', 'sibanded1030@gmail.com', '0794065577', '1997-12-12', 'male', 'gauteng', 'recent-graduate', 'degree', 'Software Developer', '$2y$10$mlDKcbt12tR.64VpNTWm9uG6Wx7xVMglKNAtAN3BvCZdhS88jbv8C', NULL, 'active', NULL, '2026-09-14 11:00:50', '2026-08-04 00:12:28', '2026-09-14 09:00:50'),
-(11, 9, 'Bafana', 'Mangena', 'Bafana', 'bafana.mangena@gmail.com', '0794543322', '1999-12-12', 'male', 'gauteng', 'recent-graduate', NULL, 'Software Developer', '$2y$10$EmTLBNldtnAqD7vzdHUd0.Xnu/AoV1XeUa9s3l2nSppqaOI7CDUKy', NULL, 'active', NULL, '2026-09-08 11:52:30', '2026-09-03 21:46:28', '2026-09-08 09:58:17');
+(11, 9, 'Bafana', 'Mangena', 'Bafana', 'bafana.mangena@gmail.com', '0794543322', '1999-12-12', 'male', 'gauteng', 'recent-graduate', NULL, 'Software Developer', '$2y$10$EmTLBNldtnAqD7vzdHUd0.Xnu/AoV1XeUa9s3l2nSppqaOI7CDUKy', NULL, 'active', NULL, '2026-10-30 10:42:51', '2026-09-03 21:46:28', '2026-10-30 09:42:51'),
+(12, 9, 'Nqobile', 'June', 'Nqonqo', 'nqobile.june@gmail.com', '0785434466', '2004-06-12', 'female', 'gauteng', 'recent-graduate', 'diploma', NULL, '$2y$10$/6zewb/vEEatuNLWoMH5peHKvixbLBdmuegAbGKDRvX/NBXS6jpSG', NULL, 'active', NULL, '2026-10-30 10:50:11', '2026-10-30 09:46:39', '2026-10-30 09:50:11');
 
 -- --------------------------------------------------------
 
@@ -2667,7 +2826,26 @@ INSERT INTO `user_sessions` (`id`, `user_id`, `session_hash`, `ip_address`, `use
 (198, 1, 'a5f209ec0d6526e9a19dbafa1a3850cb83081a1ead1926f8ee047236f873eea1', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36', '2026-09-20 12:17:21', '2026-09-20 12:17:21', NULL, 1),
 (199, 1, '01f3fc286ed5b462cf3813bfa7ba27311fd2b2a530abe322512bfe175a940931', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36', '2026-10-15 10:00:07', '2026-10-15 10:00:07', '2026-10-15 10:56:00', 0),
 (200, 5, '8ac79d0b0cd77a6c08eff97faadcbcafad66c0f7ac22a253e83a7590f54b31d7', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36', '2026-10-15 10:56:23', '2026-10-15 10:56:23', '2026-10-15 11:36:01', 0),
-(201, 7, '77badf6a472dd0120e9d5fb4e27ddef780f64e53c2e2120eedfd470835228409', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36', '2026-10-15 11:37:40', '2026-10-15 11:37:40', NULL, 1);
+(201, 7, '77badf6a472dd0120e9d5fb4e27ddef780f64e53c2e2120eedfd470835228409', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36', '2026-10-15 11:37:40', '2026-10-15 11:37:40', NULL, 1),
+(202, 9, 'ff099830122befcbba785d8897024e62f80f777702af87292b69e3c2031099e3', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-28 09:01:42', '2026-10-28 09:01:42', '2026-10-28 09:28:37', 0),
+(203, 1, 'd8f581e100862450bfd3bb7146de2180084b6be2c66ad9f5573984fc897642ce', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-28 09:28:55', '2026-10-28 09:28:55', NULL, 1),
+(204, 1, '71320d8b957290841c449175884fa4f4673ce82448f89a9d42d818e866ebc405', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-28 10:12:59', '2026-10-28 10:12:59', '2026-10-28 11:01:53', 0),
+(205, 9, 'de7cb97b9846b425173e0ca7e2e5793eee336aa246a244c52c972ea343c69d50', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-28 11:02:20', '2026-10-28 11:02:20', '2026-10-28 11:56:45', 0),
+(206, 1, '160bfd6ce3cff92f4be7de21a19dfe00f645e618a6d01ece04a706c828dfcfdf', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-28 11:57:04', '2026-10-28 11:57:04', '2026-10-28 12:53:30', 0),
+(207, 9, '8dbcdb2547c7c727df4eee6b04f361ef1e6ab541ad4583e4d19b6f96dec23ce2', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-28 12:53:48', '2026-10-28 12:53:48', '2026-10-28 13:28:32', 0),
+(208, 1, '72dccee6c398941ce4521a2a483f016d3afe4db01f0b76fe617edf57f2546675', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-28 13:28:45', '2026-10-28 13:28:45', '2026-10-28 13:31:17', 0),
+(209, 1, '07d42bb033949117626258f54465ce40da1aaafb0f788fba0c3ca4e48722bd4b', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-28 13:31:48', '2026-10-28 13:31:48', '2026-10-28 13:34:00', 0),
+(210, 9, 'e727d5002c8ca2884149c9236186e3bddae066335212ac746ca181dea18eb08f', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-28 13:34:15', '2026-10-28 13:34:15', '2026-10-28 13:38:41', 0),
+(211, 9, 'd0facead4125e03bc849a92cdf5fd840f973a6a9f8844747b7d3fa0d876982e4', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-29 10:42:39', '2026-10-29 10:42:39', '2026-10-29 10:59:37', 0),
+(212, 9, '1038295e6b2279b3a3b25243af7e56aaa3c3ee73054ad7470f463a1d39608c72', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.143.1 Chrome/150.0.7871.250 Electron/43.7.7 Safari/537.36', '2026-10-29 10:49:44', '2026-10-29 10:49:44', NULL, 1),
+(213, 1, '4fa9692fcb10ac37abcdbc53aa986656c18d9fd3d2ed162b9f14118fe7b05988', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-29 11:00:25', '2026-10-29 11:00:25', '2026-10-29 11:03:39', 0),
+(214, 9, 'da0f65babffafe39c6df6d082a2c0be2ce1bcdd72bba3064dc4a5b3d81e5b885', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-29 11:04:20', '2026-10-29 11:04:20', '2026-10-29 11:17:24', 0),
+(215, 1, '6ada22d074a9577b21a86192c878f1c242b49b2420590fde2602319eff365402', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-29 11:17:51', '2026-10-29 11:17:51', '2026-10-29 11:49:41', 0),
+(216, 9, '82f262e10fffc28ba299d06aeb6aa5c72a237739bf7ffb75c0906886c8c45601', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-29 11:50:02', '2026-10-29 11:50:02', NULL, 1),
+(217, 9, 'c72a059da1c342f99024c085e08ba9816c36e81fd4f46daf2ea3213f51b038e8', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-30 09:45:11', '2026-10-30 09:45:11', '2026-10-30 10:42:24', 0),
+(218, 11, 'b3d018eb20f3340da4bc545677777e3b16e11398d60c6e90bbcc72fdba28efe3', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-30 10:42:52', '2026-10-30 10:42:52', '2026-10-30 10:44:15', 0),
+(219, 12, '7a4631723e384ac9d357dbcabc30fa0fb6ed2e63d2887ff630dab2afcd2c2f4c', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-10-30 10:50:11', '2026-10-30 10:50:11', '2026-10-30 11:29:23', 0),
+(220, 9, '521496e4e6a9347b6e0dd6976a852e58662da36aefaaf292fb9f7cb6447babf1', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36', '2026-11-02 06:04:49', '2026-11-02 06:04:49', NULL, 1);
 
 -- --------------------------------------------------------
 
@@ -2798,6 +2976,22 @@ ALTER TABLE `candidate_attendance`
   ADD KEY `idx_att_user` (`user_id`,`session_date`);
 
 --
+-- Indexes for table `candidate_learning_assignments`
+--
+ALTER TABLE `candidate_learning_assignments`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_assign_programme_candidate` (`programme_id`,`candidate_id`),
+  ADD KEY `idx_assign_candidate` (`candidate_id`,`status`);
+
+--
+-- Indexes for table `candidate_lesson_progress`
+--
+ALTER TABLE `candidate_lesson_progress`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_progress_assignment_lesson` (`assignment_id`,`lesson_id`),
+  ADD KEY `idx_progress_assignment` (`assignment_id`,`completed`);
+
+--
 -- Indexes for table `candidate_notifications`
 --
 ALTER TABLE `candidate_notifications`
@@ -2906,6 +3100,13 @@ ALTER TABLE `consents`
   ADD KEY `idx_consents_purpose` (`purpose`);
 
 --
+-- Indexes for table `course_lessons`
+--
+ALTER TABLE `course_lessons`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_course_lessons_programme` (`programme_id`,`lesson_order`);
+
+--
 -- Indexes for table `deletion_requests`
 --
 ALTER TABLE `deletion_requests`
@@ -2962,6 +3163,14 @@ ALTER TABLE `interview_status_history`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_interview_status_history_interview` (`interview_id`),
   ADD KEY `idx_interview_status_history_changed_by` (`changed_by`);
+
+--
+-- Indexes for table `learning_programmes`
+--
+ALTER TABLE `learning_programmes`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_learning_programmes_slug` (`slug`),
+  ADD KEY `idx_learning_programmes_category_status` (`category`,`status`);
 
 --
 -- Indexes for table `login_attempts`
@@ -3139,6 +3348,15 @@ ALTER TABLE `programme_eligibility`
   ADD KEY `idx_prog_elig_programme` (`programme_id`);
 
 --
+-- Indexes for table `programme_milestones`
+--
+ALTER TABLE `programme_milestones`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_pm_milestones_programme_due` (`programme_id`,`due_date`),
+  ADD KEY `idx_pm_milestones_cohort` (`cohort_id`),
+  ADD KEY `idx_pm_milestones_status_due` (`status`,`due_date`);
+
+--
 -- Indexes for table `programme_skills`
 --
 ALTER TABLE `programme_skills`
@@ -3242,19 +3460,19 @@ ALTER TABLE `work_experience`
 -- AUTO_INCREMENT for table `admin_notifications`
 --
 ALTER TABLE `admin_notifications`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
 -- AUTO_INCREMENT for table `applications`
 --
 ALTER TABLE `applications`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `application_documents`
 --
 ALTER TABLE `application_documents`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=27;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
 
 --
 -- AUTO_INCREMENT for table `application_responses`
@@ -3287,16 +3505,28 @@ ALTER TABLE `candidate_attendance`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `candidate_learning_assignments`
+--
+ALTER TABLE `candidate_learning_assignments`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `candidate_lesson_progress`
+--
+ALTER TABLE `candidate_lesson_progress`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=65;
+
+--
 -- AUTO_INCREMENT for table `candidate_notifications`
 --
 ALTER TABLE `candidate_notifications`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=65;
 
 --
 -- AUTO_INCREMENT for table `candidate_profiles`
 --
 ALTER TABLE `candidate_profiles`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `candidate_saved_opportunities`
@@ -3359,6 +3589,12 @@ ALTER TABLE `consents`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
 
 --
+-- AUTO_INCREMENT for table `course_lessons`
+--
+ALTER TABLE `course_lessons`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
 -- AUTO_INCREMENT for table `deletion_requests`
 --
 ALTER TABLE `deletion_requests`
@@ -3374,7 +3610,7 @@ ALTER TABLE `documents`
 -- AUTO_INCREMENT for table `email_verifications`
 --
 ALTER TABLE `email_verifications`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `interviews`
@@ -3395,10 +3631,16 @@ ALTER TABLE `interview_status_history`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
+-- AUTO_INCREMENT for table `learning_programmes`
+--
+ALTER TABLE `learning_programmes`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
 -- AUTO_INCREMENT for table `login_attempts`
 --
 ALTER TABLE `login_attempts`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
 
 --
 -- AUTO_INCREMENT for table `notification_preferences`
@@ -3503,6 +3745,12 @@ ALTER TABLE `programme_eligibility`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
+-- AUTO_INCREMENT for table `programme_milestones`
+--
+ALTER TABLE `programme_milestones`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `programme_skills`
 --
 ALTER TABLE `programme_skills`
@@ -3542,13 +3790,13 @@ ALTER TABLE `skills`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `user_sessions`
 --
 ALTER TABLE `user_sessions`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=202;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=221;
 
 --
 -- AUTO_INCREMENT for table `user_settings`
@@ -3598,6 +3846,13 @@ ALTER TABLE `application_status_history`
 --
 ALTER TABLE `audit_logs`
   ADD CONSTRAINT `fk_audit_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `candidate_learning_assignments`
+--
+ALTER TABLE `candidate_learning_assignments`
+  ADD CONSTRAINT `fk_cla_candidate` FOREIGN KEY (`candidate_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_cla_programme` FOREIGN KEY (`programme_id`) REFERENCES `learning_programmes` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `candidate_notifications`
@@ -3676,6 +3931,12 @@ ALTER TABLE `cohort_workflow`
 --
 ALTER TABLE `consents`
   ADD CONSTRAINT `fk_consents_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `course_lessons`
+--
+ALTER TABLE `course_lessons`
+  ADD CONSTRAINT `fk_course_lessons_programme` FOREIGN KEY (`programme_id`) REFERENCES `learning_programmes` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `deletion_requests`
@@ -3847,6 +4108,13 @@ ALTER TABLE `programmes`
 --
 ALTER TABLE `programme_eligibility`
   ADD CONSTRAINT `fk_prog_elig_programme` FOREIGN KEY (`programme_id`) REFERENCES `programmes` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `programme_milestones`
+--
+ALTER TABLE `programme_milestones`
+  ADD CONSTRAINT `fk_pm_milestones_cohort` FOREIGN KEY (`cohort_id`) REFERENCES `cohorts` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_pm_milestones_programme` FOREIGN KEY (`programme_id`) REFERENCES `programmes` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Constraints for table `programme_skills`

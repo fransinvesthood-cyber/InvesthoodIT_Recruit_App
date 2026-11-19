@@ -11529,3 +11529,86 @@ body.dark-mode .adm-analytics-state {
     width: 100%;
   }
 }
+
+/* Shared admin sidebar controls */
+@media (max-width: 1023px) {
+  body.admin-dashboard.sidebar-open {
+    overflow: hidden;
+    overflow-x: hidden;
+    overscroll-behavior: none;
+  }
+
+  body.admin-dashboard.sidebar-open .dash-header {
+    z-index: 101;
+    background: transparent;
+    border-color: transparent;
+    pointer-events: none;
+  }
+
+  body.admin-dashboard.sidebar-open .dash-header__left > :not(.dash-header__toggle),
+  body.admin-dashboard.sidebar-open .dash-header__right {
+    visibility: hidden;
+  }
+
+  .admin-dashboard .dash-header__toggle {
+    min-width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  body.admin-dashboard.sidebar-open .dash-header__toggle {
+    position: fixed;
+    top: 0.625rem;
+    left: 220px;
+    z-index: 102;
+    pointer-events: auto;
+    background: var(--bg-white);
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+@media (min-width: 1024px) {
+  .admin-dashboard .dash-header__toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .admin-dashboard .sidebar,
+  .admin-dashboard .dashboard__main {
+    transition: width 0.25s ease, margin-left 0.25s ease, max-width 0.25s ease;
+  }
+
+  body.admin-dashboard.admin-sidebar-collapsed .sidebar {
+    width: 72px;
+  }
+
+  body.admin-dashboard.admin-sidebar-collapsed .dashboard__main {
+    margin-left: 72px;
+    max-width: calc(100vw - 72px);
+  }
+
+  body.admin-dashboard.admin-sidebar-collapsed .logo__text,
+  body.admin-dashboard.admin-sidebar-collapsed .sidebar__section-label,
+  body.admin-dashboard.admin-sidebar-collapsed .sidebar__user-info {
+    display: none;
+  }
+
+  body.admin-dashboard.admin-sidebar-collapsed .sidebar__link,
+  body.admin-dashboard.admin-sidebar-collapsed .sidebar__logout {
+    justify-content: center;
+    gap: 0;
+    font-size: 0;
+  }
+
+  body.admin-dashboard.admin-sidebar-collapsed .sidebar__link i,
+  body.admin-dashboard.admin-sidebar-collapsed .sidebar__logout i {
+    font-size: 0.95rem;
+  }
+
+  body.admin-dashboard.admin-sidebar-collapsed .sidebar__user {
+    justify-content: center;
+  }
+}
