@@ -20,13 +20,25 @@ if ($name === '') $name = 'Assessor';
         <ul class="sidebar__menu">
             <li>
                 <a class="sidebar__link <?= in_array($currentPage,['dashboard'],true)?'active':'' ?>" href="<?= url('assessor/dashboard.php') ?>">
-                    <i class="fas fa-grid-2"></i> Dashboard
+                    <i class="fas fa-table-cells-large"></i> Dashboard
                 </a>
             </li>
-            <!-- NEW SCHEDULING WORKSPACE -->
+            <!-- Personal scheduling (per-assessor sessions from earlier module) -->
             <li>
-                <a class="sidebar__link <?= in_array($currentPage,['scheduling','workload'],true)?'active':'' ?>" href="<?= url('assessor/scheduling.php') ?>">
-                    <i class="fas fa-calendar-check"></i> Scheduling & Workspace
+                <a class="sidebar__link <?= in_array($currentPage,['scheduling'],true)?'active':'' ?>" href="<?= url('assessor/scheduling.php') ?>">
+                    <i class="fas fa-calendar-check"></i> My Scheduling
+                </a>
+            </li>
+            <!-- Team-wide scheduling, allocation & availability (this module) -->
+            <li>
+                <a class="sidebar__link <?= in_array($currentPage,['scheduling_team'],true)?'active':'' ?>" href="<?= url('assessor/scheduling_workload.php') ?>">
+                    <i class="fas fa-calendar-plus"></i> Scheduling &amp; Workload
+                </a>
+            </li>
+            <!-- Workload analytics -->
+            <li>
+                <a class="sidebar__link <?= in_array($currentPage,['workload'],true)?'active':'' ?>" href="<?= url('assessor/workload.php') ?>">
+                    <i class="fas fa-chart-simple"></i> Workload Monitor
                 </a>
             </li>
         </ul>
@@ -40,12 +52,17 @@ if ($name === '') $name = 'Assessor';
             </li>
             <li>
                 <a class="sidebar__link <?= in_array($currentPage,['scoring'],true)?'active':'' ?>" href="<?= url('assessor/scoring_queue.php') ?>">
-                    <i class="fas fa-star-half-stroke"></i> Scoring & Evaluation
+                    <i class="fas fa-star-half-stroke"></i> Scoring &amp; Evaluation
                 </a>
             </li>
             <li>
                 <a class="sidebar__link <?= in_array($currentPage,['documents'],true)?'active':'' ?>" href="<?= url('assessor/documents.php') ?>">
                     <i class="fas fa-file-shield"></i> Document Verification
+                </a>
+            </li>
+            <li>
+                <a class="sidebar__link <?= in_array($currentPage,['evidence','evidence_review','evidence_download'],true)?'active':'' ?>" href="<?= url('assessor/evidence.php') ?>">
+                    <i class="fas fa-fingerprint"></i> Evidence &amp; Verification
                 </a>
             </li>
             <li>
@@ -56,6 +73,12 @@ if ($name === '') $name = 'Assessor';
             <li>
                 <a class="sidebar__link <?= in_array($currentPage,['moderation'],true)?'active':'' ?>" href="<?= url('assessor/moderation.php') ?>">
                     <i class="fas fa-scale-balanced"></i> Moderation Status
+                </a>
+            </li>
+            <!-- Appeals & Reassessment Management -->
+            <li>
+                <a class="sidebar__link <?= in_array($currentPage,['appeals','appeal_review'],true)?'active':'' ?>" href="<?= url('assessor/appeals.php') ?>">
+                    <i class="fas fa-gavel"></i> Appeals
                 </a>
             </li>
         </ul>

@@ -33,38 +33,97 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  var adminContent = document.getElementById('adminDashContent');
-  if (!adminContent) return; // Not an admin dashboard page
-
   // ============================================
-  // 1. SIDEBAR TOGGLE & NAVIGATION
+  // 1. SIDEBAR TOGGLE (shared by all admin pages)
   // ============================================
   var sidebar = document.getElementById('adminSidebar');
   var sidebarToggle = document.getElementById('sidebarToggle');
   var sidebarClose = document.getElementById('sidebarClose');
   var sidebarOverlay = document.getElementById('sidebarOverlay');
 
-function openSidebar() {
-    if (sidebar) sidebar.classList.add('open');
-    if (sidebarOverlay) sidebarOverlay.classList.add('open');
-    document.body.style.overflow = 'hidden';
-    document.body.classList.add('sidebar-open');
-  }
+  var isMobileSidebar = function () {
+    return window.matchMedia('(max-width: 1023px)').matches;
+  };
+  var lastSidebarMobileMode = null;
 
   function closeSidebar() {
     if (sidebar) sidebar.classList.remove('open');
     if (sidebarOverlay) sidebarOverlay.classList.remove('open');
-    document.body.style.overflow = '';
     document.body.classList.remove('sidebar-open');
+    if (sidebarToggle) {
+      var mobile = isMobileSidebar();
+      var expanded = !mobile && !document.body.classList.contains('admin-sidebar-collapsed');
+      sidebarToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      sidebarToggle.setAttribute('aria-label', mobile ? 'Open sidebar' : (expanded ? 'Collapse sidebar' : 'Expand sidebar'));
+      var closeIcon = sidebarToggle.querySelector('i');
+      if (closeIcon) closeIcon.className = 'fas fa-bars';
+    }
   }
 
-  if (sidebarToggle) sidebarToggle.addEventListener('click', openSidebar);
-  if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
-  if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
+  function setMobileSidebarOpen(open) {
+    if (!sidebar) return;
+    sidebar.classList.toggle('open', open);
+    if (sidebarOverlay) sidebarOverlay.classList.toggle('open', open);
+    document.body.classList.toggle('sidebar-open', open);
+    if (sidebarToggle) {
+      sidebarToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      sidebarToggle.setAttribute('aria-label', open ? 'Close sidebar' : 'Open sidebar');
+      var toggleIcon = sidebarToggle.querySelector('i');
+      if (toggleIcon) toggleIcon.className = open ? 'fas fa-times' : 'fas fa-bars';
+    }
+  }
 
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && sidebar && sidebar.classList.contains('open')) closeSidebar();
-  });
+  function syncSidebarForViewport() {
+    var mobile = isMobileSidebar();
+    if (mobile === lastSidebarMobileMode) return;
+    lastSidebarMobileMode = mobile;
+
+    if (mobile) {
+      document.body.classList.remove('admin-sidebar-collapsed');
+      closeSidebar();
+    } else {
+      closeSidebar();
+      document.body.classList.remove('sidebar-open');
+      document.body.classList.remove('admin-sidebar-collapsed');
+      if (sidebarToggle) {
+        sidebarToggle.setAttribute('aria-expanded', 'true');
+        sidebarToggle.setAttribute('aria-label', 'Collapse sidebar');
+      }
+    }
+  }
+
+  if (sidebar && sidebarToggle) {
+    syncSidebarForViewport();
+
+    sidebarToggle.addEventListener('click', function () {
+      if (isMobileSidebar()) {
+        setMobileSidebarOpen(!sidebar.classList.contains('open'));
+        return;
+      }
+
+      var collapsed = document.body.classList.toggle('admin-sidebar-collapsed');
+      sidebarToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      sidebarToggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+    });
+
+    if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
+
+    sidebar.querySelectorAll('.sidebar__link').forEach(function (link) {
+      link.addEventListener('click', function () {
+        if (isMobileSidebar()) closeSidebar();
+      });
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && sidebar.classList.contains('open')) closeSidebar();
+    });
+
+    window.addEventListener('resize', syncSidebarForViewport, { passive: true });
+  }
+
+  var adminContent = document.getElementById('adminDashContent');
+  if (!adminContent) return; // Not an admin dashboard page
 
   // Sidebar active link highlight on scroll
   var sidebarLinks = document.querySelectorAll('.sidebar__link');
@@ -893,4 +952,3 @@ function openSidebar() {
     });
   }
 });
-

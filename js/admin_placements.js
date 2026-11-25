@@ -24,29 +24,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Sidebar toggle
-  var sidebarToggle = document.getElementById('sidebarToggle');
-  var sidebarClose = document.getElementById('sidebarClose');
-  var sidebarOverlay = document.getElementById('sidebarOverlay');
-  var sidebar = document.getElementById('adminSidebar');
-
-  function openSidebar() {
-    if (sidebar) sidebar.classList.add('open');
-    if (sidebarOverlay) sidebarOverlay.classList.add('open');
-    document.body.style.overflow = 'hidden';
-  }
-  function closeSidebar() {
-    if (sidebar) sidebar.classList.remove('open');
-    if (sidebarOverlay) sidebarOverlay.classList.remove('open');
-    document.body.style.overflow = '';
-  }
-  if (sidebarToggle) sidebarToggle.addEventListener('click', openSidebar);
-  if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
-  if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && sidebar && sidebar.classList.contains('open')) closeSidebar();
-  });
-
   // Search & Filter functionality
   var searchInput = document.getElementById('placementSearch');
   // NOTE: only the toolbar filter dropdowns drive page-reload filtering.

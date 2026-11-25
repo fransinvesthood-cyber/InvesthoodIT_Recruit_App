@@ -12,5 +12,14 @@ document.getElementById('portalSidebarClose')?.addEventListener('click',closeSid
 const nb=document.getElementById('pmNotificationButton'),dd=document.getElementById('pmNotificationDropdown');nb?.addEventListener('click',e=>{e.stopPropagation();dd?.classList.toggle('is-open')});
 const modal=document.getElementById('pmAllNotificationsModal');document.getElementById('pmViewAllNotifications')?.addEventListener('click',e=>{e.preventDefault();modal?.classList.add('is-open')});
 ['pmAllNotificationsClose','pmAllNotificationsDone'].forEach(id=>document.getElementById(id)?.addEventListener('click',()=>modal?.classList.remove('is-open')));
+// Show a lightweight busy state only after native validation succeeds.
+document.querySelectorAll('form:not([data-no-loading])').forEach(form=>form.addEventListener('submit',()=>{
+  if (form.dataset.loadingState === 'active') return;
+  const submitter = form.querySelector('button[type=submit],button:not([type]),input[type=submit]');
+  if (!submitter || submitter.disabled) return;
+  form.dataset.loadingState = 'active';
+  submitter.classList.add('pm-loading-submit');
+  submitter.setAttribute('aria-busy','true');
+}));
 }
 document.readyState==='loading'?document.addEventListener('DOMContentLoaded',init):init()})();

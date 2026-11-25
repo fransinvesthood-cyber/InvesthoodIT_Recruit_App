@@ -36,6 +36,8 @@ $titles = [
     'activity_log' => 'Activity Log',
     'notifications' => 'Notifications',
     'announcements' => 'Communication Centre',
+    'stakeholders' => 'Stakeholder Engagement',
+    'benefits' => 'Benefits Realisation & Impact',
     'milestones' => 'Milestones & Deadlines',
 ];
 

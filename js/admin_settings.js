@@ -39,10 +39,4 @@
     var sp = btn.querySelector('.btn__spinner');
     if (sp) sp.hidden = false;
   });
-  var sb = document.getElementById('sidebarToggle');
-  var side = document.getElementById('adminSidebar');
-  var ov = document.getElementById('sidebarOverlay');
-  if (sb && side) sb.addEventListener('click', function () {
-    side.classList.toggle('open'); if (ov) ov.classList.toggle('active');
-  });
 })();

@@ -109,7 +109,7 @@ if ($stmt) {
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <title><?= e($pageTitle) ?> | Investhood IT</title>
 <link rel="stylesheet" href="<?= url('css/styles.css') ?>">
-<link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20261021">
+<link rel="stylesheet" href="<?= url('css/programme_manager_enhancements.css') ?>?v=20261118">
 <style>
 .pm-performance-page{padding:0 0 2rem}.pm-performance-hero{margin-bottom:1.5rem}
 .pm-performance-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin:1.25rem 0}

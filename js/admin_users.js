@@ -9,35 +9,6 @@
   'use strict';
 
   // ============================================
-  // SIDEBAR TOGGLE (reuse from admin_dashboard.js)
-  // ============================================
-  var sidebarToggle = document.getElementById('sidebarToggle');
-  var sidebar = document.getElementById('adminSidebar');
-  var sidebarOverlay = document.getElementById('sidebarOverlay');
-  var sidebarClose = document.getElementById('sidebarClose');
-
-  if (sidebarToggle && sidebar) {
-    sidebarToggle.addEventListener('click', function () {
-      sidebar.classList.toggle('active');
-      if (sidebarOverlay) sidebarOverlay.classList.toggle('active');
-    });
-  }
-
-  if (sidebarClose && sidebar) {
-    sidebarClose.addEventListener('click', function () {
-      sidebar.classList.remove('active');
-      if (sidebarOverlay) sidebarOverlay.classList.remove('active');
-    });
-  }
-
-  if (sidebarOverlay && sidebar) {
-    sidebarOverlay.addEventListener('click', function () {
-      sidebar.classList.remove('active');
-      sidebarOverlay.classList.remove('active');
-    });
-  }
-
-  // ============================================
   // THEME TOGGLE
   // ============================================
   var themeToggle = document.getElementById('themeToggle');

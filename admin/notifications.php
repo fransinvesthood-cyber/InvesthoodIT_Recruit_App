@@ -121,9 +121,9 @@ $flashes = render_flashes();
 </main>
 </div>
 <script src="<?= url('js/script.js') ?>"></script>
+<script src="<?= url('js/admin_dashboard.js') ?>"></script>
 <script src="<?= url('js/admin_notifications.js') ?>"></script>
 </body>
 </html>
-
 
 

@@ -60,7 +60,10 @@ function render_flashes(): string
 
     foreach ($flashes as $flash) {
         $icon = $icons[$flash['type']] ?? $icons['info'];
-        $html .= '<div class="notification notification--' . $flash['type'] . '">';
+        $isWelcome = $flash['type'] === 'success' && strcasecmp((string)$flash['title'], 'Welcome Back!') === 0;
+        $welcomeClass = $isWelcome ? ' notification--welcome' : ''; 
+        $welcomeAttribute = $isWelcome ? ' data-autodismiss="2500"' : ''; 
+        $html .= '<div class="notification notification--' . $flash['type'] . $welcomeClass . '"' . $welcomeAttribute . '>';
         $html .= '<div class="notification__icon"><i class="fas ' . $icon . '"></i></div>';
         $html .= '<div class="notification__content">';
         $html .= '<div class="notification__title">' . htmlspecialchars($flash['title'], ENT_QUOTES, 'UTF-8') . '</div>';
@@ -71,6 +74,7 @@ function render_flashes(): string
     }
 
     $html .= '</div>';
+    $html .= '<script>(function(){document.querySelectorAll(".notification--welcome[data-autodismiss]").forEach(function(item){var delay=parseInt(item.getAttribute("data-autodismiss"),10)||2500;window.setTimeout(function(){if(!item.isConnected)return;item.classList.add("removing");window.setTimeout(function(){if(item.isConnected)item.remove();},300);},delay);});})();</script>';
     return $html;
 }
 
