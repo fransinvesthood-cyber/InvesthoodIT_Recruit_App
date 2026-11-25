@@ -119,20 +119,35 @@ function time_ago(?string $datetime): string
  */
 function client_ip(): string
 {
-    $keys = ['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'];
-    foreach ($keys as $key) {
-        if (!empty($_SERVER[$key])) {
-            $ip = $_SERVER[$key];
-            if ($key === 'HTTP_X_FORWARDED_FOR') {
-                $parts = explode(',', $ip);
-                $ip = trim($parts[0]);
-            }
-            if (filter_var($ip, FILTER_VALIDATE_IP)) {
-                return $ip;
+    $remote = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+    if (!filter_var($remote, FILTER_VALIDATE_IP)) {
+        return '0.0.0.0';
+    }
+
+    // Forwarded headers are attacker-controlled unless the direct peer is a
+    // specifically trusted reverse proxy. Configure exact proxy IPs in .env.
+    $trustedRaw = function_exists('env') ? (string) env('TRUSTED_PROXY_IPS', '') : '';
+    $trusted = array_values(array_filter(array_map('trim', explode(',', $trustedRaw))));
+    if (!in_array($remote, $trusted, true)) {
+        return $remote;
+    }
+
+    foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR'] as $key) {
+        if (empty($_SERVER[$key])) {
+            continue;
+        }
+        $candidates = $key === 'HTTP_X_FORWARDED_FOR'
+            ? array_map('trim', explode(',', (string) $_SERVER[$key]))
+            : [trim((string) $_SERVER[$key])];
+
+        foreach ($candidates as $candidate) {
+            if (filter_var($candidate, FILTER_VALIDATE_IP)) {
+                return $candidate;
             }
         }
     }
-    return '0.0.0.0';
+
+    return $remote;
 }
 
 /**

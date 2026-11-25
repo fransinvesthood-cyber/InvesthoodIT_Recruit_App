@@ -12,6 +12,12 @@
  * Start the application session with hardened settings.
  * Call this once at bootstrap.
  */
+function secure_cookie_enabled(): bool
+{
+    return (defined('COOKIE_SECURE') && COOKIE_SECURE)
+        || (function_exists('investhood_is_https_request') && investhood_is_https_request());
+}
+
 function start_session(): void
 {
     // Avoid duplicate starts
@@ -24,7 +30,7 @@ function start_session(): void
         'lifetime' => 0,
         'path'     => '/',
         'domain'   => '',
-        'secure'   => defined('COOKIE_SECURE') ? COOKIE_SECURE : false,
+        'secure'   => secure_cookie_enabled(),
         'httponly' => true,
         'samesite' => 'Lax',
     ]);
@@ -34,6 +40,10 @@ function start_session(): void
     // Prevent session fixation
     ini_set('session.use_strict_mode', '1');
     ini_set('session.use_only_cookies', '1');
+    ini_set('session.use_trans_sid', '0');
+    ini_set('session.cookie_secure', secure_cookie_enabled() ? '1' : '0');
+    ini_set('session.sid_length', '48');
+    ini_set('session.sid_bits_per_character', '6');
     ini_set('session.cookie_httponly', '1');
     ini_set('session.cookie_samesite', 'Lax');
 
@@ -95,6 +105,11 @@ function regenerate_session(): void
         session_start();
     }
     session_regenerate_id(true);
+
+    // Rotate the CSRF secret whenever the session ID changes (e.g. login).
+    if (isset($_SESSION['_csrf_token'])) {
+        $_SESSION['_csrf_token'] = bin2hex(random_bytes(32));
+    }
 }
 
 /**

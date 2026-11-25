@@ -9,6 +9,15 @@ document.addEventListener('DOMContentLoaded', function () {
     b.append('csrf_token', TOKEN);
     return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': TOKEN }, body: b.toString(), credentials: 'same-origin' }).then(function (r) { return r.json(); });
   }
+  function safeNotificationUrl(value) {
+    try {
+      var parsed = new URL(String(value || ''), window.location.origin);
+      if (parsed.origin !== window.location.origin || !/^https?:$/.test(parsed.protocol)) return '#';
+      return parsed.pathname + parsed.search + parsed.hash;
+    } catch (e) {
+      return '#';
+    }
+  }
   function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
   var badge = document.getElementById('adminNotifBadge');
   var ddCount = document.getElementById('adminNotifDropdownCount');
@@ -28,7 +37,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!list) return;
     if (!items || !items.length) { list.innerHTML = '<div class="notif-dropdown__empty"><i class="fas fa-bell-slash"></i> You are all caught up!</div>'; return; }
     list.innerHTML = items.map(function (n) {
-      return '<a class="notif-item notif-dropdown__item' + (n.is_read ? '' : ' notif-item--unread') + '" href="' + esc(n.url) + '" data-notif-id="' + n.id + '" data-notif-url="' + esc(n.url) + '"><div class="notif-item__icon notif-item__icon--' + esc(n.tone) + '"><i class="fas ' + esc(n.icon) + '"></i></div><div class="notif-item__content"><div class="notif-item__title">' + esc(n.title) + '</div><div class="notif-item__message">' + esc(n.message) + '</div><div class="notif-item__time">' + esc(n.time) + '</div></div></a>';
+      return '<a class="notif-item notif-dropdown__item' + (n.is_read ? '' : ' notif-item--unread') + '" href="' + esc(safeNotificationUrl(n.url)) + '" data-notif-id="' + n.id + '" data-notif-url="' + esc(safeNotificationUrl(n.url)) + '"><div class="notif-item__icon notif-item__icon--' + esc(n.tone) + '"><i class="fas ' + esc(n.icon) + '"></i></div><div class="notif-item__content"><div class="notif-item__title">' + esc(n.title) + '</div><div class="notif-item__message">' + esc(n.message) + '</div><div class="notif-item__time">' + esc(n.time) + '</div></div></a>';
     }).join('');
   }
   if (btn && dd) {
@@ -56,7 +65,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var item = link.closest('[data-notif-id]');
       if (!item) return;
       var id = parseInt(item.getAttribute('data-notif-id'), 10);
-      var url = item.getAttribute('data-notif-url') || link.getAttribute('href');
+      var url = safeNotificationUrl(item.getAttribute('data-notif-url') || link.getAttribute('href'));
       if (!id || !url) return;
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
       e.preventDefault();

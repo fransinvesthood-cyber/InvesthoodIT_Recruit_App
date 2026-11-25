@@ -14,12 +14,35 @@ enforce_csrf();
 
 $userId = (int) current_user_id();
 $action = $_POST['action'] ?? '';
+$resolveAssignedStaff = static function ($rawId, string $roleSlug): ?int {
+    $staffId = (int) $rawId;
+    if ($staffId <= 0) return null;
+    $valid = Database::fetchOne(
+        "SELECT u.id FROM users u INNER JOIN roles r ON r.id = u.role_id
+         WHERE u.id = ? AND r.slug = ? AND u.status = 'active' LIMIT 1",
+        'is',
+        [$staffId, $roleSlug]
+    );
+    return $valid ? $staffId : null;
+};
+$saveProgrammeTeam = static function (int $programmeId) use ($resolveAssignedStaff): void {
+    Database::execute(
+        "UPDATE programmes SET programme_manager_id = ?, programme_officer_id = ? WHERE id = ?",
+        'iii',
+        [
+            $resolveAssignedStaff($_POST['programme_manager_id'] ?? 0, 'programme_manager'),
+            $resolveAssignedStaff($_POST['programme_officer_id'] ?? 0, 'programme_officer'),
+            $programmeId
+        ]
+    );
+};
 
 switch ($action) {
     case 'create':
         $errors = [];
         $id = ProgrammeController::create($userId, $_POST, $errors);
         if ($id) {
+            $saveProgrammeTeam((int) $id);
             set_flash('success', 'Programme Created', 'The programme was created successfully.');
             safe_redirect('admin/programme_detail.php?id=' . $id);
         }
@@ -33,6 +56,7 @@ switch ($action) {
         $id = (int) ($_POST['id'] ?? 0);
         $errors = [];
         if (ProgrammeController::update($userId, $id, $_POST, $errors)) {
+            $saveProgrammeTeam($id);
             set_flash('success', 'Programme Updated', 'The programme was updated successfully.');
             safe_redirect('admin/programme_detail.php?id=' . $id);
         }

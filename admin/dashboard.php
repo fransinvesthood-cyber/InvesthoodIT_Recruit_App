@@ -940,10 +940,108 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
             <p class="section__text" style="font-size:0.9rem;">Real-time platform performance metrics and intelligence.</p>
           </div>
 
+          <?php
+          // Full record sets used by the Executive Overview detail modals.
+          // Queries intentionally return rows (not COUNT aggregates).
+          $adminExecRecords = [];
+          $adminExecFetch = static function (string $key, string $sql): array {
+              try { return Database::fetchAll($sql); }
+              catch (Throwable $e) { error_log('[ADMIN EXEC MODAL] ' . $key . ': ' . $e->getMessage()); return []; }
+          };
+          $adminExecRecords['Total Candidates'] = $adminExecFetch('candidates',
+              "SELECT u.id, CONCAT(u.first_name, ' ', u.last_name) AS name, u.email, u.status, u.created_at,
+                      cp.professional_title, cp.city, cp.employment_status, cp.completion_percent
+               FROM users u INNER JOIN roles r ON r.id = u.role_id
+               LEFT JOIN candidate_profiles cp ON cp.user_id = u.id
+               WHERE r.slug = 'candidate' AND u.status = 'active'
+               ORDER BY u.created_at DESC");
+          $adminExecRecords['Active Programmes'] = $adminExecFetch('programmes',
+              "SELECT id, name, type, status, start_date, end_date, created_at
+               FROM programmes WHERE status = 'active' ORDER BY name ASC");
+          $adminExecRecords['Active Cohorts'] = $adminExecFetch('cohorts',
+              "SELECT c.id, c.name, p.name AS programme_name, c.status, c.start_date, c.end_date,
+                      c.delivery_mode, c.location, c.max_capacity
+               FROM cohorts c LEFT JOIN programmes p ON p.id = c.programme_id
+               WHERE c.status = 'active' ORDER BY c.start_date DESC");
+          $adminExecRecords['Available Opportunities'] = $adminExecFetch('opportunities',
+              "SELECT id, title, type, organisation, province, city, work_arrangement,
+                      application_open_date, application_close_date, start_date, end_date,
+                      available_positions, applications_count, status, created_at
+               FROM opportunities
+               WHERE status IN ('published','closing_soon')
+               ORDER BY COALESCE(application_close_date, end_date) ASC, created_at DESC");
+
+          $adminExecRecords['Total Applications'] = $adminExecFetch('applications',
+              "SELECT a.id, a.application_reference, a.status, a.created_at, a.submitted_at,
+                      CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,'')) AS candidate_name,
+                      u.email, o.title AS opportunity_title, o.organisation
+               FROM applications a
+               LEFT JOIN users u ON u.id = a.candidate_id
+               LEFT JOIN opportunities o ON o.id = a.opportunity_id
+               ORDER BY a.created_at DESC");
+
+          $adminExecRecords['Active Placements'] = $adminExecFetch('placements',
+              "SELECT pl.id, pl.placement_reference, pl.status, pl.start_date, pl.end_date,
+                      pl.department, pl.location,
+                      CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,'')) AS candidate_name,
+                      u.email, o.title AS opportunity_title, pr.name AS programme_name,
+                      c.name AS cohort_name
+               FROM placements pl
+               LEFT JOIN users u ON u.id = pl.candidate_id
+               LEFT JOIN applications a ON a.id = pl.application_id
+               LEFT JOIN opportunities o ON o.id = a.opportunity_id
+               LEFT JOIN programmes pr ON pr.id = pl.programme_id
+               LEFT JOIN cohorts c ON c.id = pl.cohort_id
+               WHERE pl.status IN ('placed','active','placement_in_progress')
+               ORDER BY pl.start_date DESC");
+
+          $adminExecRecords['Successful Placements'] = $adminExecFetch('successful placements',
+              "SELECT pl.id, pl.placement_reference, pl.status, pl.start_date, pl.end_date,
+                      pl.department, pl.location,
+                      CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,'')) AS candidate_name,
+                      u.email, o.title AS opportunity_title, pr.name AS programme_name,
+                      c.name AS cohort_name
+               FROM placements pl
+               LEFT JOIN users u ON u.id = pl.candidate_id
+               LEFT JOIN applications a ON a.id = pl.application_id
+               LEFT JOIN opportunities o ON o.id = a.opportunity_id
+               LEFT JOIN programmes pr ON pr.id = pl.programme_id
+               LEFT JOIN cohorts c ON c.id = pl.cohort_id
+               WHERE pl.status IN ('placed','active','placement_in_progress','completed')
+               ORDER BY pl.start_date DESC");
+
+          $adminExecRecords['Interviews This Month'] = $adminExecFetch('interviews',
+              "SELECT i.id, i.status, i.scheduled_at, i.location,
+                      CONCAT(u.first_name, ' ', u.last_name) AS candidate_name,
+                      u.email, o.title AS opportunity_title
+               FROM interviews i
+               LEFT JOIN users u ON u.id = i.candidate_id
+               LEFT JOIN opportunities o ON o.id = i.opportunity_id
+               WHERE i.scheduled_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+                 AND i.scheduled_at < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+               ORDER BY i.scheduled_at ASC");
+          // Metrics without a dedicated record table open the underlying candidate/profile records.
+          $adminExecRecords['Talent Pool Members'] = $adminExecFetch('talent pool members',
+              "SELECT u.id, CONCAT(u.first_name, ' ', u.last_name) AS name, u.email,
+                      u.phone, u.province, u.employment_status, u.qualification_level,
+                      cp.professional_title, cp.city, cp.completion_percent,
+                      cp.availability_date, cp.created_at AS profile_created_at
+               FROM users u
+               INNER JOIN roles r ON r.id = u.role_id
+               LEFT JOIN candidate_profiles cp ON cp.user_id = u.id
+               WHERE r.slug = 'candidate'
+                 AND u.status = 'active'
+                 AND (cp.is_active = 1 OR cp.id IS NULL)
+               ORDER BY cp.completion_percent DESC, u.created_at DESC");
+          $adminExecRecords['Completion Rate'] = $adminExecRecords['Total Candidates'];
+          $adminExecRecords['Skills Verification Rate'] = $adminExecRecords['Total Candidates'];
+          $adminExecRecords['Profile Completeness'] = $adminExecRecords['Total Candidates'];
+          $adminExecRecordsJson = json_encode($adminExecRecords, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+          ?>
           <!-- Executive Stats Grid -->
           <div class="admin-executive-grid" id="adminExecutiveGrid">
             <?php $adminPending = []; try { $adminPending = AdminNotification::pendingTasks(); } catch (Throwable $e) { $adminPending = []; } ?>
-            <div class="admin-exec-card">
+            <div class="admin-exec-card" data-exec-modal-card role="button" tabindex="0" aria-haspopup="dialog">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--primary"><i class="fas fa-users"></i></div>
                 <span class="admin-exec-card__change up">+12.5%</span>
@@ -955,7 +1053,7 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
                 <a href="#" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
-            <div class="admin-exec-card">
+            <div class="admin-exec-card" data-exec-modal-card role="button" tabindex="0" aria-haspopup="dialog">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--cyan"><i class="fas fa-graduation-cap"></i></div>
                 <span class="admin-exec-card__change up">+8.3%</span>
@@ -967,7 +1065,7 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
                 <a href="#" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
-            <div class="admin-exec-card">
+            <div class="admin-exec-card" data-exec-modal-card role="button" tabindex="0" aria-haspopup="dialog">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--amber"><i class="fas fa-layer-group"></i></div>
                 <span class="admin-exec-card__change up">+15.0%</span>
@@ -979,7 +1077,7 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
                 <a href="#" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
-            <div class="admin-exec-card">
+            <div class="admin-exec-card" data-exec-modal-card role="button" tabindex="0" aria-haspopup="dialog">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--green"><i class="fas fa-briefcase"></i></div>
                 <span class="admin-exec-card__change up">+22.1%</span>
@@ -991,7 +1089,7 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
                 <a href="<?= url('admin/opportunities.php') ?>" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
-            <div class="admin-exec-card">
+            <div class="admin-exec-card" data-exec-modal-card role="button" tabindex="0" aria-haspopup="dialog">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--purple"><i class="fas fa-file-alt"></i></div>
                 <span class="admin-exec-card__change up">+18.7%</span>
@@ -1003,7 +1101,7 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
                 <a href="#admin-applications" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
-            <div class="admin-exec-card">
+            <div class="admin-exec-card" data-exec-modal-card role="button" tabindex="0" aria-haspopup="dialog">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--indigo"><i class="fas fa-handshake"></i></div>
                 <span class="admin-exec-card__change up">+6.8%</span>
@@ -1015,7 +1113,7 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
                 <a href="#" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
-            <div class="admin-exec-card">
+            <div class="admin-exec-card" data-exec-modal-card role="button" tabindex="0" aria-haspopup="dialog">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--primary"><i class="fas fa-database"></i></div>
                 <span class="admin-exec-card__change up">+11.2%</span>
@@ -1027,7 +1125,7 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
                 <a href="#" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
-            <div class="admin-exec-card">
+            <div class="admin-exec-card" data-exec-modal-card role="button" tabindex="0" aria-haspopup="dialog">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--green"><i class="fas fa-check-circle"></i></div>
                 <span class="admin-exec-card__change up">+9.4%</span>
@@ -1039,7 +1137,7 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
                 <a href="<?= url('admin/placements.php') ?>" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
-            <div class="admin-exec-card">
+            <div class="admin-exec-card" data-exec-modal-card role="button" tabindex="0" aria-haspopup="dialog">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--cyan"><i class="fas fa-chart-line"></i></div>
                 <span class="admin-exec-card__change up">+4.2%</span>
@@ -1051,7 +1149,7 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
                 <a href="#" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
-            <div class="admin-exec-card">
+            <div class="admin-exec-card" data-exec-modal-card role="button" tabindex="0" aria-haspopup="dialog">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--amber"><i class="fas fa-calendar-check"></i></div>
                 <span class="admin-exec-card__change <?= e($interviewMonthChangeClass) ?>"><?= e($interviewMonthChangeLabel) ?></span>
@@ -1063,7 +1161,7 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
                 <a href="<?= url('admin/interviews.php') ?>" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
-            <div class="admin-exec-card">
+            <div class="admin-exec-card" data-exec-modal-card role="button" tabindex="0" aria-haspopup="dialog">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--purple"><i class="fas fa-clipboard-check"></i></div>
                 <span class="admin-exec-card__change up">+5.8%</span>
@@ -1075,7 +1173,7 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
                 <a href="#" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
-            <div class="admin-exec-card">
+            <div class="admin-exec-card" data-exec-modal-card role="button" tabindex="0" aria-haspopup="dialog">
               <div class="admin-exec-card__header">
                 <div class="admin-exec-card__icon admin-exec-card__icon--indigo"><i class="fas fa-user-check"></i></div>
                 <span class="admin-exec-card__change up">+3.4%</span>
@@ -1087,6 +1185,51 @@ html[data-theme="dark"] .admin-chatbot__body,body.dark-mode .admin-chatbot__body
                 <a href="#" class="admin-exec-card__link">View <i class="fas fa-arrow-right"></i></a>
               </div>
             </div>
+          </div>
+
+          <!-- Executive Overview Card Details Modal -->
+          <div class="admin-exec-modal" id="adminExecModal" aria-hidden="true">
+            <div class="admin-exec-modal__backdrop" data-exec-modal-close></div>
+            <section class="admin-exec-modal__dialog" role="dialog" aria-modal="true"
+                     aria-labelledby="adminExecModalTitle" aria-describedby="adminExecModalDescription">
+              <header class="admin-exec-modal__header">
+                <div>
+                  <span class="admin-exec-modal__eyebrow">Executive Overview</span>
+                  <h3 id="adminExecModalTitle">Metric details</h3>
+                </div>
+                <button type="button" class="admin-exec-modal__close" data-exec-modal-close aria-label="Close details">
+                  <i class="fas fa-times"></i>
+                </button>
+              </header>
+              <div class="admin-exec-modal__body">
+                <div class="admin-exec-modal__metric">
+                  <span class="admin-exec-modal__value" id="adminExecModalValue">—</span>
+                  <span class="admin-exec-modal__label" id="adminExecModalLabel"></span>
+                </div>
+                <p id="adminExecModalDescription">More information about this executive metric.</p>
+                <div class="admin-exec-modal__context" id="adminExecModalContext"></div>
+                <div class="admin-exec-modal__records-wrap">
+                  <div class="admin-exec-modal__search">
+                    <i class="fas fa-search" aria-hidden="true"></i>
+                    <input type="search" id="adminExecModalSearch" class="admin-exec-modal__search-input"
+                           placeholder="Search records..." aria-label="Search records in this modal" autocomplete="off">
+                    <button type="button" id="adminExecModalSearchClear" class="admin-exec-modal__search-clear" aria-label="Clear search" hidden>
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </div>
+                  <div class="admin-exec-modal__records-heading">
+                    <strong>Records</strong>
+                    <span id="adminExecModalRecordCount">0 records</span>
+                  </div>
+                  <div class="admin-exec-modal__records" id="adminExecModalRecords">
+                    <p class="admin-exec-modal__empty">Select a metric to view its records.</p>
+                  </div>
+                </div>
+              </div>
+              <footer class="admin-exec-modal__footer">
+                <button type="button" class="btn btn--ghost" data-exec-modal-close>Close</button>
+              </footer>
+            </section>
           </div>
 
           <!-- Active Cohorts Panel (real data) -->
@@ -3516,6 +3659,280 @@ $talentSkillsCategories = (int) ($talentSkillsCategoriesRow['cnt'] ?? 0);
     </main>
   </div>
 
+
+
+
+<style>
+.admin-exec-card[data-exec-modal-card] { cursor:pointer; position:relative; pointer-events:auto; }
+.admin-exec-card[data-exec-modal-card]:focus-visible { outline:3px solid var(--accent, #2563eb); outline-offset:4px; }
+.admin-exec-card[data-exec-modal-card]:hover { transform:translateY(-3px); }
+.admin-exec-modal { display:none; position:fixed; inset:0; z-index:10050; align-items:center; justify-content:center; padding:1rem; }
+.admin-exec-modal.is-open { display:flex; }
+.admin-exec-modal__backdrop { position:absolute; inset:0; background:rgba(15,23,42,.68); backdrop-filter:blur(3px); }
+.admin-exec-modal__dialog { position:relative; width:min(100%,560px); max-height:min(85vh,760px); overflow:auto; border-radius:18px; background:var(--surface, #fff); color:var(--text, #172033); box-shadow:0 24px 80px rgba(0,0,0,.28); }
+.admin-exec-modal__header,.admin-exec-modal__footer { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.1rem 1.35rem; }
+.admin-exec-modal__header { border-bottom:1px solid var(--border, #e5e7eb); }
+.admin-exec-modal__header h3 { margin:.25rem 0 0; font-size:1.2rem; color:inherit; }
+.admin-exec-modal__eyebrow { font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted, #64748b); }
+.admin-exec-modal__close { width:38px; height:38px; border:0; border-radius:10px; background:var(--surface-2, #f1f5f9); color:inherit; cursor:pointer; }
+.admin-exec-modal__body { padding:1.35rem; }
+.admin-exec-modal__metric { display:flex; align-items:baseline; flex-wrap:wrap; gap:.65rem; margin-bottom:.8rem; }
+.admin-exec-modal__value { font-size:2.25rem; line-height:1.1; font-weight:800; color:var(--primary, #2563eb); }
+.admin-exec-modal__label { font-weight:700; font-size:1rem; }
+.admin-exec-modal__body p { color:var(--muted, #64748b); line-height:1.6; margin:.4rem 0 1rem; }
+.admin-exec-modal__context { padding:1rem; border-radius:12px; background:var(--surface-2, #f8fafc); color:inherit; line-height:1.6; }
+.admin-exec-modal__footer { border-top:1px solid var(--border, #e5e7eb); justify-content:flex-end; flex-wrap:wrap; }
+body.dark .admin-exec-modal__dialog, body.dark-mode .admin-exec-modal__dialog,
+html[data-theme="dark"] .admin-exec-modal__dialog, body[data-theme="dark"] .admin-exec-modal__dialog,
+[data-bs-theme="dark"] .admin-exec-modal__dialog { background:var(--surface, #1e293b); color:var(--text, #f1f5f9); }
+body.dark .admin-exec-modal__context, body.dark-mode .admin-exec-modal__context,
+html[data-theme="dark"] .admin-exec-modal__context, body[data-theme="dark"] .admin-exec-modal__context,
+[data-bs-theme="dark"] .admin-exec-modal__context { background:var(--surface-2, #0f172a); }
+.admin-exec-modal__records-wrap { margin-top:1.25rem; }
+.admin-exec-modal__search { display:flex; align-items:center; gap:.65rem; margin:0 0 .9rem; padding:.65rem .8rem; border:1px solid var(--border,#e5e7eb); border-radius:11px; background:var(--surface,#fff); color:var(--muted,#64748b); }
+.admin-exec-modal__search-input { flex:1; min-width:0; border:0!important; outline:0!important; box-shadow:none!important; background:transparent!important; color:var(--text,#172033)!important; padding:.2rem!important; }
+.admin-exec-modal__search-input::placeholder { color:var(--muted,#94a3b8); }
+.admin-exec-modal__search-clear { border:0; background:transparent; color:inherit; cursor:pointer; padding:.25rem .4rem; border-radius:6px; }
+.admin-exec-modal__search-clear[hidden] { display:none!important; }
+body.dark .admin-exec-modal__search,body.dark-mode .admin-exec-modal__search,
+html[data-theme="dark"] .admin-exec-modal__search,body[data-theme="dark"] .admin-exec-modal__search,
+[data-bs-theme="dark"] .admin-exec-modal__search { background:#0f172a; border-color:rgba(255,255,255,.18); }
+body.dark .admin-exec-modal__search-input,body.dark-mode .admin-exec-modal__search-input,
+html[data-theme="dark"] .admin-exec-modal__search-input,body[data-theme="dark"] .admin-exec-modal__search-input,
+[data-bs-theme="dark"] .admin-exec-modal__search-input { color:#f8fafc!important; }
+.admin-exec-modal__records-heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:.65rem; }
+.admin-exec-modal__records-heading span { color:var(--muted,#64748b); font-size:.82rem; }
+.admin-exec-modal__records { min-width:0; }
+.admin-exec-modal__table-scroll { max-height:360px; overflow:auto; border:1px solid var(--border,#e5e7eb); border-radius:10px; }
+.admin-exec-modal__table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.admin-exec-modal__table th,.admin-exec-modal__table td { padding:.7rem .75rem; text-align:left; vertical-align:top; border-bottom:1px solid var(--border,#e5e7eb); white-space:nowrap; }
+.admin-exec-modal__table th { position:sticky; top:0; z-index:1; background:var(--surface-2,#f8fafc); text-transform:capitalize; font-weight:700; }
+.admin-exec-modal__table tr:last-child td { border-bottom:0; }
+.admin-exec-modal__empty { padding:1rem; border-radius:10px; background:var(--surface-2,#f8fafc); color:var(--muted,#64748b); }
+body.dark .admin-exec-modal__table th,body.dark-mode .admin-exec-modal__table th,
+html[data-theme="dark"] .admin-exec-modal__table th,body[data-theme="dark"] .admin-exec-modal__table th,
+[data-bs-theme="dark"] .admin-exec-modal__table th { background:#0f172a; }
+body.dark .admin-exec-modal__table-scroll,body.dark-mode .admin-exec-modal__table-scroll,
+html[data-theme="dark"] .admin-exec-modal__table-scroll,body[data-theme="dark"] .admin-exec-modal__table-scroll,
+[data-bs-theme="dark"] .admin-exec-modal__table-scroll { border-color:rgba(255,255,255,.14); }
+@media(max-width:600px) { .admin-exec-modal__table-scroll { max-height:45vh; } }
+body.admin-exec-modal-open { overflow:hidden; }
+@media (max-width:600px) {
+  .admin-exec-modal { padding:.65rem; }
+  .admin-exec-modal__dialog { max-height:92vh; border-radius:14px; }
+  .admin-exec-modal__header,.admin-exec-modal__footer { padding:1rem; }
+  .admin-exec-modal__body { padding:1rem; }
+  .admin-exec-modal__value { font-size:1.9rem; }
+  .admin-exec-modal__footer > * { flex:1 1 auto; text-align:center; }
+}
+
+/* Executive Overview cards: responsive grid and content sizing */
+.admin-exec-grid,
+.admin-executive-grid,
+.admin-stats-grid,
+.admin-dashboard .admin-exec-grid {
+  display:grid !important;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));
+  gap:1rem;
+  width:100%;
+  min-width:0;
+}
+.admin-exec-card[data-exec-modal-card] {
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
+  overflow-wrap:anywhere;
+}
+.admin-exec-card[data-exec-modal-card] *,
+.admin-exec-card[data-exec-modal-card] *::before,
+.admin-exec-card[data-exec-modal-card] *::after { box-sizing:border-box; }
+.admin-exec-card__header,
+.admin-exec-card__footer {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:.65rem;
+  min-width:0;
+}
+.admin-exec-card__number {
+  max-width:100%;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  line-height:1.15;
+}
+.admin-exec-card__label,
+.admin-exec-card__period,
+.admin-exec-card__change,
+.admin-exec-card__link {
+  min-width:0;
+  max-width:100%;
+  overflow-wrap:anywhere;
+}
+@media (max-width: 1100px) {
+  .admin-exec-grid,
+  .admin-executive-grid,
+  .admin-stats-grid,
+  .admin-dashboard .admin-exec-grid {
+    grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));
+  }
+}
+@media (max-width: 768px) {
+  .admin-exec-grid,
+  .admin-executive-grid,
+  .admin-stats-grid,
+  .admin-dashboard .admin-exec-grid {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:.75rem;
+  }
+  .admin-exec-card[data-exec-modal-card] { padding:1rem; }
+  .admin-exec-card__header { align-items:flex-start; }
+  .admin-exec-card__footer { align-items:flex-start; }
+}
+@media (max-width: 480px) {
+  .admin-exec-grid,
+  .admin-executive-grid,
+  .admin-stats-grid,
+  .admin-dashboard .admin-exec-grid {
+    grid-template-columns:minmax(0,1fr);
+    gap:.7rem;
+  }
+  .admin-exec-card[data-exec-modal-card] { padding:.9rem; }
+  .admin-exec-card__number { font-size:clamp(1.35rem,7vw,2rem); }
+}
+
+</style>
+<script>
+(function () {
+  'use strict';
+  var modal = document.getElementById('adminExecModal');
+  if (!modal) return;
+  var title = document.getElementById('adminExecModalTitle');
+  var value = document.getElementById('adminExecModalValue');
+  var label = document.getElementById('adminExecModalLabel');
+  var description = document.getElementById('adminExecModalDescription');
+  var context = document.getElementById('adminExecModalContext');
+  var recordsHost = document.getElementById('adminExecModalRecords');
+  var recordCount = document.getElementById('adminExecModalRecordCount');
+  var searchInput = document.getElementById('adminExecModalSearch');
+  var searchClear = document.getElementById('adminExecModalSearchClear');
+  var currentRows = [];
+  var currentKeys = [];
+  var lastFocus = null;
+  var allRecords = <?= $adminExecRecordsJson ?: '{}' ?>;
+
+  function escapeHtml(value) {
+    return String(value === null || value === undefined || value === '' ? '—' : value)
+      .replace(/[&<>"']/g, function (ch) {
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]);
+      });
+  }
+  function renderFilteredRecords() {
+    var query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+    var rows = currentRows.filter(function (row) {
+      if (!query) return true;
+      return currentKeys.some(function (key) {
+        return String(row[key] === null || row[key] === undefined ? '' : row[key]).toLowerCase().indexOf(query) !== -1;
+      });
+    });
+    recordCount.textContent = rows.length + ' of ' + currentRows.length + (currentRows.length === 1 ? ' record' : ' records');
+    if (!rows.length) {
+      recordsHost.innerHTML = '<p class="admin-exec-modal__empty">' +
+        (currentRows.length ? 'No records match your search.' : 'No matching records were found.') +
+        '</p>';
+      return;
+    }
+    recordsHost.innerHTML = '<div class="admin-exec-modal__table-scroll"><table class="admin-exec-modal__table"><thead><tr>' +
+      currentKeys.map(function (key) { return '<th>' + escapeHtml(key.replace(/_/g, ' ')) + '</th>'; }).join('') +
+      '</tr></thead><tbody>' + rows.map(function (row) {
+        return '<tr>' + currentKeys.map(function (key) { return '<td>' + escapeHtml(row[key]) + '</td>'; }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  function renderRecords(metricName) {
+    currentRows = Array.isArray(allRecords[metricName]) ? allRecords[metricName] : [];
+    currentKeys = currentRows.length ? Object.keys(currentRows[0]) : [];
+    if (searchInput) searchInput.value = '';
+    if (searchClear) searchClear.hidden = true;
+    renderFilteredRecords();
+  }
+
+  function openModal(card) {
+    if (!card) return;
+    lastFocus = document.activeElement;
+    var metricLabel = card.querySelector('.admin-exec-card__label');
+    var metricValue = card.querySelector('.admin-exec-card__number');
+    var period = card.querySelector('.admin-exec-card__period');
+    var change = card.querySelector('.admin-exec-card__change');
+    var metricName = metricLabel ? metricLabel.textContent.trim() : 'Metric details';
+    title.textContent = metricName;
+    label.textContent = metricName;
+    value.textContent = metricValue ? metricValue.textContent.trim() : '—';
+    description.textContent = 'Current executive overview figure for ' + metricName.toLowerCase() + '.';
+    renderRecords(metricName);
+    context.textContent = [
+      period ? period.textContent.trim() : '',
+      change ? 'Performance indicator: ' + change.textContent.trim() : ''
+    ].filter(Boolean).join(' • ') || 'No additional summary is available for this metric.';
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('admin-exec-modal-open');
+    var close = modal.querySelector('[data-exec-modal-close]');
+    if (close) close.focus();
+  }
+
+  function closeModal() {
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('admin-exec-modal-open');
+    if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
+  }
+
+  document.addEventListener('click', function (event) {
+    var target = event.target && event.target.nodeType === 1
+      ? event.target
+      : (event.target && event.target.parentElement ? event.target.parentElement : null);
+    if (!target) return;
+
+    var closeControl = target.closest('[data-exec-modal-close]');
+    if (closeControl) {
+      event.preventDefault();
+      closeModal();
+      return;
+    }
+
+    var card = target.closest('[data-exec-modal-card]');
+    if (card && !modal.contains(card)) {
+      event.preventDefault();
+      openModal(card);
+    }
+  });
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      if (searchClear) searchClear.hidden = !searchInput.value;
+      renderFilteredRecords();
+    });
+  }
+  if (searchClear) {
+    searchClear.addEventListener('click', function () {
+      if (searchInput) { searchInput.value = ''; searchInput.focus(); }
+      searchClear.hidden = true;
+      renderFilteredRecords();
+    });
+  }
+
+  document.addEventListener('keydown', function (event) {
+    var card = event.target.closest && event.target.closest('[data-exec-modal-card]');
+    if (card && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      openModal(card);
+      return;
+    }
+    if (event.key === 'Escape' && modal.classList.contains('is-open')) closeModal();
+  });
+})();
+</script>
 
 <!-- =========================================================
      ADMIN ASSISTANT

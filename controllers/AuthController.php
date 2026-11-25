@@ -322,7 +322,7 @@ class AuthController
             [
                 'expires'  => $expiry,
                 'path'     => '/',
-                'secure'   => COOKIE_SECURE,
+                'secure'   => secure_cookie_enabled(),
                 'httponly' => true,
                 'samesite' => 'Lax',
             ]
@@ -392,7 +392,7 @@ class AuthController
             setcookie('remember_me', '', [
                 'expires'  => time() - 3600,
                 'path'     => '/',
-                'secure'   => COOKIE_SECURE,
+                'secure'   => secure_cookie_enabled(),
                 'httponly' => true,
                 'samesite' => 'Lax',
             ]);

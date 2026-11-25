@@ -18,6 +18,18 @@ if (!$programme) {
 }
 
 $user = current_user();
+$programmeManagers = Database::fetchAll(
+    "SELECT u.id, u.first_name, u.last_name, u.email
+     FROM users u INNER JOIN roles r ON r.id = u.role_id
+     WHERE r.slug = 'programme_manager' AND u.status = 'active'
+     ORDER BY u.first_name, u.last_name"
+);
+$programmeOfficers = Database::fetchAll(
+    "SELECT u.id, u.first_name, u.last_name, u.email
+     FROM users u INNER JOIN roles r ON r.id = u.role_id
+     WHERE r.slug = 'programme_officer' AND u.status = 'active'
+     ORDER BY u.first_name, u.last_name"
+);
 $old = $_SESSION['programme_form_old'] ?? [];
 $errors = $_SESSION['programme_form_errors'] ?? [];
 unset($_SESSION['programme_form_old'], $_SESSION['programme_form_errors']);
@@ -136,6 +148,36 @@ $flashes = render_flashes();
             </div>
           </section>
 
+
+          <section class="pm-form-section">
+            <div class="pm-form-section__header"><span class="pm-form-section__icon"><i class="fas fa-user-tie"></i></span><div><h3>Programme Team</h3><p>Assign the staff responsible for managing and coordinating this programme.</p></div></div>
+            <div class="pm-form-section__body">
+              <div class="pm-form-row">
+                <div class="pm-form-field">
+                  <label class="pm-form-label" for="programme_manager_id">Programme Manager</label>
+                  <select id="programme_manager_id" name="programme_manager_id" class="form-input form-input--select">
+                    <option value="0">Unassigned</option>
+                    <?php foreach ($programmeManagers as $staff): ?>
+                      <option value="<?= (int)$staff['id'] ?>" <?= (int)($old['programme_manager_id'] ?? $programme['programme_manager_id'] ?? 0) === (int)$staff['id'] ? 'selected' : '' ?>>
+                        <?= e($staff['first_name'] . ' ' . $staff['last_name'] . ' (' . $staff['email'] . ')') ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+                <div class="pm-form-field">
+                  <label class="pm-form-label" for="programme_officer_id">Programme Officer</label>
+                  <select id="programme_officer_id" name="programme_officer_id" class="form-input form-input--select">
+                    <option value="0">Unassigned</option>
+                    <?php foreach ($programmeOfficers as $staff): ?>
+                      <option value="<?= (int)$staff['id'] ?>" <?= (int)($old['programme_officer_id'] ?? $programme['programme_officer_id'] ?? 0) === (int)$staff['id'] ? 'selected' : '' ?>>
+                        <?= e($staff['first_name'] . ' ' . $staff['last_name'] . ' (' . $staff['email'] . ')') ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </section>
           <section class="pm-form-section">
             <div class="pm-form-section__header"><span class="pm-form-section__icon"><i class="fas fa-calendar-alt"></i></span><div><h3>Dates</h3><p>Programme start and end dates.</p></div></div>
             <div class="pm-form-section__body">

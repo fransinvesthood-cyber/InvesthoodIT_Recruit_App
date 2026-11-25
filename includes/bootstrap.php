@@ -15,6 +15,10 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/constants.php';
 
+// Apply consistent browser security headers across all portal routes.
+require_once __DIR__ . '/security_headers.php';
+investhood_apply_security_headers();
+
 // --- Error handling (production-safe) ---
 error_reporting(E_ALL);
 ini_set('display_errors', APP_ENV === 'development' ? '1' : '0');

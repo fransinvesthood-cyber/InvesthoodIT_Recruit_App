@@ -25,6 +25,16 @@ document.addEventListener('DOMContentLoaded', function () {
     }).then(function (res) { return res.json(); });
   }
 
+  function safeNotificationUrl(value) {
+    try {
+      var parsed = new URL(String(value || ''), window.location.origin);
+      if (parsed.origin !== window.location.origin || !/^https?:$/.test(parsed.protocol)) return '#';
+      return parsed.pathname + parsed.search + parsed.hash;
+    } catch (e) {
+      return '#';
+    }
+  }
+
   function escapeHtml(value) {
     return String(value == null ? '' : value)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -84,7 +94,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     dropdownList.innerHTML = notifications.map(function (n) {
       return '<a class="notif-item notif-dropdown__item' + (n.is_read ? '' : ' notif-item--unread') + '"' +
-        ' href="' + escapeHtml(n.url) + '" data-notif-id="' + parseInt(n.id, 10) + '" data-notif-url="' + escapeHtml(n.url) + '">' +
+        ' href="' + escapeHtml(safeNotificationUrl(n.url)) + '" data-notif-id="' + parseInt(n.id, 10) + '" data-notif-url="' + escapeHtml(safeNotificationUrl(n.url)) + '">' +
         '<div class="notif-item__icon notif-item__icon--' + escapeHtml(n.tone) + '"><i class="fas ' + escapeHtml(n.icon) + '"></i></div>' +
         '<div class="notif-item__content">' +
           '<div class="notif-item__title">' + escapeHtml(n.title) + '</div>' +

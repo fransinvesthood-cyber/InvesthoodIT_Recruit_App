@@ -1,0 +1,23 @@
+# Investhood IT platform security baseline (Apache 2.4+)
+Options -Indexes
+ServerSignature Off
+
+# Deny direct web access to internal application code and private data.
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^(?:config|includes|middleware|helpers|models|controllers|database|storage|uploads_private|vendor)(?:/|$) - [F,L,NC]
+
+# Development, diagnostic, verification and one-off migration scripts must
+# only be run from the CLI or a controlled administrator workflow.
+RewriteRule ^(?:_dev_tools|check_columns|check_syntax|cleanup_temp|db_check|generate_hash|landing_test|lint_check|reset_commercial_password|run_application_documents_migration|run_application_form_migration|smoke_application_test|test_landing_queries|test_query|test_upload_insert|verify_[^/]+)\.php$ - [F,L,NC]
+</IfModule>
+
+# Never expose source archives, SQL dumps, logs, backups, environment files or metadata.
+<FilesMatch "(?i)(^\.env(?:\..*)?$|^composer\.(json|lock)$|\.(sql|zip|log|bak|old|orig|tmp|dist|md|bat)$)">
+    Require all denied
+</FilesMatch>
+
+# Block common editor/backup artifacts.
+<FilesMatch "(?i)(~|\.swp|\.swo|\.save)$">
+    Require all denied
+</FilesMatch>

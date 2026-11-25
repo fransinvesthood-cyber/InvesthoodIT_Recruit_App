@@ -1,0 +1,5 @@
+# Developer diagnostics must never be web-accessible.
+<FilesMatch "(?i)^(debug_documents|selection_debug)\.php$">
+    Require all denied
+</FilesMatch>
+Options -Indexes

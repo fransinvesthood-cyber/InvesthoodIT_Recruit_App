@@ -481,16 +481,40 @@ document.addEventListener('DOMContentLoaded', function () {
       warning: 'fa-exclamation-triangle'
     };
 
+    var allowedTypes = ['success', 'error', 'info', 'warning'];
+    type = allowedTypes.indexOf(type) !== -1 ? type : 'info';
+
     var notif = document.createElement('div');
     notif.className = 'notification notification--' + type;
-    notif.innerHTML =
-      '<div class="notification__icon"><i class="fas ' + (icons[type] || icons.info) + '"></i></div>' +
-      '<div class="notification__content">' +
-        '<div class="notification__title">' + title + '</div>' +
-        '<div class="notification__message">' + message + '</div>' +
-      '</div>' +
-      '<button class="notification__close" aria-label="Close"><i class="fas fa-times"></i></button>';
 
+    var iconWrap = document.createElement('div');
+    iconWrap.className = 'notification__icon';
+    var icon = document.createElement('i');
+    icon.className = 'fas ' + (icons[type] || icons.info);
+    iconWrap.appendChild(icon);
+
+    var content = document.createElement('div');
+    content.className = 'notification__content';
+    var titleEl = document.createElement('div');
+    titleEl.className = 'notification__title';
+    titleEl.textContent = String(title == null ? '' : title);
+    var messageEl = document.createElement('div');
+    messageEl.className = 'notification__message';
+    messageEl.textContent = String(message == null ? '' : message);
+    content.appendChild(titleEl);
+    content.appendChild(messageEl);
+
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'notification__close';
+    closeBtn.setAttribute('aria-label', 'Close');
+    var closeIcon = document.createElement('i');
+    closeIcon.className = 'fas fa-times';
+    closeBtn.appendChild(closeIcon);
+
+    notif.appendChild(iconWrap);
+    notif.appendChild(content);
+    notif.appendChild(closeBtn);
     container.appendChild(notif);
 
     notif.querySelector('.notification__close').addEventListener('click', function () {

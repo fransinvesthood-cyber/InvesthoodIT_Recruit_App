@@ -14,12 +14,35 @@ enforce_csrf();
 
 $userId = (int) current_user_id();
 $action = $_POST['action'] ?? '';
+$resolveAssignedStaff = static function ($rawId, string $roleSlug): ?int {
+    $staffId = (int) $rawId;
+    if ($staffId <= 0) return null;
+    $valid = Database::fetchOne(
+        "SELECT u.id FROM users u INNER JOIN roles r ON r.id = u.role_id
+         WHERE u.id = ? AND r.slug = ? AND u.status = 'active' LIMIT 1",
+        'is',
+        [$staffId, $roleSlug]
+    );
+    return $valid ? $staffId : null;
+};
+$saveCohortTeam = static function (int $cohortId) use ($resolveAssignedStaff): void {
+    Database::execute(
+        "UPDATE cohorts SET programme_manager_id = ?, programme_officer_id = ? WHERE id = ?",
+        'iii',
+        [
+            $resolveAssignedStaff($_POST['programme_manager_id'] ?? 0, 'programme_manager'),
+            $resolveAssignedStaff($_POST['programme_officer_id'] ?? 0, 'programme_officer'),
+            $cohortId
+        ]
+    );
+};
 
 switch ($action) {
     case 'create':
         $errors = [];
         $id = CohortController::create($userId, $_POST, $errors);
         if ($id) {
+            $saveCohortTeam((int) $id);
             $cohort = Cohort::find($id);
             set_flash('success', 'Cohort Created', 'The cohort was created successfully.');
             safe_redirect('admin/cohort_detail.php?id=' . $id);
@@ -35,6 +58,7 @@ switch ($action) {
         $id = (int) ($_POST['id'] ?? 0);
         $errors = [];
         if (CohortController::update($userId, $id, $_POST, $errors)) {
+            $saveCohortTeam($id);
             set_flash('success', 'Cohort Updated', 'The cohort was updated successfully.');
             safe_redirect('admin/cohort_detail.php?id=' . $id);
         }
